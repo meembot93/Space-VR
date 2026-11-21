@@ -59,6 +59,7 @@ export class Guide {
   constructor(G) {
     this.G = G;
     this.root = new THREE.Group();          // position in the world
+    this.root.userData.kind = 'characters';
     this.bob = new THREE.Group(); this.root.add(this.bob);
     this.look = buildStandIn(); this.bob.add(this.look);
     this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
