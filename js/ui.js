@@ -63,6 +63,13 @@ export class UI {
       new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 1, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false }));
     this.fader.renderOrder = 1000; G.camera.add(this.fader);
     this.fade = 1; this.fadeTo = 1; this.fadeSpeed = 1;
+    // Pause: the world dims and a card says how to carry on
+    this.dim = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 8),
+      new THREE.MeshBasicMaterial({ color: 0x02040c, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false }));
+    this.dim.renderOrder = 985; this.dim.visible = false; G.camera.add(this.dim);
+    this.pauseCard = makeCard(1100, 260, 0.9, { size: 52 });
+    this.pauseCard.renderOrder = 995; G.scene.add(this.pauseCard);
+    this.paused = false; this.dimV = 0;
     this.domSub = document.getElementById('dsub');
     this.domHint = document.getElementById('dhint');
   }
@@ -85,8 +92,17 @@ export class UI {
     if (this.domHint) { this.domHint.textContent = text; this.domHint.style.display = text && this.G.mode === 'desktop' ? 'block' : 'none'; }
   }
 
+  setPaused(on) {
+    this.paused = on;
+    const vr = this.G.mode !== 'desktop';
+    this.pauseCard.userData.set(on ? 'Paused' : '', on ? (vr ? 'Press A or X to carry on' : 'Press P to carry on') : '');
+    if (this.domHint) { this.domHint.textContent = on ? 'Paused. Press P to carry on.' : ''; this.domHint.style.display = on && !vr ? 'block' : 'none'; }
+  }
+
   update(dt) {
     const G = this.G, cam = G.camera;
+    this.dimV = damp(this.dimV, this.paused ? 0.55 : 0, 6, dt);
+    this.dim.material.opacity = this.dimV; this.dim.visible = this.dimV > 0.005;
     // Fade
     if (this.fade !== this.fadeTo) {
       const s = this.fadeSpeed * dt;
@@ -104,12 +120,13 @@ export class UI {
     if (Math.abs(dy) > 0.35) this.subYaw += dy * (1 - Math.exp(-dt * 3));
     const fx = Math.sin(this.subYaw), fz = Math.cos(this.subYaw);
     const desk = G.mode === 'desktop';
-    for (const [card, dist, drop] of [[this.sub, 1.6, 0.42], [this.hint, 1.5, 0.08]]) {
+    for (const [card, dist, drop] of [[this.sub, 1.6, 0.42], [this.hint, 1.5, 0.08], [this.pauseCard, 1.3, -0.05]]) {
       card.position.set(_a.x + fx * dist, _a.y - drop, _a.z + fz * dist);
       card.lookAt(_a.x, card.position.y, _a.z);
       if (desk) card.visible = false; // the page shows them instead
       else if (card === this.sub) card.visible = !!(this.subsOn && this.subText);
-      else card.visible = this.hintT > 0;
+      else if (card === this.hint) card.visible = this.hintT > 0 && !this.paused;
+      else card.visible = this.paused;
     }
   }
 }

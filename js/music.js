@@ -74,6 +74,6 @@ export class Music {
     const c = this.cur; if (!c || !this.G.audio.ctx) return;
     const talking = this.G.narration.cur ? 0.45 : 1;
     this.duck += (talking - this.duck) * Math.min(1, dt * 2);
-    if (c.out.gain.value > 0.01 && this.G.t > (c.t0 ??= this.G.t + 4)) c.out.gain.setTargetAtTime(c.vol * this.duck, this.G.audio.ctx.currentTime, 0.3);
+    if (c.out.gain.value > 0.01 && this.G.t > (c.t0 ??= this.G.t + 4)) c.out.gain.setTargetAtTime(c.vol * this.duck * (this.G.paused ? 0.35 : 1), this.G.audio.ctx.currentTime, 0.3);
   }
 }

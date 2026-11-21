@@ -53,8 +53,9 @@ export class Narration {
         const ctx = this.G.audio.ctx, src = ctx.createBufferSource(); src.buffer = buf;
         const an = ctx.createAnalyser(); an.fftSize = 256; token.an = an; token.data = new Float32Array(256);
         src.connect(an); an.connect(this.G.audio.voiceBus);
-        src.onended = () => ok();
-        src.start(); token.src = src;
+        token.buf = buf; token.offset = 0;
+        this.startSrc(token, src);
+        if (this.paused) { this.paused = false; this.pause(true); } // a line that begins while paused waits too
       } else {
         // No recording yet: read time at about 2.6 words a second, plus a breath
         const words = text.split(/\s+/).length;
@@ -63,6 +64,25 @@ export class Narration {
     });
     if (this.cur === token) { this.cur = null; this.G.ui.subtitle(''); this.level = 0; this.G.events.emit('narrating', { id, on: false }); }
     await new Promise((ok) => setTimeout(ok, 350 / this.speed)); // a little pause between lines
+  }
+
+  startSrc(c, src) {
+    const ctx = this.G.audio.ctx;
+    src.onended = () => { if (this.cur === c && !c.paused) c.done(); };
+    src.start(0, c.offset); c.src = src; c.startT = ctx.currentTime;
+  }
+
+  // Pause (A or X button): the voice stops where it is and carries on from there
+  pause(on) {
+    const c = this.cur; this.paused = on;
+    if (!c || c.fake || !c.src || c.paused === on) return;
+    const ctx = this.G.audio.ctx;
+    if (on) { c.paused = true; c.offset += ctx.currentTime - c.startT; try { c.src.stop(); } catch (e) { /* ignore */ } }
+    else {
+      c.paused = false;
+      const src = ctx.createBufferSource(); src.buffer = c.buf; src.connect(c.an);
+      this.startSrc(c, src);
+    }
   }
 
   stop() {
@@ -74,11 +94,11 @@ export class Narration {
   }
 
   // Testing: skip the line being said (N key on desktop with ?debug)
-  skip() { const c = this.cur; if (!c) return; if (c.fake) c.left = 0; else try { c.src?.stop(); } catch (e) { /* ignore */ } }
+  skip() { const c = this.cur; if (!c) return; if (c.fake) c.left = 0; else if (c.paused) c.done(); else try { c.src?.stop(); } catch (e) { /* ignore */ } }
 
   update(dt) {
     const c = this.cur;
-    if (!c) { this.level *= Math.exp(-dt * 8); return; }
+    if (!c || this.paused) { this.level *= Math.exp(-dt * 8); return; }
     if (c.fake && c.done) {
       c.left -= dt;
       // A gentle made-up "talking" rhythm so the guide still pulses with placeholder lines

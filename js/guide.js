@@ -1,5 +1,5 @@
-// The guide, Astra: a small glowing star with friendly eyes that floats beside you through every
-// chapter. Every narration line is the guide talking (in Meem's voice), so it glows brighter
+// The guide, Astra: a small glowing star with friendly eyes that floats out in front of you through
+// every chapter. Every narration line is the guide talking (in Meem's voice), so it glows brighter
 // while it speaks. Chapters can send it to hover by something (flyTo) and call it back (follow).
 //
 // Looks: Meem's Tripo model star_guide.glb once it's listed in models/index.json; until then
@@ -8,7 +8,11 @@ import * as THREE from 'three';
 import { loadModel } from './models.js';
 import { damp, clamp } from './util.js';
 
-const SIZE = 0.3; // metres across, about a basketball
+const SIZE = 0.3; // metres across, about a basketball (it looks bigger further away, see update)
+const AHEAD = 7;     // when it's just keeping you company: about 7 m (23 ft) out in front of you
+const SIDE = -9;     // ...a little left of straight ahead (degrees), so it never hides what you're looking at
+const LAZY = 32;     // it only moves round to your front again once you turn more than this (degrees) away
+const D2R = Math.PI / 180;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
 
 function glowTex() {
@@ -60,10 +64,10 @@ export class Guide {
     this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.halo.scale.setScalar(SIZE * 3.2); this.bob.add(this.halo);
     G.scene.add(this.root);
-    this.mode = 'follow';  // 'follow' (beside you) or 'at' (hovering by something)
+    this.mode = 'follow';  // 'follow' (out in front of you) or 'at' (hovering by something)
     this.target = new THREE.Vector3();
     this.lookTarget = null;
-    this.side = -1;        // which side of you it floats on: -1 left, +1 right
+    this.homeYaw = null;   // the direction (from you) it rests in while following
     this.placed = false;
     this.speed = 2.2;
     this.glow = 0;
@@ -79,9 +83,9 @@ export class Guide {
 
   // Hover next to a point in the world (e.g. the stone, the gap) and face `lookAt` (or you)
   flyTo(pos, lookAt = null) { this.mode = 'at'; this.target.copy(pos); this.lookTarget = lookAt ? lookAt.clone() : null; }
-  follow() { this.mode = 'follow'; this.lookTarget = null; }
-  // Snap straight to its spot beside you (start of a chapter)
-  place() { this.placed = false; }
+  follow() { this.mode = 'follow'; this.lookTarget = null; this.homeYaw = null; }
+  // Snap straight to its spot in front of you (start of a chapter)
+  place() { this.placed = false; this.homeYaw = null; }
   chime() { this.G.audio.chime(this.root.position); }
 
   update(dt) {
@@ -90,18 +94,27 @@ export class Guide {
     if (_b.lengthSq() < 1e-4) _b.set(0, 0, -1); _b.normalize();
     let goal = _c;
     if (this.mode === 'follow') {
-      // In front of you and off to one side, a bit below eye level
-      goal.copy(_a).addScaledVector(_b, 0.95); // right of you is (-fz, 0, fx)
-      goal.x += -_b.z * this.side * 0.7; goal.z += _b.x * this.side * 0.7; goal.y -= 0.25;
+      // Out in front of you, a little above the horizon. It doesn't chase every small head turn:
+      // only when you look well away does it drift round to your new front.
+      const headYaw = Math.atan2(_b.x, -_b.z);
+      const off = this.homeYaw == null ? Infinity : Math.abs(((headYaw - this.homeYaw) / D2R + 540) % 360 - 180);
+      if (off > LAZY) this.homeYaw = headYaw + SIDE * D2R;
+      goal.set(Math.sin(this.homeYaw), 0, -Math.cos(this.homeYaw)).multiplyScalar(AHEAD).add(_a);
+      goal.y = _a.y + 0.45;
+      const gh = G.world.height ? G.world.height(goal.x, goal.z) : 0;
+      if (goal.y < gh + 1.2) goal.y = gh + 1.2;
     } else goal.copy(this.target);
     if (!this.placed) { this.root.position.copy(goal); this.placed = true; }
     // Glide there, without overshooting
     const d = this.root.position.distanceTo(goal);
-    const k = 1 - Math.exp(-dt * (this.mode === 'follow' ? 2.2 : 1.6));
+    const k = 1 - Math.exp(-dt * (this.mode === 'follow' ? 1.4 : 1.6));
     if (d > 0.001) {
       const step = Math.min(d * k, this.speed * 3 * dt + d * 0.02);
       this.root.position.lerp(goal, step / d);
     }
+    // Bigger the further away it is, so it's always easy to see (normal size up close)
+    const far = this.root.position.distanceTo(_a);
+    this.root.scale.setScalar(damp(this.root.scale.x, clamp(far / 2.4, 1, 4), 3, dt));
     // Gentle floating
     const t = G.t;
     this.bob.position.y = Math.sin(t * 1.7) * 0.03;

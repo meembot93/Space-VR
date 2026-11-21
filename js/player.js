@@ -130,6 +130,10 @@ export class Player {
       if (trig && !h.trig) this.touch(h);
       h.trig = trig; h.sq = sq;
       if (h.held) h.held.onHold?.(h, dt);
+      // A or X: pause / carry on
+      const ax4 = btn(4);
+      if (ax4 && !h.ax4) this.G.togglePause?.();
+      h.ax4 = ax4;
       // B or Y: voice chat mic on/off
       const by = btn(5);
       if (by && !h.by) this.G.net?.voice.setMuted(!this.G.net.voice.muted);
@@ -187,6 +191,7 @@ export class Player {
     document.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
       if (e.code === 'KeyM') this.G.net?.voice.setMuted(!this.G.net.voice.muted);
+      if (e.code === 'KeyP') this.G.togglePause?.();
       if (e.code === 'KeyN' && this.G.debug) this.G.narration.skip();
       if (e.code === 'KeyE') { const it = this.deskTarget(); if (it?.onTouch) it.onTouch(this.deskHand); else if (it?.onKey) it.onKey(this.deskHand); }
     });
