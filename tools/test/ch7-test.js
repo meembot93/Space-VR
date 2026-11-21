@@ -4,7 +4,7 @@
 // loop, watches the small-circle-on-big-circle machine trace the same loop, then touches the
 // journal page to finish Era 1.
 //
-//   cd tools/test && npm install && node ch7-test.js        (add --shots to save screenshots)
+//   cd tools/test && npm install && node ch7-test.js  (or npm run test:ch7; add --shots to save screenshots)
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 
