@@ -54,7 +54,8 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   await until(() => G.director.chapter?.s.phase === 'search', null, 90000);
   await page.evaluate(() => clearInterval(window.__skip));
   await until(() => G.director.chapter?.sirius.material.opacity > 0.05, null, 30000).catch(() => {});
-  const sky = await page.evaluate(() => ({ op: G.director.chapter.sirius.material.opacity }));
+  // (she twinkles, so take the brightest of a few looks)
+  const sky = await page.evaluate(async () => { let op = 0; for (let i = 0; i < 10; i++) { op = Math.max(op, G.director.chapter.sirius.material.opacity); await new Promise((r) => setTimeout(r, 100)); } return { op }; });
   check(sky.op > 0.05, `Sirius shows just above the horizon (brightness ${sky.op.toFixed(2)})`);
   await shot('2_search');
   // aim: turn the controller so its pointing direction (-Z) is toward Sirius, in the rig's own space
