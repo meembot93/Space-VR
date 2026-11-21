@@ -61,6 +61,13 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
 - `js/net/`: multiplayer and voice chat, adapted from Broadside VR.
 - `js/atmosphere.js`: golden-hour haze, ground mist, sea-breeze specks, moving firelight, dust in sunbeams (per chapter, reads chapter state only).
 - `js/flight.js`: between chapters you glide along a timeline ribbon through the stars; it shows the next chapter's year and place (PLACES).
+- `js/extras.js` + `js/wow/chN.js`: each chapter's big "wow" moment, living constellations and cameo
+  characters, kept apart from the chapter's story file. They start on narration lines (on every headset)
+  and can hold the story for a moment (`after(id, D)`). Chapter 7's file also has the Era 1 finale.
+- `js/skyfigures.js` + `js/skyart.js`: living constellations, glowing figures (the Hunter, the Bull, the
+  Lion, the Great Bear, the Scorpion, the Swan, the Seven Sisters as doves, the zodiac) drawn over the
+  real stars and moving: `G.skyFigures.play('lion')`. `js/wow/echo.js`: ghostly "echo" cameo people.
+  `js/wow/space.js`: the whole Earth from space (map: `data/earth.jpg`, made by `tools/sky/build_earth.py`).
 - `js/soundscape.js`: steady 3D sounds placed in each chapter (fire, river, waves, crowds, leaves), one recipe per chapter.
 - Sound effects and ambience are synthesized with WebAudio. Background music (`js/music.js`) is a
   soft generated score unless `sounds/music/index.json` lists a track for the chapter, e.g.
@@ -76,6 +83,10 @@ the clay, grabs the four glowing tablets, looks up at the Moon and checks it tur
 `npm run test:ch7` plays Chapter 7: walks up the hall, touches Ptolemy's scroll, grips
 and follows Mars around its backward loop, checks the small-circle-on-big-circle machine puts Mars in
 the same place, hears Aristarchus, and touches the last journal page.
+
+`node shot.js <chapter> <line id> <secs> <az> <el> out.png` saves a screenshot of a moment (SLOW=1 lets
+lines play at real speed after that line; LOOK='js' points the view at something). `node trace.js <chapter>`
+prints each narration line as the chapter plays itself.
 
 ## Version number (please keep it up to date)
 

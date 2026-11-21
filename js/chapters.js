@@ -41,6 +41,7 @@ export class Director {
     const G = this.G, info = CHAPTERS.find((c) => c.n === n);
     if (!info?.ready) throw new Error('Chapter ' + n + ' is not built yet');
     this.stop();
+    G.extras?.dispose();
     if (this.chapter) { this.chapter.dispose(); this.chapter = null; }
     G.interactables.length = 0;
     const mod = await info.load();
@@ -49,6 +50,7 @@ export class Director {
     G.sky.budget(G.scene);   // the rest of the triangle budget goes on the stars
     this.n = n; this.info = info;
     G.narration.preload(`ch${n}_`);
+    await G.extras?.load(n, this.chapter);   // wow moments, sky figures, cameos (js/extras.js)
     return this.chapter;
   }
 
@@ -58,7 +60,9 @@ export class Director {
     this.running = true;
     G.events.emit('chapterStart', { n: this.n });
     try {
-      await ch.run(this.helpers(token));
+      const D = this.helpers(token);
+      await ch.run(D);
+      await G.extras?.outro(D);
       if (token === this.token) G.events.emit('chapterEnd', { n: this.n });
     } catch (e) { if (!(e instanceof Stop)) console.error(e); }
     if (token === this.token) this.running = false;
@@ -69,7 +73,7 @@ export class Director {
   helpers(token) {
     const G = this.G, check = () => { if (token !== this.token) throw new Stop(); };
     const D = {
-      say: async (id) => { check(); G.events.emit('say', { id }); await G.narration.say(id); check(); },
+      say: async (id) => { check(); G.events.emit('say', { id }); await G.narration.say(id); check(); await G.extras?.after(id, D); check(); },
       wait: (s) => D.until(() => false, s),
       until: (cond, timeout = Infinity, step = null) => new Promise((ok, fail) => {
         const w = { cond, left: timeout, ok, fail, token, step };

@@ -17,6 +17,8 @@ import { Soundscape } from './soundscape.js';
 import { Flight } from './flight.js';
 import { Atmosphere } from './atmosphere.js';
 import { VERSION } from './version.js';
+import { Extras } from './extras.js';
+import { SkyFigures } from './skyfigures.js';
 
 const params = new URLSearchParams(location.search);
 const G = window.G = { t: 0, mode: null, params, debug: params.has('debug'), isHost: true, started: false };
@@ -57,6 +59,8 @@ G.stargazing = new Stargazing(G);
 G.soundscape = new Soundscape(G);
 G.flight = new Flight(G);
 G.atmosphere = new Atmosphere(G);
+G.skyFigures = new SkyFigures(G);
+G.extras = new Extras(G);
 G.player.setupVR(renderer);
 
 // ---------- Settings on the title screen (remembered on this headset) ----------
@@ -122,6 +126,7 @@ G.onNetEvent = (name, d) => {
   else if (name === 'chapterEnd') { chapterEnded(); G.music.stop(5); }
   else if (name === 'kids') G.setKids(d.on);
   else if (name === 'pause') setPaused(d.on, true);
+  else if (name === 'extra') G.events.emit('extra', d);   // a wow moment the host started (js/extras.js)
 };
 
 // ---------- Pause (A or X in VR, P on desktop) ----------
@@ -364,7 +369,7 @@ function tick() {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   G.t += dt;
   if (G.mode) G.player.update(dt);
-  if (!G.paused) G.director.update(dt);
+  if (!G.paused) { G.director.update(dt); G.extras.update(dt, G.t); G.skyFigures.update(dt); }
   G.narration.update(dt);
   G.music.update(dt);
   G.soundscape.update(dt);
