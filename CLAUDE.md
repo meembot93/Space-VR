@@ -17,3 +17,7 @@
   `G.sky.setMoon(az, el, size, phase)` (phase 0 new .. 0.5 full) or `hideMoon()`. Pointing at stars
   to get names (js/stargazing.js) works by itself at night. Shared helpers: js/shapes.js (rng, noise2, roughStone).
 - Chapters run in order: when one ends, the next `ready` chapter in js/chapters.js loads and plays.
+- Kids mode (default, picked on the title page) is fully hands-free; Adults is interactive. In a chapter's
+  run(): wait on player actions with `D.auto(cond, step, {after, timeout})`, show instructions with
+  `D.hint(text, s)`, and move people with `D.goTo(pos, yaw)` when `D.kids`. Interactables are off in Kids
+  mode. `node tools/test/kids-test.js <n>` checks a chapter plays itself; interactive tests use `&rating=adults`.

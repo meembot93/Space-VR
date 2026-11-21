@@ -278,7 +278,7 @@ export default class Campfire {
     s.guide = at(185, 9, 4.5).toArray();
     await D.say('ch1_03');
     s.phase = 'sky';
-    G.ui.showHint(G.mode === 'vr' ? 'Point a controller at a star to see its name' : 'Look at a star to see its name', 7);
+    D.hint(G.mode === 'vr' ? 'Point a controller at a star to see its name' : 'Look at a star to see its name', 7);
     await D.say('ch1_04');
     await D.wait(fast ? 1 : 12);                // time to look around the sky
     // The storyteller holds up a bone; then it floats over to you, with a flint
@@ -288,9 +288,10 @@ export default class Campfire {
     s.phase = 'carve'; s.night = 1.2;
     G.events.emit('sfx', { k: 'page' });
     await D.say('ch1_06');
-    G.ui.showHint(G.mode === 'desktop' ? this.boneIt.deskHint : this.boneIt.hint, 8);
+    D.hint(G.mode === 'desktop' ? this.boneIt.deskHint : this.boneIt.hint, 8);
     this.idleT = 0;
-    await D.until(() => s.marks >= 1, fast ? 2 : 30);
+    // (Kids mode: the flint carves the first mark by itself, then keeps going)
+    await D.auto(() => s.marks >= 1, () => this.mark(), { after: fast ? 0.3 : 2.5, timeout: fast ? 2 : 30 });
     if (s.marks < 1) this.mark();
     // The Moon grows night by night (the builders of time help if you stop)
     this.autoFrom = 1; this.autoTo = 15;
@@ -311,8 +312,8 @@ export default class Campfire {
     s.bone = 0;
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
-    G.ui.showHint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
-    await D.until(() => s.journal === 2);
+    D.hint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
+    await D.auto(() => s.journal === 2, () => this.act({ type: 'touchPage' }), { after: fast ? 0.5 : 4 });
     G.ui.showHint('');
     G.events.emit('sfx', { k: 'page' });
     await D.wait(1.2);

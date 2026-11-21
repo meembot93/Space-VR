@@ -15,7 +15,7 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.addInitScript({ path: require.resolve('iwer/build/iwer.min.js') });
   await page.addInitScript(() => { const d = new IWER.XRDevice(IWER.metaQuest3); d.installRuntime({ forceInstall: true }); window.__xr = d; });
-  await page.goto(`http://localhost:${srv.address().port}/index.html?fast&chapter=1`);
+  await page.goto(`http://localhost:${srv.address().port}/index.html?fast&rating=adults&chapter=1`);
   await page.waitForFunction(() => !document.getElementById('vrBtn').disabled, null, { timeout: 15000 });
   await page.click('#vrBtn');
   await page.waitForFunction(() => window.G?.mode === 'vr', null, { timeout: 10000 });

@@ -964,7 +964,7 @@ export default class Antikythera {
   async run(D) {
     const G = this.G, s = this.s, fast = G.params.has('fast');
     const placeAll = (pos, yaw) => G.events.emit('placePlayers', { x: pos.x, z: pos.z, yaw });
-    const hint = (it, secs = 7) => G.ui.showHint(G.mode === 'desktop' ? it.deskHint : it.hint, secs);
+    const hint = (it, secs = 7) => D.hint(G.mode === 'desktop' ? it.deskHint : it.hint, secs);
     const near = (spot, d) => G.players.every((p) => { p.headPos?.(_a) ?? _a.copy(p.view?.head || spot); return Math.hypot(_a.x - spot.x, _a.z - spot.z) < d; });
     // On the boat, after the storm. The diver is getting ready at the ladder.
     s.scene = 'top'; s.phase = 'boat';
@@ -988,10 +988,11 @@ export default class Antikythera {
     await D.say('ch6_03');
     s.ghost = 0;
     // The lump of bronze on the flat rock
-    s.phase = 'lump'; s.ring = 1; s.point = 2;
+    s.phase = 'lump'; s.ring = D.kids ? 0 : 1; s.point = 2;
     s.guide = [ROCK.x - 0.55, this.rockTop + 0.55, ROCK.z - 0.1];
     await D.say('ch6_04');
     hint(this.lumpIt, 8);
+    if (D.kids) { await D.wait(fast ? 0.2 : 1); await D.goTo(STAND, 0); await D.wait(fast ? 0.2 : 1.5); s.lump = 1; }   // Kids mode: the diver lifts it for you
     const got = await D.until(() => s.lump >= 1, fast ? 15 : 40);
     if (!got) {
       // Nobody picked it up: bring everyone to the rock and lift it for them
@@ -1009,13 +1010,13 @@ export default class Antikythera {
     await D.until(() => s.build >= 1, 12);
     s.build = 1;
     // Turn the handle
-    s.phase = 'crank'; s.ring = 1;
+    s.phase = 'crank'; s.ring = D.kids ? 0 : 1;
     s.guide = [ROCK.x - 0.6, this.rockTop + 0.95, ROCK.z + 0.05];
     hint(this.crankIt, 8);
     await D.say('ch6_07');
     s.flip = 1;
     s.phase = 'eclipse';
-    G.ui.showHint('Keep turning the handle until the pointer reaches an eclipse sign', 8);
+    D.hint('Keep turning the handle until the pointer reaches an eclipse sign', 8);
     await D.until(() => s.eclipse > 0, 120);
     s.eclipse = 1; s.ring = 0; G.ui.showHint('');
     G.events.emit('sfx', { k: 'swell' });
@@ -1028,7 +1029,7 @@ export default class Antikythera {
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
     hint(this.pageIt, 8);
-    await D.until(() => s.journal === 2);
+    await D.auto(() => s.journal === 2, () => this.act({ type: 'touchPage' }), { after: fast ? 0.5 : 4 });
     G.ui.showHint('');
     G.events.emit('sfx', { k: 'page' });
     await D.wait(1.2);
@@ -1072,10 +1073,12 @@ export default class Antikythera {
       const T = this.phaseT;
       if (s.phase === 'dive') s.dive = Math.min(1, s.dive + dt / 6 * fast);
       if (s.phase === 'xray') { s.xray = clamp((T - 2.5) / 2.5, 0, 1); s.build = clamp((T - 7) / 4.5, 0, 1); }
-      if (s.phase === 'crank' && T > 13.2) s.flip = 1;     // "And on the back..."
+      if (s.phase === 'crank' && T > 13.2) s.flip = 1;
+      if (s.phase === 'crank' && G.kids && T > 2 && s.build >= 1 && !this.cranking) s.crank += dt * 0.5;     // "And on the back..."
       if (s.phase === 'eclipse') {
         // after a while the handle turns itself, so nobody gets stuck
-        if (T > 30 && !this.cranking) s.crank += dt * 0.7;
+        // (Kids mode: it turns by itself straight away)
+        if (T > (G.kids ? 1 : 30) && !this.cranking) s.crank += dt * 0.7;
         const m0 = this.prevCrank ?? s.crank;
         if (!s.eclipse) for (const m of ECLIPSES) if ((m0 < m && s.crank >= m) || (m0 > m && s.crank <= m)) { s.eclipse = 1; s.eclM = m; break; }
       }

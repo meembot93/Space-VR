@@ -692,7 +692,8 @@ export default class Nile {
     s.guide = at(288, 14, ROOF + 3.2).toArray();               // Astra floats out toward the pyramids
     await D.say('ch3_02');
     s.guide = at(80, 16, ROOF + 1.8).toArray();                // ...then over to the river side
-    G.ui.showHint('Turn around to see the river (right stick)', 6);
+    D.hint('Turn around to see the river (right stick)', 6);
+    if (D.kids) D.goTo(new THREE.Vector3(0.6, 0, 0.4), this.faceToward(_c.set(0.6, 0, 0.4), at(80, 100))).catch(() => {});   // turn you to face it
     await D.say('ch3_03');
     s.guide = at(140, 12, ROOF + 1.5).toArray();
     await D.say('ch3_04');
@@ -705,8 +706,9 @@ export default class Nile {
     // Search: Sirius comes up over the horizon. Point at it.
     s.phase = 'search'; this.searchT = G.t;
     if (s.tm < -6) s.tm = -6;                                  // (only if the lines were skipped)
-    G.ui.showHint(G.mode === 'desktop' ? 'Look for a bright star just rising in the east, and hold the crosshair on it' : 'A bright star is rising in the east. Point at it with your controller', 9);
-    const got = await D.until(() => s.found, fast ? 8 : 90);
+    D.hint(G.mode === 'desktop' ? 'Look for a bright star just rising in the east, and hold the crosshair on it' : 'A bright star is rising in the east. Point at it with your controller', 9);
+    // Kids mode: once Sirius is up, the priest spots it for everyone
+    const got = await D.auto(() => s.found, () => { if ((this.sirEl ?? -9) > 1) s.found = 1; }, { after: fast ? 0.5 : 6, timeout: fast ? 8 : 90 });
     if (!got) s.found = 1;                                      // after a while, the priest shows everyone
     G.ui.showHint('');
     s.phase = 'found'; s.point = 2;
@@ -716,8 +718,8 @@ export default class Nile {
     s.phase = 'bell'; s.point = 0; s.guide = _a.copy(this.bellPos).add(_b.set(-0.6, 0.5, -0.6)).toArray();
     const rung0 = s.rung;
     await D.say('ch3_07');
-    if (s.rung === rung0) G.ui.showHint(G.mode === 'desktop' ? this.bellIt.deskHint : this.bellIt.hint, 8);
-    if (!(await D.until(() => s.rung > rung0, fast ? 4 : 40))) s.rung++;   // the priest rings it if nobody does
+    if (s.rung === rung0) D.hint(G.mode === 'desktop' ? this.bellIt.deskHint : this.bellIt.hint, 8);
+    if (!(await D.auto(() => s.rung > rung0, () => { s.rung++; }, { after: fast ? 0.3 : 1.2, timeout: fast ? 4 : 40 }))) s.rung++;   // the priest rings it if nobody does
     G.ui.showHint('');
     s.phase = 'sunrise'; s.guide = null;
     await D.until(() => s.lights >= 1 && s.tm >= 52, fast ? 6 : 40);
@@ -731,8 +733,8 @@ export default class Nile {
     // The journal page
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
-    G.ui.showHint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
-    await D.until(() => s.journal === 2);
+    D.hint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
+    await D.auto(() => s.journal === 2, () => this.act({ type: 'touchPage' }), { after: fast ? 0.5 : 4 });
     G.ui.showHint('');
     G.events.emit('sfx', { k: 'page' });
     await D.wait(1.2);
@@ -746,8 +748,8 @@ export default class Nile {
     await G.ui.fadeIn(2);
     s.phase = 'hold';
     await D.say('br3_01');
-    G.ui.showHint(G.mode === 'desktop' ? this.diskIt.deskHint : this.diskIt.hint, 9);
-    if (!(await D.until(() => s.held, fast ? 4 : 45))) s.held = 1;
+    D.hint(G.mode === 'desktop' ? this.diskIt.deskHint : this.diskIt.hint, 9);
+    if (!(await D.auto(() => s.held, () => { s.held = 1; }, { after: fast ? 0.3 : 2, timeout: fast ? 4 : 45 }))) s.held = 1;
     G.ui.showHint('');
     G.events.emit('sfx', { k: 'swell' });
     await D.until(() => s.match >= 1, fast ? 3 : 10);
@@ -783,6 +785,7 @@ export default class Nile {
     let sd = dirFromAzEl(sirAz0, sirEl0, _a);
     if (si >= 0) { sf.update(sunAz, sunEl, t); sd = sf.dirOf(si, _a); }
     const sirEl = Math.asin(clamp(sd.y, -1, 1)) / D2R, sirAz = (Math.atan2(sd.x, -sd.z) / D2R + 360) % 360;
+    this.sirEl = sirEl;
     this.sirius.position.copy(sd).multiplyScalar(850);
     const ext = smooth(-0.4, 1.6, sirEl) * (1 - smooth(-6.5, -2.5, sunEl));
     const tw = 0.75 + 0.25 * Math.sin(t * 23) * Math.sin(t * 7.3 + 1) + 0.12 * Math.sin(t * 41);
