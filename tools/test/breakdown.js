@@ -25,7 +25,9 @@ const ROOT = path.resolve(process.env.ROOT || path.join(__dirname, '../..'));
         else if (m?.color) { r = m.color.r; gg = m.color.g; b = m.color.b; }
         return gg > r * 1.08 && gg > b * 1.1;
       };
+      const t0 = G.t;
       const sample = () => {
+        if (G.t - t0 < 6) return;   // skip the first moments, while models are still arriving
         const k = {}; let total = 0;
         G.scene.traverseVisible((o) => {
           if (!o.isMesh || !o.geometry) return;
