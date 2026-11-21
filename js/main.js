@@ -226,7 +226,8 @@ function chapterEnded() {
     }, 4500);
     return;
   }
-  G.ui.subtitle(`End of Chapter ${n}. Thank you for watching the sky!`, 'More chapters are on the way.');
+  if (n === 7) G.ui.subtitle('The end of Era 1: Watchers of the Sky. Thank you for watching the sky!', 'Era 2 is on the way.');
+  else G.ui.subtitle(`End of Chapter ${n}. Thank you for watching the sky!`, 'More chapters are on the way.');
   setTimeout(async () => {
     await G.ui.fadeOut(1.5);
     G.ui.subtitle('');

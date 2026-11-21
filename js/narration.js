@@ -13,7 +13,8 @@ export class Narration {
     this.files = {};
     this.buffers = new Map();
     this.cur = null;      // { id, src, endT }
-    this.level = 0;       // how loud the voice is right now, 0..1 (the guide star glows with it)
+    this.level = 0;       // how loud Astra's voice is right now, 0..1 (the guide star glows with it)
+    this.otherLevel = 0;  // ...and anyone else's (SPEAKERS in script.js): a chapter can make them glow with it
     this.speed = G.params.has('fast') ? 6 : 1; // ?fast: placeholder lines go by quickly (testing)
     this.ready = fetch(DIR + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then((j) => { this.files = j || {}; }).catch(() => {});
   }
@@ -45,6 +46,7 @@ export class Narration {
     let buf = null;
     if (this.has(id) && this.G.audio.ctx) { try { buf = await this.load(id); } catch (e) { buf = null; } }
     if (this.cur !== token) return;
+    token.speaker = SPEAKERS[id] || '';
     this.G.ui.subtitle(text, buf ? '' : this.G.debug ? `(placeholder: recording ${id} not added yet)` : '', SPEAKERS[id] || GUIDE_NAME);
     this.G.events.emit('narrating', { id, on: true });
     await new Promise((ok) => {
@@ -110,5 +112,7 @@ export class Narration {
       const lv = Math.min(1, Math.sqrt(e / (c.data.length / 2)) * 6);
       this.level = Math.max(lv, this.level * Math.exp(-dt * 10));
     }
+    // Someone other than Astra is talking: they get the glow, Astra stays quiet
+    if (c.speaker) { this.otherLevel = this.level; this.level = 0; } else this.otherLevel *= Math.exp(-dt * 8);
   }
 }

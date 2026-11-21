@@ -20,7 +20,7 @@ export const CHAPTERS = [
   { n: 4, title: 'Babylon predicts an eclipse', ready: true, load: () => import('./chapters/babylon.js') },
   { n: 5, title: 'Greece proves the Earth is round', ready: false },
   { n: 6, title: 'Diving for the Antikythera machine', ready: false },
-  { n: 7, title: 'Ptolemy’s spinning sky', ready: false },
+  { n: 7, title: 'Ptolemy’s spinning sky', ready: true, load: () => import('./chapters/ptolemy.js') },
 ];
 
 class Stop extends Error {}
