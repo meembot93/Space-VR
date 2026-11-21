@@ -59,6 +59,7 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
   `tools/lineup.html?model=builder` previews every pose. Models: docs/ASSETS.md.
 - `js/player.js`: you, your hands, the controls. Chapters add grabbable things to `G.interactables`.
 - `js/net/`: multiplayer and voice chat, adapted from Broadside VR.
+- `js/atmosphere.js`: golden-hour haze, ground mist, sea-breeze specks, moving firelight, dust in sunbeams (per chapter, reads chapter state only).
 - `js/flight.js`: between chapters you glide along a timeline ribbon through the stars; it shows the next chapter's year and place (PLACES).
 - `js/soundscape.js`: steady 3D sounds placed in each chapter (fire, river, waves, crowds, leaves), one recipe per chapter.
 - Sound effects and ambience are synthesized with WebAudio. Background music (`js/music.js`) is a

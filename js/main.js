@@ -15,6 +15,7 @@ import { Music } from './music.js';
 import { Stargazing } from './stargazing.js';
 import { Soundscape } from './soundscape.js';
 import { Flight } from './flight.js';
+import { Atmosphere } from './atmosphere.js';
 import { VERSION } from './version.js';
 
 const params = new URLSearchParams(location.search);
@@ -55,6 +56,7 @@ G.music = new Music(G);
 G.stargazing = new Stargazing(G);
 G.soundscape = new Soundscape(G);
 G.flight = new Flight(G);
+G.atmosphere = new Atmosphere(G);
 G.player.setupVR(renderer);
 
 // ---------- Settings on the title screen (remembered on this headset) ----------
@@ -372,6 +374,7 @@ function tick() {
   camera.getWorldPosition(_a);
   starDetail(now);
   G.sky.update(dt, _a, G.t);
+  G.atmosphere.update(dt, G.t);
   if (G.mode) G.stargazing.update(dt);
   camera.getWorldDirection(_b); _c.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(_q));
   G.audio.setListener(_a, _b, _c, G.t);
