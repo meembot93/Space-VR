@@ -6,11 +6,31 @@
 // The music dips while Astra is talking.
 const DIR = new URL('../sounds/music/', import.meta.url).href;
 
-// Chord progressions per mood: each chord is a list of note frequencies (Hz)
+// Each chapter has its own mood: chords (semitones from A3), how many seconds each chord lasts,
+// high twinkling notes, a low drone, and a lead voice that plays a few slow notes from `scale`:
+//   flute (breathy, Ch1), reed (Egypt and Babylon), lyre (plucked, Greece), none.
 const N = (semi) => 220 * Math.pow(2, semi / 12); // semitones from A3
 const MOODS = {
-  dawn: { chords: [[-9, -2, 3, 7], [-7, 0, 5, 9], [-12, -5, 0, 4], [-10, -3, 2, 5]], tempo: 9, twinkle: [12, 14, 16, 19, 21, 24] },
+  dawn: { chords: [[-9, -2, 3, 7], [-7, 0, 5, 9], [-12, -5, 0, 4], [-10, -3, 2, 5]], tempo: 9, twinkle: [12, 14, 16, 19, 21, 24], drone: -21 },
+  // Ch1: a cold, starry Ice Age night by the fire; a bone flute far off
+  ch1: { chords: [[-7, 0, 3, 7], [-9, -2, 3, 8], [-12, -5, 0, 3], [-10, -3, 2, 5]], tempo: 11, twinkle: [15, 17, 19, 22, 24, 27], drone: -19, lead: 'flute', scale: [3, 5, 7, 10, 12, 15] },
+  // Ch2: Stonehenge before sunrise, warm and hopeful
+  ch2: { chords: [[-9, -2, 3, 7], [-7, 0, 5, 9], [-12, -5, 0, 4], [-10, -3, 2, 5]], tempo: 9, twinkle: [12, 14, 16, 19, 21, 24], drone: -21 },
+  // Ch3: Egypt, an old desert scale (with a step and a half in it), a reed pipe
+  ch3: { chords: [[-5, 2, 7], [-4, 3, 7], [-5, 0, 4, 7], [-7, 0, 3]], tempo: 10, twinkle: [12, 13, 16, 17, 19, 24], drone: -17, lead: 'reed', scale: [7, 8, 11, 12, 14, 15, 19] },
+  // Ch4: Babylon at night, deep and patient
+  ch4: { chords: [[-12, -5, 0, 3], [-10, -3, 2, 5], [-14, -7, -2, 3], [-12, -5, 0, 5]], tempo: 12, twinkle: [12, 15, 17, 19, 24], drone: -24, lead: 'reed', scale: [0, 2, 3, 5, 7, 8, 12] },
+  // Ch5: Greece, a plucked lyre over soft chords
+  ch5: { chords: [[-7, 0, 3, 7], [-5, 2, 5, 9], [-9, -2, 3, 7], [-10, -3, 2, 5]], tempo: 9, twinkle: [12, 14, 15, 19, 21], drone: -19, lead: 'lyre', scale: [0, 2, 3, 5, 7, 9, 10, 12] },
+  // Ch6: the sea and the bronze machine, glinting
+  ch6: { chords: [[-12, -5, 0, 4, 6], [-10, -3, 2, 6], [-8, -1, 4, 7], [-12, -5, 2, 7]], tempo: 9, twinkle: [16, 18, 19, 23, 24, 28], drone: -24, lead: 'lyre', scale: [4, 6, 7, 11, 12, 14, 16] },
+  // Ch7: Ptolemy's great spinning sky, the finale
+  ch7: { chords: [[-12, -5, 0, 4, 7], [-7, 0, 4, 9], [-9, -2, 3, 7], [-5, 2, 7, 11]], tempo: 10, twinkle: [12, 16, 19, 23, 24, 28], drone: -24, lead: 'lyre', scale: [0, 4, 7, 9, 11, 12, 16] },
 };
+
+// The big moments: when Astra starts one of these lines, the music swells up under her
+// instead of dipping (and a bright chord blooms).
+const SWELLS = new Set(['ch1_04', 'ch2_08', 'ch3_06', 'ch4_09', 'ch5_06', 'ch5_12', 'ch6_05', 'ch7_04', 'ch7_12', 'br3_01']);
 
 export class Music {
   constructor(G) {
@@ -18,7 +38,7 @@ export class Music {
     this.ready = fetch(DIR + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then((j) => { this.files = j || {}; }).catch(() => {});
   }
 
-  async play(name, mood = 'dawn', vol = 0.5) {
+  async play(name, mood = null, vol = 0.5) {
     const A = this.G.audio; if (!A.ctx) return;
     this.stop(3);
     await this.ready;
@@ -34,31 +54,93 @@ export class Music {
         cur.nodes.push(src); return;
       } catch (e) { console.warn('Music file failed, using the generated score', e); }
     }
-    this.score(cur, MOODS[mood] || MOODS.dawn);
+    this.score(cur, MOODS[mood || name] || MOODS.dawn);
   }
 
-  // The generated score: one chord every `tempo` seconds, gently overlapping, plus sparkles
+  // The generated score: a low drone, one chord every `tempo` seconds gently overlapping, a few
+  // sparkles high above, and now and then a short phrase on the chapter's lead voice
   score(cur, m) {
-    const ctx = this.G.audio.ctx, lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(cur.out);
+    const ctx = this.G.audio.ctx, lp = cur.lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(cur.out);
+    cur.m = m;
+    // the drone: two soft sines a fifth apart, breathing slowly
+    for (const [semi, g0] of [[m.drone ?? -21, 0.05], [(m.drone ?? -21) + 7, 0.025]]) {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = N(semi);
+      const g = ctx.createGain(); g.gain.value = g0;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07 + Math.random() * 0.05; const lg = ctx.createGain(); lg.gain.value = g0 * 0.5;
+      lfo.connect(lg); lg.connect(g.gain); o.connect(g); g.connect(lp); o.start(); lfo.start(); cur.nodes.push(o, lfo);
+    }
     let i = 0;
     const chord = () => {
       if (this.cur !== cur) return;
-      const t = ctx.currentTime, notes = m.chords[i++ % m.chords.length], len = m.tempo * 1.6;
-      for (const n of notes) for (const det of [-3, 3]) {
-        const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = N(n); o.detune.value = det;
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + m.tempo * 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
-        o.connect(g); g.connect(lp); o.start(t); o.stop(t + len + 0.1);
-      }
+      this.chord(cur, m.chords[i++ % m.chords.length], 0.05, m.tempo);
       // two or three soft bell-like notes high above
-      for (let k = 0; k < 2 + (i % 2); k++) {
-        const tt = t + 1 + Math.random() * (m.tempo - 2), f = N(m.twinkle[Math.floor(Math.random() * m.twinkle.length)]);
-        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.035, tt + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, tt + 2.5);
-        o.connect(g); g.connect(cur.out); o.start(tt); o.stop(tt + 2.6);
+      const t = ctx.currentTime;
+      for (let k = 0; k < 2 + (i % 2); k++) this.bellNote(cur, t + 1 + Math.random() * (m.tempo - 2), N(m.twinkle[Math.floor(Math.random() * m.twinkle.length)]), 0.035);
+      // every other chord, a short phrase on the lead voice
+      if (m.lead && i % 2 === 0) {
+        let tt = t + 1.5 + Math.random() * 2, k = Math.floor(Math.random() * m.scale.length);
+        for (let j = 0, n = 3 + Math.floor(Math.random() * 3); j < n; j++) {
+          k = Math.max(0, Math.min(m.scale.length - 1, k + (Math.random() < 0.5 ? -1 : 1) * (1 + Math.floor(Math.random() * 2))));
+          const len = m.lead === 'lyre' ? 0.6 + Math.random() * 0.5 : 0.9 + Math.random() * 1.1;
+          this.lead(cur, m.lead, tt, N(m.scale[k]), len); tt += len * (m.lead === 'lyre' ? 0.8 : 1);
+        }
       }
       cur.timer = setTimeout(chord, m.tempo * 1000);
     };
     chord();
+  }
+
+  chord(cur, notes, peak, tempo) {
+    const ctx = this.G.audio.ctx, t = ctx.currentTime, len = tempo * 1.6;
+    for (const n of notes) for (const det of [-3, 3]) {
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = N(n); o.detune.value = det;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + tempo * 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(g); g.connect(cur.lp); o.start(t); o.stop(t + len + 0.1);
+    }
+  }
+
+  bellNote(cur, tt, f, peak) {
+    const ctx = this.G.audio.ctx, o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(peak, tt + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, tt + 2.5);
+    o.connect(g); g.connect(cur.out); o.start(tt); o.stop(tt + 2.6);
+  }
+
+  // One note on the lead voice
+  lead(cur, kind, t, f, len) {
+    const ctx = this.G.audio.ctx, A = this.G.audio, g = ctx.createGain(); g.connect(cur.lp);
+    if (kind === 'lyre') {
+      // plucked: bright at first, fading fast, with an octave shimmer
+      for (const [mul, p] of [[1, 0.06], [2, 0.02], [3, 0.008]]) {
+        const o = ctx.createOscillator(); o.type = mul === 1 ? 'triangle' : 'sine'; o.frequency.value = f * mul;
+        const gg = ctx.createGain(); gg.gain.setValueAtTime(0.0001, t); gg.gain.exponentialRampToValueAtTime(p, t + 0.005); gg.gain.exponentialRampToValueAtTime(0.0001, t + len * 2.2);
+        o.connect(gg); gg.connect(g); o.start(t); o.stop(t + len * 2.3);
+      }
+      return;
+    }
+    // flute or reed: a held note that swells and fades, with a little vibrato
+    const o = ctx.createOscillator(); o.type = kind === 'reed' ? 'sawtooth' : 'sine'; o.frequency.value = f;
+    const vib = ctx.createOscillator(); vib.frequency.value = 5; const vg = ctx.createGain(); vg.gain.value = f * 0.006; vib.connect(vg); vg.connect(o.frequency);
+    const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = kind === 'reed' ? f * 3 : f * 2; fl.Q.value = kind === 'reed' ? 4 : 0.7;
+    const peak = kind === 'reed' ? 0.03 : 0.045;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + len * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(fl); fl.connect(g); o.start(t); vib.start(t); o.stop(t + len + 0.05); vib.stop(t + len + 0.05);
+    if (kind === 'flute' && A.noiseBuf) {
+      // the breath in a bone flute
+      const nz = ctx.createBufferSource(); nz.buffer = A.noiseBuf; const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = f * 2; nf.Q.value = 3;
+      const ng = ctx.createGain(); ng.gain.value = 0.25; nz.connect(nf); nf.connect(ng); ng.connect(g); nz.start(t, Math.random()); nz.stop(t + len);
+    }
+  }
+
+  // A big moment: the music rises for `secs` and a bright chord blooms
+  swell(secs = 14) {
+    const c = this.cur; if (!c || !this.G.audio.ctx) return;
+    this.swellUntil = this.G.t + secs;
+    if (c.m) {
+      const top = c.m.chords[0].map((n) => n + 12);
+      this.chord(c, [...c.m.chords[0], ...top], 0.04, secs * 0.45);
+      for (let k = 0; k < 5; k++) this.bellNote(c, this.G.audio.ctx.currentTime + 0.5 + k * 0.35, N(c.m.twinkle[k % c.m.twinkle.length] + 12), 0.03);
+    }
+    if (c.lp) { const t = this.G.audio.ctx.currentTime; c.lp.frequency.setTargetAtTime(3200, t, 2); c.lp.frequency.setTargetAtTime(1400, t + secs * 0.7, 3); }
   }
 
   stop(fade = 2) {
@@ -69,11 +151,14 @@ export class Music {
     setTimeout(() => { for (const n of c.nodes) try { n.stop(); } catch (e) { /* done */ } c.out.disconnect(); }, fade * 1000 + 200);
   }
 
-  // Duck under Astra's voice
+  // Duck under Astra's voice (but rise for the big moments); quieter during the flights between chapters
   update(dt) {
     const c = this.cur; if (!c || !this.G.audio.ctx) return;
-    const talking = this.G.narration.cur ? 0.45 : 1;
-    this.duck += (talking - this.duck) * Math.min(1, dt * 2);
+    const id = this.G.narration.cur?.id;
+    if (id !== this.lastLine) { this.lastLine = id; if (SWELLS.has(id)) this.swell(16); }
+    const swelling = this.G.t < (this.swellUntil || 0);
+    const talking = swelling ? 1.5 : this.G.narration.cur ? 0.45 : 1;
+    this.duck += (talking - this.duck) * Math.min(1, dt * (swelling ? 0.6 : 2));
     if (c.out.gain.value > 0.01 && this.G.t > (c.t0 ??= this.G.t + 4)) c.out.gain.setTargetAtTime(c.vol * this.duck * (this.G.paused ? 0.35 : 1), this.G.audio.ctx.currentTime, 0.3);
   }
 }
