@@ -10,7 +10,8 @@
 // outside on that line, and the Avenue runs away from the entrance between two banks.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
-import { makePerson, animatePerson } from '../people.js';
+import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
+import { makeHerd, makeFlock, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
@@ -88,6 +89,8 @@ function ropeTex() {
   t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
 
+let _glowTex = null;
+function glowTex() { return (_glowTex ||= canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); })); }
 function glowSprite(color = 'rgba(255,220,140,1)') {
   const t = canvasTex(64, 64, (g) => {
     const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, color); gr.addColorStop(1, 'rgba(0,0,0,0)');
@@ -113,6 +116,9 @@ export default class Stonehenge {
       cheer: 0,
       journal: 0,      // 1 = the page is out, 2 = you touched it
       ring: 0,         // the glowing ring that shows where to stand
+      sunTo: null,     // ch2_04: where the little "sun marker" walks along the horizon (bearing)
+      gasp: 0,         // the crowd gasps at the first light
+      home: 0,         // the end: people head home to the village
     };
     this.view = { p: 0 };
     G.world.height = groundHeight;
@@ -128,6 +134,7 @@ export default class Stonehenge {
     this.buildMovingStone();
     this.buildPeople();
     this.buildEffects();
+    this.buildLife();
     this.journal = makeJournalPage('stonehenge');
     this.journal.visible = false; this.root.add(this.journal);
     this.registerInteractables();
@@ -468,6 +475,51 @@ export default class Stonehenge {
     for (let i = 0; i < 14; i++) { const s = new THREE.Sprite(dm.clone()); s.visible = false; this.root.add(s); this.dust.push(s); }
   }
 
+  // ---------- Life on the plain ----------
+  // Cattle and sheep in the fields between you and the village, a shepherd and his dog, families
+  // walking out from the village with torches to watch the sunrise, and birds once it's light.
+  buildLife() {
+    this.life = new Life(this.root);
+    // (directions from where you start toward the village)
+    const S = this.start.pos, V = at(150, 165), dir = _a.subVectors(V, S).setY(0).normalize().clone(), side = new THREE.Vector3(dir.z, 0, -dir.x);
+    const along = (d, sd = 0) => S.clone().addScaledVector(dir, d).addScaledVector(side, sd);
+    const c = along(13, 6);
+    this.cattle = this.life.add(makeHerd('cow', { n: 7, area: { x: c.x, z: c.z, r: 5 }, height: groundHeight, seed: 31 }));
+    const sh = along(20, -8);
+    this.sheep = this.life.add(makeHerd('sheep', { n: 14, area: { x: sh.x, z: sh.z, r: 5 }, height: groundHeight, mode: 'follow', seed: 32 }));
+    this.dog = this.life.add(makeHerd('dog', { n: 1, area: { x: sh.x, z: sh.z, r: 3 }, height: groundHeight, mode: 'follow', seed: 33 }));
+    this.flock = this.life.add(makeFlock({ n: 16, center: new THREE.Vector3(0, 28, 0), r: 30, height: 8, color: 0x1a1a1c, seed: 34 }));
+    this.flock.group.visible = false;
+    this.walkers = [];
+    const torch = () => {
+      const g = new THREE.Group(), k = new Kit(); k.cyl(0.025, 0.03, 0.8, 5, 0x4a3420, [0, 0.4, 0]); k.cyl(0.05, 0.04, 0.12, 6, 0x2a1a10, [0, 0.82, 0]); g.add(k.mesh());
+      const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0xffa040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      f.position.y = 0.98; f.scale.set(0.35, 0.5, 1); g.add(f); g.userData.flame = f; return g;
+    };
+    // the shepherd, walking his flock slowly about the field
+    const shep = makePerson({ model: 'builder', seed: 301, tunic: 0x6a5a40, beard: true });
+    shep.g.position.copy(sh).setY(groundHeight(sh.x, sh.z)); this.root.add(shep.g); shep.glance = true;
+    shep.routine = [0, 1, 2, 3].map((i) => { const p = along(17 + (i % 2) * 8, -6 - (i > 1 ? 6 : 0)); return { x: p.x, z: p.z, pose: i === 2 ? 'beckon' : 'idle', secs: 5 + i }; });
+    const crook = new Kit(); crook.tube([[0, 0, 0], [0, 1.5, 0], [0.08, 1.65, 0], [0.16, 1.55, 0]], 0.02, 0x6a5038, 4);
+    holdProp(shep, crook.mesh(), 'Right', [0, 0.05, 0.03]);
+    this.shepherd = shep; this.walkers.push(shep);
+    // families with torches, coming out from the village to the stones before dawn
+    const route = [along(130, 4), along(95, 2), along(60, -2), along(25, -16), at(AXIS - 34, 40), at(AXIS - 30, 33)];
+    for (let i = 0; i < 6; i++) {
+      const P = makePerson({ model: 'builder', seed: 320 + i * 9, tunic: [0x8a7a64, 0x7a6a50, 0x9a8466][i % 3], height: i === 4 ? 1.3 : 1.7 + (i % 2) * 0.08 });
+      const k = 1 + Math.floor(i / 2), p = route[k];
+      const off = (i % 2 ? 1 : -1) * 0.7, back = (i % 2) * 1.4;
+      P.g.position.set(p.x + off, groundHeight(p.x, p.z), p.z + back); this.root.add(P.g);
+      P.routine = route.slice(k + 1).map((q, j, a) => ({ x: q.x + off + (j === a.length - 1 ? i * 1.1 : 0), z: q.z + back, pose: 'idle', secs: j === a.length - 1 ? 1e9 : 0.01, look: j === a.length - 1 ? at(AXIS, 60, 2) : null }));
+      if (i !== 4) { const tc = torch(); holdProp(P, tc, i % 2 ? 'Right' : 'Left', [0, 0.04, 0.03]); (this.torches ||= []).push(tc); }
+      P.glance = true; P.walker = true; this.walkers.push(P);
+    }
+    // ch2_04: a little glowing sun that walks along the dotted line on the horizon
+    this.marker = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    this.marker.scale.setScalar(26); this.root.add(this.marker); this.markerAz = WINTER;
+    this.sunLook = at(AXIS, 80, 3);
+  }
+
   // Where you stand to haul: beside the rope, near the middle of the circle
   pullSpot() {
     const tan = new THREE.Vector3(-this.u.z, 0, this.u.x);
@@ -554,10 +606,15 @@ export default class Stonehenge {
     s.ring = 0; G.ui.showHint('');
     s.phase = 'explain';
     s.path = 1; s.guide = at(AXIS + 40, 7, 2.6).toArray();
-    await D.say('ch2_04');
-    s.point = 1; s.guide = at(SLOT, R_SARSEN - 1, 2.4).toArray();
+    // the little sun walks the horizon as Astra tells it: winter, creeping along, summer, stop, back
+    const l4 = D.sayAsync('ch2_04');
+    await D.cue('In winter'); s.sunTo = WINTER;
+    await D.cue('day by day'); s.sunTo = AXIS;
+    await D.cue('turns around'); s.sunTo = AXIS + 22;
+    await l4;
+    s.point = 1; s.guide = at(SLOT, R_SARSEN - 1, 2.4).toArray(); s.sunTo = AXIS;
     await D.say('ch2_05');
-    s.path = 0;
+    s.path = 0; s.sunTo = null;
     // Haul the stone in
     s.point = 0; s.phase = 'pull'; s.ring = D.kids ? 0 : 1; this.ringSpot.copy(this.pullSpot());
     s.guide = at(SLOT, 5.5, 1.8).toArray();
@@ -582,7 +639,10 @@ export default class Stonehenge {
     await D.say('ch2_07');
     s.phase = 'sunrise'; G.events.emit('sfx', { k: 'swell' });
     await D.until(() => s.sunEl >= 0.6);
-    await D.say('ch2_08');
+    s.gasp = 1;                                         // everyone gasps at the first light...
+    const l8 = D.sayAsync('ch2_08');
+    await D.cue('Just like'); s.gasp = 0; s.cheer = 1;  // ...and cheers: just like they planned it
+    await l8;
     s.cheer = 1; G.events.emit('sfx', { k: 'cheer' });
     await D.wait(fast ? 0.5 : 3);
     s.cheer = 0;
@@ -592,7 +652,9 @@ export default class Stonehenge {
     await D.until(() => s.lapse >= 1);
     s.path = 0; s.phase = 'closing';
     s.guide = null;
-    await D.say('ch2_10');
+    const l10 = D.sayAsync('ch2_10');
+    await D.cue('We still'); s.home = 1;                // the day begins: people head back to the village
+    await l10;
     // The journal page
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
@@ -695,15 +757,47 @@ export default class Stonehenge {
         const back = (this.view.p * (PULL_FROM - PULL_TO)) % 1.2;
         if (s.raise >= 1) {
           // walk over to their watching spot (instantly when it's dark: the fade hides it)
-          P.g.position.lerp(_a.copy(P.watch).setY(groundHeight(P.watch.x, P.watch.z)), G.ui.fade > 0.9 ? 1 : 1 - Math.exp(-dt * 0.8));
+          const d0 = P.g.position.distanceTo(_a.copy(P.watch).setY(groundHeight(P.watch.x, P.watch.z)));
+          P.g.position.lerp(_a, G.ui.fade > 0.9 ? 1 : Math.min(1, dt * 1.1 / Math.max(d0, 1e-3)));
           P.g.rotation.y = P.watchFace;
+          if (d0 > 0.25 && G.ui.fade <= 0.9) { P.pose = 'walk'; P.stride = (P.stride || 0) + dt * 1.1 / 0.62 * Math.PI; P.g.rotation.y = Math.atan2(_a.x - P.g.position.x, _a.z - P.g.position.z); }
         } else P.g.position.copy(P.home).addScaledVector(this.u, -back * (s.phase === 'pull' ? 1 : 0));
       } else if (P.role === 'pit') P.pose = s.phase === 'raise' ? 'pull' : s.cheer ? 'cheer' : s.point ? 'point' : 'idle';
-      else P.pose = s.cheer ? 'cheer' : s.point ? 'point' : 'idle';
+      else if (!P.walker) P.pose = s.cheer ? 'cheer' : s.point ? 'point' : 'idle';
+      // Reactions: everyone gasps at the first light and watches the sunrise; otherwise they glance at you
+      if (s.gasp && !P.walker) P.pose = 'gasp';
+      P.glance = true;
+      P.look = s.phase === 'sunrise' || s.gasp ? this.sunLook : null;
       at(SLOT, R_SARSEN, 1.5, P.pointAt);
       animatePerson(P, t, dt);
       P.blk.x = P.g.position.x; P.blk.z = P.g.position.z;
     }
+
+    // Life: herds, the shepherd, the torch walkers, birds once the Sun is up
+    if (s.home && !this.homeSet) {
+      this.homeSet = true;
+      const V = at(150, 120);
+      for (const P of [...this.people.filter((p) => p.role === 'crowd'), ...this.walkers.slice(1)]) { P.routine = [{ x: V.x + (P.phase % 3) * 2, z: V.z + (P.phase % 2) * 2, pose: 'idle', secs: 1e9 }]; P.ri = 0; P.rt = 0; P.walker = true; }
+      for (const P of this.people) if (P.role === 'crowd') this.walkers.push(P);
+    }
+    for (const P of this.walkers) {
+      runRoutine(P, dt, { height: groundHeight, speed: P === this.shepherd ? 0.6 : 1.05 });
+      if (P.walker && P.pose === 'idle' && s.gasp) P.pose = 'gasp'; else if (P.walker && P.pose === 'idle' && s.cheer) P.pose = 'cheer';
+      if (P.blk) { P.blk.x = P.g.position.x; P.blk.z = P.g.position.z; }
+      if (P.role === 'crowd') continue;   // (animated with the rest of the people above)
+      animatePerson(P, t, dt);
+    }
+    this.sheep.lead.copy(this.shepherd.g.position); this.dog.lead.copy(this.shepherd.g.position);
+    for (const tc of this.torches) { const f = tc.userData.flame; f.scale.set(0.3 + 0.06 * Math.sin(t * 13 + tc.id), 0.45 + 0.1 * Math.sin(t * 9 + tc.id * 2), 1); f.material.opacity = clamp(1 - (s.sunEl + 2) / 6, 0.15, 1); }
+    this.flock.group.visible = s.sunEl > -1;
+    this.life.update(dt, t);
+    // ch2_04: the little sun on the horizon
+    const mOn = s.sunTo != null && this.pathV > 0.3 ? 1 : 0;
+    this.marker.material.opacity = damp(this.marker.material.opacity, mOn * 0.95, 2, dt);
+    this.marker.visible = this.marker.material.opacity > 0.01;
+    if (s.sunTo != null) this.markerAz += clamp(s.sunTo - this.markerAz, -dt * 9, dt * 9);
+    else this.markerAz = WINTER;
+    dirFromAzEl(this.markerAz, 1.2, this.marker.position).multiplyScalar(300);
 
     // Guide: hover where the story wants it, or beside you
     if (s.guide) { _a.fromArray(s.guide); if (!this.guideAt || !this.guideAt.equals(_a)) { this.guideAt = _a.clone(); G.guide.flyTo(this.guideAt); G.guide.chime(); } }

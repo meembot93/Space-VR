@@ -17,7 +17,8 @@
 // origin, so the walking limit (G.world.bounds, a circle round the origin) keeps you on it.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
-import { makePerson, animatePerson } from '../people.js';
+import { makePerson, animatePerson, walkToward } from '../people.js';
+import { makeHerd, makeFlock, makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
@@ -135,7 +136,8 @@ function textSprite(text, sub = '', w = 512) {
 }
 
 // The Nebra sky disk, as it looked when new: blue-green bronze with gold inlay
-function nebraTex() {
+function nebraTex(stage = 3) {
+  // stage: 0 bare bronze, 1 + the Sun, 2 + the Moon, 3 + the stars (the whole disk)
   return canvasTex(512, 512, (g, w) => {
     const c = w / 2, R = w / 2 - 2;
     g.fillStyle = '#2f6b5e'; g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.fill();
@@ -149,8 +151,9 @@ function nebraTex() {
     const gold = g.createLinearGradient(0, 0, w, w); gold.addColorStop(0, '#f6d77a'); gold.addColorStop(0.5, '#d9a93a'); gold.addColorStop(1, '#f2cc66');
     g.fillStyle = gold; g.strokeStyle = gold;
     // the Sun (or full Moon) and the crescent Moon
-    g.beginPath(); g.arc(c - 110, c + 40, 62, 0, 6.283); g.fill();
-    g.beginPath(); g.arc(c + 95, c - 70, 66, 0, 6.283); g.arc(c + 125, c - 95, 60, 0, 6.283, true); g.fill('evenodd');
+    if (stage >= 1) { g.beginPath(); g.arc(c - 110, c + 40, 62, 0, 6.283); g.fill(); }
+    if (stage >= 2) { g.beginPath(); g.arc(c + 95, c - 70, 66, 0, 6.283); g.arc(c + 125, c - 95, 60, 0, 6.283, true); g.fill('evenodd'); }
+    if (stage < 3) return;
     // horizon arcs at the edges, and the "sun boat" at the bottom
     g.lineCap = 'round';
     for (const s of [-1, 1]) { g.lineWidth = 14; g.beginPath(); g.arc(c, c, R - 22, s < 0 ? Math.PI * 0.78 : -Math.PI * 0.22, s < 0 ? Math.PI * 1.22 : Math.PI * 0.22); g.stroke(); }
@@ -252,6 +255,9 @@ export default class Nile {
       scene: 'egypt',   // or 'nebra'
       held: 0,          // the disk is held up
       match: 0,         // 0..1 the disk's stars light up the sky's
+      preview: 0,       // ch3_04: the flood shown spreading over the fields (and the black mud it leaves)
+      cal: 0,           // ch3_09: 1 the three seasons in a ring, 2 ...that turn into our twelve months
+      gold: 3,          // the Nebra disk: how much of its gold is on (0 bare bronze .. 3 all)
     };
     this.view = { water: FLOOD_LO, season: -1 };
     G.world.height = (x, z) => (this.s.scene === 'nebra' ? nebraHeight(x, z) : ROOF);
@@ -271,6 +277,8 @@ export default class Nile {
     this.buildRoof();
     this.buildPeople();
     this.buildSkyBits();
+    this.buildLife();
+    this.buildCalendar();
     this.buildNebra();
     this.journal = makeJournalPage('nile'); this.journal.visible = false; this.root.add(this.journal);
     this.registerInteractables();
@@ -692,6 +700,55 @@ export default class Nile {
     this.people.push(pr);
   }
 
+  // Life along the Nile: fishermen out on the river with lamps, ibis wading at the field edges,
+  // goats and a donkey by the village, egrets flying over at dawn, smoke from the bread ovens.
+  buildLife() {
+    this.life = new Life(this.egypt);
+    this.ibis = this.life.add(makeHerd('ibis', { n: 9, area: { x: 70, z: -40, r: 22 }, height: (x, z) => groundHeight(x, z) + 0.05, seed: 41, scale: 1.4 }));
+    this.goats = this.life.add(makeHerd('goat', { n: 7, area: { x: 18, z: 26, r: 7 }, height: groundHeight, seed: 42 }));
+    this.donkeys = this.life.add(makeHerd('donkey', { n: 2, area: { x: 22, z: -18, r: 5 }, height: groundHeight, seed: 43 }));
+    this.egrets = this.life.add(makeFlock({ n: 14, center: new THREE.Vector3(90, 22, -10), r: 45, height: 6, color: 0xf4f2ea, seed: 44, size: 1.3, speed: 7 }));
+    this.egrets.group.visible = false;
+    for (const sp of this.roofSpots.slice(2, 6)) this.life.add(makeSmoke(sp.clone().add(_a.set(2, 0.5, 2)), { rise: 9, color: 0xc8c0b4, size: 1.6, opacity: 0.25 }));
+    // reed fishing boats drifting on the river, each with a fisherman and a lamp at the bow
+    this.boats = [];
+    for (let i = 0; i < 4; i++) {
+      const k = new Kit(), g = new THREE.Group();
+      k.cyl(0.35, 0.25, 5.2, 8, 0xb8a060, [0, 0.15, 0], [Math.PI / 2, 0, 0], [1, 1, 0.55]);   // a bundle of papyrus reeds
+      k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, 2.8], [Math.PI / 2 - 0.6, 0, 0]); k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, -2.8], [-Math.PI / 2 + 0.6, 0, 0]);
+      k.cyl(0.03, 0.03, 3.2, 4, 0x5a4030, [0.3, 1.0, -1.2], [0.5, 0, 0.2]);                // the pole
+      k.cyl(0.2, 0.26, 0.9, 6, 0xe8e0cc, [0, 0.75, -1], 0); k.ball(0.14, 1, 0x7a4e32, [0, 1.35, -1]);   // the fisherman, seated
+      g.add(k.mesh());
+      const lamp = new THREE.Sprite(glowMat('rgba(255,190,100,1)')); lamp.position.set(0, 1.1, 2.4); lamp.scale.setScalar(5); g.add(lamp);
+      g.userData = { z: -260 + i * 170, x: 205 + (i % 2) * 40 + i * 6, v: (i % 2 ? 1 : -1) * (0.6 + i * 0.1), lamp };
+      this.egypt.add(g); this.boats.push(g);
+    }
+  }
+
+  // ch3_09: the Egyptian year as a ring in the sky (Flood, Growing, Harvest), which turns into our
+  // own calendar's twelve months
+  buildCalendar() {
+    const wheel = (months) => canvasTex(512, 512, (g, w) => {
+      const c = w / 2, R = 230;
+      g.lineCap = 'butt';
+      const segs = months ? 12 : 3, cols = months ? null : ['#5aa0d8', '#6ab04a', '#e0b040'];
+      const names = months ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] : ['Flood', 'Growing', 'Harvest'];
+      for (let i = 0; i < segs; i++) {
+        const a0 = -Math.PI / 2 + i / segs * Math.PI * 2 + 0.03, a1 = -Math.PI / 2 + (i + 1) / segs * Math.PI * 2 - 0.03;
+        g.strokeStyle = months ? ['#5aa0d8', '#6ab04a', '#e0b040'][Math.floor(((i + 6) % 12) / 4)] : cols[i];
+        g.globalAlpha = 0.85; g.lineWidth = 56; g.beginPath(); g.arc(c, c, R - 40, a0, a1); g.stroke(); g.globalAlpha = 1;
+        const am = (a0 + a1) / 2; g.fillStyle = '#fff8e8'; g.font = `bold ${months ? 30 : 40}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.save(); g.translate(c + Math.cos(am) * (R - 40), c + Math.sin(am) * (R - 40)); g.rotate(am + Math.PI / 2); g.fillText(names[i], 0, 0); g.restore();
+      }
+      g.fillStyle = '#fff2c8'; g.font = 'bold 44px Georgia, serif'; g.textAlign = 'center'; g.fillText('365', c, c - 8); g.font = '28px Georgia, serif'; g.fillText('days', c, c + 30);
+    });
+    this.calMats = [wheel(false), wheel(true)].map((map) => new THREE.MeshBasicMaterial({ map, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+    this.cal = new THREE.Group();
+    for (const m of this.calMats) this.cal.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m));
+    this.cal.position.copy(at(92, 55, ROOF + 14)); this.cal.scale.setScalar(26); this.cal.lookAt(0, ROOF + 1.6, 0);
+    this.cal.visible = false; this.egypt.add(this.cal);
+  }
+
   // Sirius itself (bright, twinkling, a little bigger than the sky's other stars), its name,
   // the glow of lamps across the village, and the rays you point with.
   buildSkyBits() {
@@ -744,7 +801,8 @@ export default class Nile {
     // the disk
     const disk = new THREE.Group();
     // (lit a little by itself: it's night, and you need to see it)
-    const face = new THREE.MeshBasicMaterial({ map: nebraTex(), color: 0x9a9a92 });
+    this.diskTex = [0, 1, 2, 3].map((k) => nebraTex(k));   // ch3 bridge: the gold goes on piece by piece as Astra names it
+    const face = new THREE.MeshBasicMaterial({ map: this.diskTex[3], color: 0x9a9a92 }); this.diskFace = face;
     const edge = new THREE.MeshBasicMaterial({ color: 0x1e4a3e });
     const dm = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.01, 48), [edge, face, edge]);
     dm.rotation.x = Math.PI / 2; disk.add(dm);       // face toward +Z (toward you, or up when held up)
@@ -839,7 +897,12 @@ export default class Nile {
     if (D.kids) D.goTo(new THREE.Vector3(0.6, 0, 0.4), this.faceToward(_c.set(0.6, 0, 0.4), at(80, 100))).catch(() => {});   // turn you to face it
     await D.say('ch3_03');
     s.guide = at(140, 12, ROOF + 1.5).toArray();
-    await D.say('ch3_04');
+    // the flood, shown: the water spreads over the fields, then drains away leaving black mud
+    const l4 = D.sayAsync('ch3_04');
+    await D.cue('It spreads'); s.preview = 1;
+    await D.cue('If you know'); s.preview = 2;
+    await l4;
+    s.preview = 0;
     // The priest by his sighting post; watch the east
     s.phase = 'watch'; s.ring = 1; s.point = 1;
     const [, , saz] = skyAt(0);
@@ -872,7 +935,11 @@ export default class Nile {
     await D.say('ch3_08');
     await D.until(() => s.year >= 1);
     s.phase = 'closing'; s.guide = null;
-    await D.say('ch3_09');
+    s.cal = 1;                                                 // the Egyptian year, as a ring...
+    const l9 = D.sayAsync('ch3_09');
+    await D.cue('basic shape'); s.cal = 2;                     // ...that becomes our own twelve months
+    await l9;
+    await D.wait(fast ? 0.3 : 1.5); s.cal = 0;
     // The journal page
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
@@ -889,8 +956,12 @@ export default class Nile {
     G.guide.place();
     await D.wait(0.3);
     await G.ui.fadeIn(2);
-    s.phase = 'hold';
-    await D.say('br3_01');
+    s.phase = 'hold'; s.gold = 0;                              // the gold goes on as Astra names each piece
+    const lb = D.sayAsync('br3_01');
+    await D.cue('golden Sun'); s.gold = 1;
+    await D.cue('a Moon'); s.gold = 2;
+    await D.cue('little cluster'); s.gold = 3;
+    await lb;
     D.hint(G.mode === 'desktop' ? this.diskIt.deskHint : this.diskIt.hint, 9);
     if (!(await D.auto(() => s.held, () => { s.held = 1; }, { after: fast ? 0.3 : 2, timeout: fast ? 4 : 45 }))) s.held = 1;
     G.ui.showHint('');
@@ -968,16 +1039,19 @@ export default class Nile {
 
     // Water: the river, then the flood rising over the fields and going down again
     const y = s.year;
-    const flood = s.phase === 'year' || s.phase === 'closing' || s.phase === 'journal' ? Math.sin(Math.PI * clamp(y / 0.42, 0, 1)) : 0;
+    // (ch3_04 shows it early: up over the fields, then down again leaving black mud)
+    this.previewV = damp(this.previewV || 0, s.preview === 1 ? 1 : 0, 0.7, dt);
+    this.mudV = damp(this.mudV || 0, s.preview === 2 ? 1 : 0, 1.2, dt);
+    const flood = Math.max(this.previewV * 0.8, s.phase === 'year' || s.phase === 'closing' || s.phase === 'journal' ? Math.sin(Math.PI * clamp(y / 0.42, 0, 1)) : 0);
     const level = lerp(FLOOD_LO, FLOOD_HI, ease(flood));
     this.water.position.y = level;
-    const wet = clamp(smooth(0.06, 0.18, y) - smooth(0.5, 0.62, y) * 0.6, 0, 1);
+    const wet = Math.max(Math.round(Math.max(this.previewV, this.mudV) * 10) / 10, clamp(smooth(0.06, 0.18, y) - smooth(0.5, 0.62, y) * 0.6, 0, 1));
     const key = Math.round(y * 200) + Math.round(wet * 50) * 1000;
     if (key !== this.view.season) { this.view.season = key; this.colorFields(y, wet); }
     this.fields.visible = level < FLOOD_HI - 0.05;
     // the flood water is brown with silt; the river in summer is dark and clear
     this.water.material.emissive.copy(G.scene.fog.color).multiplyScalar(0.3 - 0.2 * flood);
-    this.water.material.color.setHex(0x22404e).lerp(SILT, smooth(0.0, 0.5, flood) * (s.phase === 'year' ? 1 : 0));
+    this.water.material.color.setHex(0x22404e).lerp(SILT, smooth(0.0, 0.5, flood) * (s.phase === 'year' || s.preview ? 1 : 0));
     const grow = smooth(0.42, 0.6, y), ripe = smooth(0.7, 0.85, y), cut = smooth(0.94, 1.0, y);
     this.crops.visible = grow > 0.01 && cut < 0.99 && level < 0.1;
     this.crops.scale.y = Math.max(0.01, grow * (1 - cut));
@@ -1002,13 +1076,34 @@ export default class Nile {
     for (const P of this.walkers) {
       P.g.visible = s.lights > 0.05;
       if (s.lights > 0.2 && s.phase !== 'arrive') {
-        _b.copy(P.goal).sub(P.g.position); _b.y = 0; const d = _b.length();
-        if (d > 0.5) { P.g.position.addScaledVector(_b.normalize(), Math.min(d, P.speed * dt * fast)); P.g.rotation.y = Math.atan2(_b.x, _b.z); }
-        P.g.position.y = groundHeight(P.g.position.x, P.g.position.z) + (d > 0.5 ? Math.abs(Math.sin(t * 6 + P.phase)) * 0.05 : 0);
-        P.pose = d > 0.5 ? 'idle' : 'point'; P.pointAt.set(400, 2, P.g.position.z);
+        // Through the year: up the mound out of the flood, then out to the fields to plant, tend and
+        // bring in the harvest (some carry the sheaves home on their heads)
+        const yr = s.phase === 'year' ? s.year : s.phase === 'closing' || s.phase === 'journal' ? 1 : -1;
+        const home = yr > 0.04 && yr < 0.42;
+        const there = walkToward(P, home ? P.home.x : P.goal.x, home ? P.home.z : P.goal.z, dt, { speed: P.speed * fast * (yr >= 0 ? 2.5 : 1), height: groundHeight, stop: 0.5 });
+        if (there) {
+          if (yr < 0) { P.pose = 'point'; P.pointAt.set(400, 2, P.g.position.z); }
+          else if (home) P.pose = 'idle';
+          else if (yr < 0.72) P.pose = 'work';
+          else P.pose = P.phase % 3 < 1 ? 'carry' : 'work';
+        }
       }
       animatePerson(P, t, dt);
     }
+    // Life: boats drift on the river, lamps fading at dawn; birds fly once it's light
+    for (const b of this.boats) {
+      const u = b.userData; u.z += u.v * dt; if (u.z > 400) u.z = -400; if (u.z < -400) u.z = 400;
+      b.position.set(u.x, Math.max(FLOOD_LO, this.water.position.y) + 0.05 + Math.sin(t * 1.3 + u.x) * 0.04, u.z); b.rotation.y = u.v > 0 ? 0 : Math.PI;
+      u.lamp.material.opacity = clamp(1 - (sunEl + 4) / 8, 0, 1) * (0.8 + 0.2 * Math.sin(t * 9 + u.x));
+    }
+    this.egrets.group.visible = sunEl > -3;
+    this.ibis.group.visible = this.water.position.y < 0;   // (they fly off when the flood comes)
+    this.life.update(dt, t);
+    // ch3_09: the year as a ring, turning into our twelve months
+    this.calV = damp(this.calV || 0, s.cal ? 1 : 0, 1.5, dt); this.calM = damp(this.calM || 0, s.cal === 2 ? 1 : 0, 1.2, dt);
+    this.cal.visible = this.calV > 0.01;
+    this.calMats[0].opacity = this.calV * (1 - this.calM) * 0.95; this.calMats[1].opacity = this.calV * this.calM * 0.95;
+    this.cal.rotation.z = (1 - this.calV) * 0.6;
     // The priest: points at where Sirius will rise, raises his arms when it's found
     const pr = this.priest;
     pr.pose = s.phase === 'found' ? 'cheer' : s.point ? 'point' : 'idle';
@@ -1083,9 +1178,12 @@ export default class Nile {
       // someone else held it up: it floats up beside you toward the stars
       d.position.lerp(_a.copy(_c).addScaledVector(this.pleiadesDir, 0.6), 0.05); d.lookAt(_a.copy(d.position).add(this.pleiadesDir));
     }
+    // the gold goes on piece by piece (with a flash each time)
+    if (this.diskFace.map !== this.diskTex[s.gold ?? 3]) { this.diskFace.map = this.diskTex[s.gold ?? 3]; this.diskFace.needsUpdate = true; this.goldFlash = 1; G.audio.chime?.(d.position, 0.4); }
+    this.goldFlash = Math.max(0, (this.goldFlash || 0) - dt * 1.5);
     // the stars on the disk and in the sky light up together
     const m = ease(s.match);
-    this.diskGlow.material.opacity = m * (0.6 + 0.2 * Math.sin(t * 3));
+    this.diskGlow.material.opacity = Math.max(m * (0.6 + 0.2 * Math.sin(t * 3)), this.goldFlash * 0.8);
     for (const sp of this.pleiades.children) if (sp.isSprite && sp !== this.pleiadesLabel) sp.material.opacity = 0.35 + m * 0.65 * (0.85 + 0.15 * Math.sin(t * 9 + sp.userData.mag * 7));
     this.pleiadesLabel.material.opacity = smooth(0.4, 1, s.match);
     this.pleiadesRing.material.opacity = m * 0.6;

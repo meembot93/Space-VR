@@ -13,7 +13,8 @@
 // The full Moon hangs in the south-west, over the river.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
-import { makePerson, animatePerson } from '../people.js';
+import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
+import { makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng } from '../shapes.js';
@@ -149,6 +150,11 @@ export default class Babylon {
       watcher: 'idle',            // what the sky-watcher is doing: idle, shelves, tablet, moon
       nod: 0,                     // counts up each time he nods
       journal: 0,                 // 1 = the page is out, 2 = you touched it
+      close: 0, closeN: 0, dry: 0, // ch4_02: the big close-up tablet, wedges pressed into it, drying
+      sky: 0,                     // ch4_03: 1 the Moon ringed, 2 + the planets, 3 + a comet, 4 + lightning
+      ghosts: 0,                  // ch4_05: how many earlier sky-watchers stand in the line
+      calm: 0,                    // ch4_08: the watchers calmly write it down while the town is scared
+      wheel: 0,                   // ch4_10: 1 sixty minutes, 2 360 degrees, 3 the twelve signs
     };
     G.world.height = () => 0;     // you are on the terrace
     G.world.bounds = 8.8;
@@ -169,6 +175,7 @@ export default class Babylon {
     this.buildMoon();
     this.buildEffects();
     this.buildJournal();
+    this.buildStory();
     this.registerInteractables();
     this.cricketT = 1; this.murmurT = 0; this.drumT = 0; this.shown = { marks: 0, fetched: [0, 0, 0, 0] };
   }
@@ -338,6 +345,135 @@ export default class Babylon {
       const o = new THREE.Points(geo, m); this.root.add(o); return o;
     };
     this.cityLights = [pts(lights, 3.2, 0xffb060), pts(torches, 4.5, 0xff9a40)];
+  }
+
+  // ---------- Story pieces timed to the narration ----------
+  buildStory() {
+    const G = this.G;
+    this.life = new Life(this.root);
+    // smoke from a few rooftop fires and bread ovens around the courtyard
+    for (const [x, z] of [[-40, 60], [55, -40], [-70, -30], [30, 90]]) this.life.add(makeSmoke(new THREE.Vector3(x, BASE + 5, z), { rise: 14, size: 3, color: 0x8a8070, opacity: 0.22 }));
+    // townspeople in the courtyard stroll about until the Moon starts to go dark
+    const town = this.people.filter((P) => P.role === 'town' && P.g.position.y <= BASE + 0.1);
+    town.forEach((P, i) => { const h = P.home; P.routine = [{ x: h.x, z: h.z, pose: 'idle', secs: 4 + i }, { x: h.x + 6 - (i % 3) * 5, z: h.z - 5 - (i % 2) * 6, pose: i % 2 ? 'talk' : 'idle', secs: 5 }]; P.ri = i % 2; P.stroll = true; });
+    // ch4_02: a close-up of a clay tablet, floating in front of you: a reed presses wedges in, then it dries
+    this.closeCv = document.createElement('canvas'); this.closeCv.width = 256; this.closeCv.height = 320;
+    this.closeTex = new THREE.CanvasTexture(this.closeCv); this.closeTex.colorSpace = THREE.SRGBColorSpace;
+    this.close = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.625), new THREE.MeshBasicMaterial({ map: this.closeTex, transparent: true, opacity: 0, fog: false }));
+    const rk = new Kit(); rk.cyl(0.006, 0.008, 0.3, 5, 0xc8b070, [0, 0.15, 0]); rk.box(0.012, 0.02, 0.012, 0x9a8050, [0, 0, 0]);
+    this.closeReed = rk.mesh(); this.closeReed.visible = false; this.root.add(this.closeReed);
+    this.close.visible = false; this.root.add(this.close); this.drawClose(0, 0);
+    this.watcherReed = this.closeReed.clone(); this.watcherReed.visible = true; holdProp(this.watcher, this.watcherReed, 'Right', [0, 0.06, 0.02]); this.watcherReed.visible = false;
+    // ch4_03: what the watchers wrote down: the Moon, the planets, a comet, the weather
+    const add = (o) => { o.visible = false; this.root.add(o); return o; };
+    this.skyBits = new THREE.Group(); this.root.add(this.skyBits);
+    this.moonRing = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    this.moonRing.position.copy(this.moonDir).multiplyScalar(830); this.moonRing.lookAt(0, 0, 0); this.moonRing.scale.setScalar(MOON_R * 1.9); this.skyBits.add(this.moonRing);
+    this.planets = [['Jupiter', 286, 27, 'rgba(255,246,220,1)', 14], ['Mars', 302, 14, 'rgba(255,150,100,1)', 10]].map(([name, az, el, col, sz]) => {
+      const g = new THREE.Group(), sp = new THREE.Sprite(glowMat(col)); sp.scale.setScalar(sz); g.add(sp);
+      const lb = label(name, 60); lb.position.y = -12; g.add(lb); g.position.copy(dirFromAzEl(az, el)).multiplyScalar(800);
+      g.userData.mats = [sp.material, lb.material]; this.skyBits.add(g); return g;
+    });
+    const ct = canvasTex(256, 32, (g, w, h) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, 'rgba(180,220,255,0)'); gr.addColorStop(0.85, 'rgba(210,235,255,0.6)'); gr.addColorStop(1, 'rgba(255,255,255,1)'); g.fillStyle = gr; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h * 0.15); g.lineTo(w, h * 0.85); g.fill(); });
+    this.comet = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.12), new THREE.MeshBasicMaterial({ map: ct, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
+    this.comet.scale.setScalar(130); this.skyBits.add(this.comet);
+    this.flash = new THREE.Sprite(glowMat('rgba(220,225,255,1)')); this.flash.position.copy(dirFromAzEl(298, 2)).multiplyScalar(700); this.flash.scale.set(500, 160, 1); this.flash.material.opacity = 0; this.skyBits.add(this.flash);
+    // ch4_05: the watchers before him, one after another, back through the years (ghostly)
+    this.ghosts = [];
+    const ghostMat = new THREE.MeshBasicMaterial({ color: 0x9ac8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    this.ghostMat = ghostMat;
+    for (let i = 0; i < 5; i++) {
+      const P = makePerson({ model: 'skywatcher', seed: 600 + i, beard: true });
+      P.g.position.set(this.deskX - 1.5 - i * 0.95, 0, this.shrineFront + 0.95 + i * 0.25); P.g.rotation.y = 0.5 + i * 0.05; P.pose = i % 2 ? 'hold' : 'idle'; P.g.visible = false;
+      P.g.traverse((o) => { if (o.isMesh) o.material = ghostMat; });
+      const tb = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.03), ghostMat); if (i % 2) holdProp(P, tb, 'Right', [0, 0.08, 0.04]);
+      this.root.add(P.g); this.ghosts.push(P);
+    }
+    // ch4_10: what Babylon left us: sixty minutes, 360 degrees, the twelve signs of the zodiac
+    const face = (kind) => canvasTex(512, 512, (g, w) => {
+      const c = w / 2, R = 220; g.strokeStyle = '#ffe2a8'; g.fillStyle = '#ffe2a8'; g.lineWidth = 6;
+      g.beginPath(); g.arc(c, c, R, 0, 6.283); g.stroke();
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (kind === 0) {
+        for (let i = 0; i < 60; i++) { const a = i / 60 * 6.283, l = i % 5 ? 14 : 30; g.lineWidth = i % 5 ? 3 : 6; g.beginPath(); g.moveTo(c + Math.sin(a) * (R - 6), c - Math.cos(a) * (R - 6)); g.lineTo(c + Math.sin(a) * (R - 6 - l), c - Math.cos(a) * (R - 6 - l)); g.stroke(); }
+        g.lineWidth = 8; g.beginPath(); g.moveTo(c, c); g.lineTo(c, c - R * 0.7); g.stroke(); g.lineWidth = 5; g.beginPath(); g.moveTo(c, c); g.lineTo(c + R * 0.45, c + R * 0.2); g.stroke();
+        g.font = 'bold 54px Georgia, serif'; g.fillText('60 minutes', c, c + R * 0.45);
+      } else if (kind === 1) {
+        for (let i = 0; i < 36; i++) { const a = i / 36 * 6.283, l = i % 9 ? 14 : 34; g.lineWidth = i % 9 ? 3 : 6; g.beginPath(); g.moveTo(c + Math.sin(a) * (R - 6), c - Math.cos(a) * (R - 6)); g.lineTo(c + Math.sin(a) * (R - 6 - l), c - Math.cos(a) * (R - 6 - l)); g.stroke(); }
+        g.font = 'bold 34px Georgia, serif'; [['0°', 0], ['90°', 90], ['180°', 180], ['270°', 270]].forEach(([tx, d]) => { const a = d * D2R; g.fillText(tx, c + Math.sin(a) * (R - 70), c - Math.cos(a) * (R - 70)); });
+        g.font = 'bold 64px Georgia, serif'; g.fillText('360°', c, c);
+      } else {
+        const signs = ['♈︎', '♉︎', '♊︎', '♋︎', '♌︎', '♍︎', '♎︎', '♏︎', '♐︎', '♑︎', '♒︎', '♓︎'];
+        for (let i = 0; i < 12; i++) { const a = (i + 0.5) / 12 * 6.283; g.lineWidth = 3; g.beginPath(); g.moveTo(c + Math.sin(i / 12 * 6.283) * R, c - Math.cos(i / 12 * 6.283) * R); g.lineTo(c + Math.sin(i / 12 * 6.283) * (R - 80), c - Math.cos(i / 12 * 6.283) * (R - 80)); g.stroke();
+          g.font = '52px "Segoe UI Symbol", "Noto Sans Symbols", "Apple Symbols", serif'; g.fillText(signs[i], c + Math.sin(a) * (R - 40), c - Math.cos(a) * (R - 40)); }
+        g.beginPath(); g.arc(c, c, R - 80, 0, 6.283); g.stroke();
+        g.font = 'bold 40px Georgia, serif'; g.fillText('12 signs', c, c - 10); g.font = '28px Georgia, serif'; g.fillText('of the zodiac', c, c + 30);
+      }
+    });
+    this.wheelMats = [0, 1, 2].map((k) => new THREE.MeshBasicMaterial({ map: face(k), transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    this.wheel = new THREE.Group(); for (const m of this.wheelMats) this.wheel.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m));
+    this.wheel.visible = false; this.root.add(this.wheel);
+  }
+
+  updateStory(dt, t) {
+    const G = this.G, s = this.s;
+    this.life.update(dt, t);
+    G.camera.getWorldPosition(_c);
+    // the close-up tablet, out in front of you, and the reed pressing into it
+    this.closeV = damp(this.closeV || 0, s.close ? 1 : 0, 3, dt);
+    this.close.visible = this.closeReed.visible = this.closeV > 0.01;
+    if (this.close.visible) {
+      if (!this.closeSet) { this.closeSet = true; G.camera.getWorldDirection(_b); _b.y = 0; _b.normalize(); this.close.position.copy(_c).addScaledVector(_b, 0.9).add(_a.set(-_b.z * 0.25, -0.15, _b.x * 0.25)); }
+      this.close.lookAt(_c); this.close.material.opacity = this.closeV;
+      this.dryV = damp(this.dryV || 0, s.dry, 0.8, dt);
+      const key = s.closeN * 100 + Math.round(this.dryV * 20);
+      if (key !== this.closeKey) { this.closeKey = key; this.drawClose(s.closeN, this.dryV); if (this.lastN !== s.closeN && s.closeN) this.squish(this.close.position); this.lastN = s.closeN; }
+      // the reed: hops to the next spot and presses in (gone once it starts to dry)
+      const n = Math.min(11, s.closeN), row = Math.floor(n / 4), col = n % 4;
+      _a.set((50 + col * 50 + (row % 2) * 10) / 256 - 0.5, 0.5 - (70 + row * 70) / 320, 0).multiply(_b.set(0.5, 0.625, 1));
+      this.closeReed.position.copy(_a).applyQuaternion(this.close.quaternion).add(this.close.position);
+      _b.set(0, 0, 1).applyQuaternion(this.close.quaternion);
+      this.closeReed.position.addScaledVector(_b, 0.03 + 0.04 * Math.abs(Math.sin(t * 9)));
+      this.closeReed.quaternion.copy(this.close.quaternion); this.closeReed.rotateX(-1.2);
+      this.closeReed.visible = this.close.visible && s.dry < 1;
+    } else this.closeSet = false;
+    this.watcherReed.visible = s.watcher === 'write' || (s.calm && s.ecl > 0.3);
+    // ch4_03: the Moon ringed, the planets, a comet, a flash of lightning far off
+    this.skyBits.position.copy(_c);
+    const sk = s.sky;
+    this.moonRing.material.opacity = damp(this.moonRing.material.opacity, sk >= 1 ? 0.7 : 0, 3, dt); this.moonRing.scale.setScalar(MOON_R * (1.9 + 0.1 * Math.sin(t * 3)));
+    for (const pl of this.planets) for (const m of pl.userData.mats) m.opacity = damp(m.opacity, sk >= 2 ? 1 : 0, 2.5, dt);
+    if (sk >= 3 && this.cometT == null) this.cometT = 0;
+    if (this.cometT != null) {
+      this.cometT += dt / 3.2; const k = Math.min(1, this.cometT);
+      dirFromAzEl(lerp(262, 318, k), lerp(46, 22, k), this.comet.position).multiplyScalar(780);
+      dirFromAzEl(lerp(262, 318, k + 0.02), lerp(46, 22, k + 0.02), _a).multiplyScalar(780);
+      this.comet.lookAt(0, 0, 0); this.comet.material.opacity = Math.sin(Math.PI * k) * 0.9;
+      // point the streak along its path (head first)
+      _b.copy(_a).sub(this.comet.position).normalize(); const up = _b.dot(_a.set(0, 1, 0).applyQuaternion(this.comet.quaternion)), right = _b.dot(_a.set(1, 0, 0).applyQuaternion(this.comet.quaternion));
+      this.comet.rotateZ(Math.atan2(up, right));
+      if (k >= 1 && sk < 3) this.cometT = null;
+    }
+    this.flash.material.opacity = sk >= 4 ? Math.max(0, Math.sin(t * 17) * Math.sin(t * 5.3)) * 0.8 * (Math.sin(t * 0.9) > 0.3 ? 1 : 0) : 0;
+    // ch4_05: the line of earlier watchers
+    this.ghostV = damp(this.ghostV || 0, s.ghosts, 2, dt);
+    this.ghostMat.opacity = Math.min(1, this.ghostV) * 0.45;
+    this.ghosts.forEach((P, i) => { P.g.visible = this.ghostV > i + 0.05; if (P.g.visible) { animatePerson(P, t, dt); if (P.model && !P.ghosted) { P.ghosted = true; P.g.traverse((o) => { if (o.isMesh) o.material = this.ghostMat; }); } } });
+    // ch4_10: the clock, the circle, the zodiac, out under the Moon
+    const wv = s.wheel;
+    this.wheelMats.forEach((m, i) => { m.opacity = damp(m.opacity, wv === i + 1 ? 0.9 : 0, 2.5, dt); });
+    this.wheel.visible = this.wheelMats.some((m) => m.opacity > 0.01);
+    if (this.wheel.visible) { this.wheel.position.copy(dirFromAzEl(MOON_AZ + 22, MOON_EL - 16)).multiplyScalar(40).add(_c); this.wheel.scale.setScalar(16); this.wheel.lookAt(_c); this.wheel.rotateZ(Math.sin(t * 0.3) * 0.05); }
+  }
+
+  // The close-up tablet: n wedges pressed in, dry = 0 (dark wet clay) .. 1 (pale, baked hard)
+  drawClose(n, dry) {
+    const g = this.closeCv.getContext('2d'), w = 256, h = 320;
+    const wet = [106, 84, 62], dr = [200, 176, 136], c = wet.map((v, i) => Math.round(lerp(v, dr[i], dry)));
+    g.clearRect(0, 0, w, h); g.fillStyle = `rgb(${c})`; g.beginPath(); g.roundRect(8, 8, w - 16, h - 16, 26); g.fill();
+    g.fillStyle = `rgba(255,255,255,${0.12 * (1 - dry)})`; g.beginPath(); g.ellipse(90, 70, 60, 26, -0.4, 0, 6.283); g.fill();   // wet shine
+    for (let i = 0; i < n; i++) { const row = Math.floor(i / 4), col = i % 4; wedge(g, 50 + col * 50 + (row % 2) * 10, 70 + row * 70, 20, [0, 90, 45, 0][(i * 7) % 4], 1); }
+    this.closeTex.needsUpdate = true;
   }
 
   buildPalms(RIVER, riverW) {
@@ -732,11 +868,23 @@ export default class Babylon {
     await G.ui.fadeIn(2.5);
     s.guide = [-7, 2.6, 4];
     await D.say('ch4_01');
-    s.guide = [-8.5, 1.4, -2];                             // out over the edge, toward the river and the palace
-    await D.say('ch4_02');
+    // ch4_02: a clay tablet up close. The reed presses wedge after wedge into it, then it dries hard.
+    s.close = 1; s.closeN = 0; s.guide = null; s.watcher = 'write';
+    const l2 = D.sayAsync('ch4_02');
+    await D.cue('They pressed');
+    for (let i = 1; i <= 12; i++) { s.closeN = i; await D.wait(fast ? 0.05 : 0.32); }
+    await D.cue('let it dry'); s.dry = 1;
+    await l2;
+    s.close = 0; s.watcher = 'idle';
     s.guide = [this.deskX, 2.7, this.shrineFront + 0.9]; s.watcher = 'shelves'; // by the shelves of tablets
-    await D.say('ch4_03');
-    s.watcher = 'idle';
+    // ...and the things they wrote down appear in the sky as Astra names them
+    const l3 = D.sayAsync('ch4_03');
+    await D.cue('Where the Moon'); s.sky = 1; s.watcher = 'moon';
+    await D.cue('Which planets'); s.sky = 2;
+    await D.cue('every comet'); s.sky = 3;
+    await D.cue('even the weather'); s.sky = 4;
+    await l3;
+    s.sky = 0; s.watcher = 'idle';
     // Write down the Moon
     s.phase = 'write'; s.guide = [this.writeSpot.x + 0.7, 1.5, this.writeSpot.z - 1.5];
     const sayW = D.say('ch4_04');
@@ -752,12 +900,18 @@ export default class Babylon {
     s.phase = 'archive'; s.watcher = 'shelves'; s.guide = [this.deskX + 1.6, 2.2, this.shrineFront + 1.1];
     const sayA = D.say('ch4_05');
     await goTo(this.archiveSpot, this.faceToward(this.archiveSpot, _a.set(this.deskX, 0, this.shrineFront)), 'Walk to the glowing ring by the shelves');
+    // the watchers before him appear in a line, one after another, back through the years
+    if (G.narration.cur?.id === 'ch4_05') {
+      await D.cue('One watcher'); s.ghosts = 1;
+      await D.cue('the next one'); s.ghosts = 3;
+      await D.cue('never stopped'); s.ghosts = 5;
+    } else s.ghosts = 5;
     await sayA;
     D.hint(G.mode === 'desktop' ? this.oldIts[0].deskHint : this.oldIts[0].hint, 8);
     this.helpAt = G.t + (D.kids ? (fast ? 0.3 : 1.5) : fast ? 4 : 40);
     await D.until(() => s.fetched.every(Boolean));
     this.helpAt = null;
-    G.ui.showHint(''); s.watcher = 'idle';
+    G.ui.showHint(''); s.watcher = 'idle'; s.ghosts = 0;
     await D.wait(fast ? 0.3 : 1.6);
     // The pattern
     s.phase = 'pattern'; s.guide = [this.deskX - 1.7, 1.7, this.shrineFront + 1.2];
@@ -780,14 +934,22 @@ export default class Babylon {
     G.ui.showHint('');
     s.phase = 'eclipse'; G.events.emit('sfx', { k: 'swell' });
     await D.until(() => s.ecl >= 0.22);
-    await D.say('ch4_08');
+    // the town below is frightened; up here the sky-watchers calmly write it down
+    const l8 = D.sayAsync('ch4_08');
+    await D.cue('But up here'); s.calm = 1; s.nod++;
+    await l8;
     await D.until(() => s.ecl >= 1);
     s.phase = 'total';
     await D.until(() => s.red >= 0.55);
     await D.say('ch4_09');
     await D.wait(fast ? 0.5 : 3);
     s.phase = 'closing'; s.guide = null; s.watcher = 'idle';
-    await D.say('ch4_10');
+    const l10 = D.sayAsync('ch4_10');
+    await D.cue('sixty minutes'); s.wheel = 1;
+    await D.cue('three hundred'); s.wheel = 2;
+    await D.cue('twelve signs'); s.wheel = 3;
+    await D.cue('All from here'); s.wheel = 0;
+    await l10;
     // The journal page
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
@@ -897,13 +1059,16 @@ export default class Babylon {
     this.ring.scale.setScalar(1 + 0.08 * Math.sin(t * 3));
     this.ring.visible = this.ringV > 0.01;
 
+    // ----- Story pieces
+    this.updateStory(dt, t);
     // ----- People
     const moonPt = _c.copy(this.moonDir).multiplyScalar(60);
     const eclipsing = s.ecl > 0.3 && s.phase !== 'journal' && s.phase !== 'done';
     for (const P of this.people) {
       if (P.role === 'watcher') {
         const w = s.watcher;
-        P.pose = w === 'shelves' || w === 'moon' ? 'point' : 'idle';
+        P.pose = w === 'shelves' || w === 'moon' ? 'point' : w === 'write' ? 'write' : 'idle';
+        if (s.calm && eclipsing) { P.pose = 'write'; }   // not scared: he writes it down
         if (w === 'shelves') P.pointAt.set(this.deskX, 1.4, this.shrineFront);
         else if (w === 'moon') P.pointAt.copy(moonPt).add(P.g.position);
         // turn to face the shelves, the Moon, or you
@@ -916,9 +1081,12 @@ export default class Babylon {
       } else if (P.role === 'apprentice') {
         P.pose = eclipsing ? 'point' : 'idle'; P.pointAt.copy(moonPt).add(P.g.position);
       } else {
-        // townspeople look up, point and murmur as the Moon darkens; in Adults mode some throw up their arms
-        P.pose = eclipsing ? (!G.kids && P.phase > 4.2 ? 'cheer' : 'point') : 'idle';
+        // townspeople stroll about; as the Moon darkens they stop, stare, point and gasp in fright
+        if (P.stroll && !eclipsing) runRoutine(P, dt, { speed: 0.9 });
+        else P.pose = eclipsing ? (P.phase % 3 < 1.2 ? 'gasp' : 'point') : 'idle';
         P.pointAt.copy(moonPt).add(P.g.position);
+        P.look = eclipsing ? _b.copy(this.moonDir).multiplyScalar(60).add(P.g.position).clone() : null;
+        P.glance = !eclipsing;
       }
       animatePerson(P, t, dt);
       if (P.role === 'watcher') this.nodHead(P, dt);

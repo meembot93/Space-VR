@@ -87,7 +87,7 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   const mt0 = await page.evaluate(() => G.director.chapter.s.mt);
   await page.evaluate(() => __xr.controllers.right.updateButtonValue('squeeze', 1));
   const t0 = Date.now(); let shotFollow = false;
-  while (Date.now() - t0 < 60000) {
+  while (Date.now() - t0 < 240000) {   // headless runs at a few fps, so following takes longer than on a headset
     const done = await page.evaluate(() => {
       const ch = G.director.chapter, V = G.camera.position.constructor;
       if (ch.s.phase !== 'follow') return true;

@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 21;
-export const CHANGES = ['Living constellations', 'A wow moment per chapter', 'Ghostly astronomer cameos', 'Era 1 finale flight'];
+export const VERSION = 22;
+export const CHANGES = ['Scenes act out the story', 'Animals and busy villages', 'People react and look at you'];

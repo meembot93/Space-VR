@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { Kit } from '../kit.js';
 import { makePerson, animatePerson } from '../people.js';
+import { makeFlock, makeDolphins, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp, angleWrap } from '../util.js';
 
 const D2R = Math.PI / 180, TAU = Math.PI * 2;
@@ -352,6 +353,7 @@ export default class Antikythera {
       scene: 'top',    // 'top' (on the boat) or 'sea' (on the seafloor)
       phase: 'boat',   // boat, seabed, lump, closer, xray, crank, eclipse, closing, journal, done
       dive: 0,         // the diver climbing down the ladder, 0..1
+      surf: 0,         // ...and bursting back up, shouting
       guide: null,     // [x, y, z] where Astra hovers, or null = out in front of you
       point: 0,        // the diver points: 1 at the statues, 2 at the lump
       ghost: 0,        // the ghost of the ship, as it was, over the wreck
@@ -971,11 +973,10 @@ export default class Antikythera {
     placeAll(START_TOP, faceToward(START_TOP, new THREE.Vector3(2, 0, 0.3)));
     await G.ui.fadeIn(2.5);
     const line1 = D.sayAsync('ch6_01');
-    await D.wait(fast ? 0.5 : 5.5);
-    s.phase = 'dive';                                  // he climbs down the ladder and is gone
+    await D.cue('One diver'); s.phase = 'dive';        // he climbs down the ladder and is gone...
+    await D.cue('comes back up'); s.surf = 1;          // ...then bursts back up, waving and shouting; the crew gasp
     await line1;
-    await D.until(() => s.dive >= 1, 8);
-    await D.wait(fast ? 0.2 : 1.2);
+    await D.wait(fast ? 0.3 : 2);
     // Follow him down (a fade, not a fall)
     await G.ui.fadeOut(1.4);
     s.scene = 'sea'; s.phase = 'seabed';
@@ -1110,12 +1111,22 @@ export default class Antikythera {
       D.g.rotation.y = lerp(turnToward(_a.set(1, 0, 0.35), START_TOP), -Math.PI / 2, step); // back to the sea, climbing down the ladder facing the boat
       D.pose = down > 0 ? 'pull' : 'idle';
     }
+    // ...and back up again, shouting about people on the seafloor
+    this.surfV = damp(this.surfV || 0, s.surf ? 1 : 0, 2.5, dt);
+    if (s.surf) { D.g.position.set(1.95, lerp(-2.6, DECK - 0.55, this.surfV), 0.25); D.g.rotation.y = -Math.PI / 2; D.pose = 'wave'; }
     D.g.visible = D.g.position.y > -2.4;
     animatePerson(D, t, dt);
+    // gulls over the boat, dolphins out at sea
+    if (!this.topLife) {
+      this.topLife = new Life(this.top);
+      this.topLife.add(makeFlock({ n: 7, center: new THREE.Vector3(4, 16, -10), r: 18, height: 5, color: 0xf0f0f0, size: 1.1, speed: 6, seed: 61 }));
+      this.topLife.add(makeDolphins({ n: 4, center: new THREE.Vector3(0, 0, 0), r: 46, sea: 0, seed: 62 }));
+    }
+    this.topLife.update(dt, t);
     // the crew turn the pump wheels once he's going down
     const pumping = k > 0.2;
     for (const w of this.wheels) w.rotation.x += dt * (pumping ? 2.4 : 0);
-    for (const P of this.crew) { P.pose = pumping ? 'pull' : 'idle'; animatePerson(P, t, dt); }
+    for (const P of this.crew) { P.pose = s.surf && this.surfV > 0.5 ? 'gasp' : pumping ? 'pull' : 'idle'; P.look = s.surf ? D.g.position : null; P.glance = true; animatePerson(P, t, dt); }
     this.surfaceBubbles.material.uniforms.opacity.value = damp(this.surfaceBubbles.material.uniforms.opacity.value, k > 0.7 ? 0.8 : 0, 2, dt);
     // waves lapping on the hull, a gull now and then
     if (G.audio.ok) {

@@ -23,6 +23,8 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   await page.evaluate(() => { window.__skip = setInterval(() => G.narration.skip(), 200); });
   const until = (fn, ms = 120000) => page.waitForFunction(fn, null, { timeout: ms, polling: 100 });
   await until(() => G.director.chapter?.s.phase === 'sky');
+  // the stars start dim and brighten when the campfire sparks fly up at "Look up" (js/wow/ch1.js)
+  await until(() => G.sky.starField.opacity > 0.9, 150000).catch(() => {});
   const night = await page.evaluate(() => G.sky.starField.opacity);
   check(night > 0.9, `a full starry night sky (stars at ${night.toFixed(2)})`);
   await until(() => G.director.chapter?.s.phase === 'carve' && G.director.chapter.bone.visible);
