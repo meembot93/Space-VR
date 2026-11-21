@@ -20,6 +20,11 @@ rises again after months hidden in the Sun's glare (worked out for the real date
 bell to wake the village, and watch a whole Egyptian year go by: Flood, Growing, Harvest. Then the
 bridge: hold the Nebra sky disk up to the Pleiades on a German hilltop. Test: `npm run test:ch3` in tools/test.
 
+**Chapter 4, Babylon predicts an eclipse.** Night on top of the ziggurat, the city and the
+Euphrates below in the moonlight. Pick up the reed and press tonight's Moon into soft clay, pull
+four old tablets off the shelf, see their eclipses line up every 18 years, and watch the full Moon
+darken and turn copper-red right on time.
+
 Address-bar options for testing: `?fast` (placeholder lines and timelines run quickly),
 `?debug` (shows which narration clips are still missing; N skips a line on desktop),
 `?chapter=2`, `?labels` (tags every stand-in model "PLACEHOLDER"), `?autostart` (desktop).
@@ -63,6 +68,8 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
 `cd tools/test && npm install && npm test` runs Chapter 2 in Chromium with Meta's IWER headset
 emulator (a virtual Quest 3): enters VR, walks, snap-turns, grips and hauls the rope, checks the
 sunbeam, touches the journal page. Add `--shots` to save screenshots.
+`npm run test:ch4` plays Chapter 4 the same way: grips the reed and presses the six marks into
+the clay, grabs the four glowing tablets, looks up at the Moon and checks it turns red.
 
 ## Version number (please keep it up to date)
 

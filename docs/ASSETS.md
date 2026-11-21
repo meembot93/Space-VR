@@ -13,6 +13,7 @@ put it in `models/`, and list it in `models/index.json` under the name the code 
 | `builder` | stonehenge_builder.glb | Ch 2 haulers, pit team and crowd | in |
 | `storyteller` | ice_age_storyteller.glb | Ch 1 | received, waits for Ch 1 |
 | `priest` | egyptian_priest.glb | Ch 3 priest-astronomer | in |
+| `skywatcher` | babylonian_skywatcher.glb | Ch 4 sky-watcher, apprentice and townspeople | in |
 
 Fields: `file`, `height` (metres; the model is scaled to it, feet on the ground), optional
 `turn` (degrees, if it faces the wrong way), optional `center` (true: centred on its middle, for
