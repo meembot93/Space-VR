@@ -1,4 +1,4 @@
-// Prints a living-constellation figure's strokes at time t as JSON (for tools/sky/figures.py).
+// Prints a living-constellation figure's strokes at time t as JSON (to plot over a star chart).
 //   node tools/sky/figure_dump.mjs hunter 0.0 > hunter.json
 import { FIGURES, layout } from '../../js/skyart.js';
 const [name, t = '0'] = process.argv.slice(2);

@@ -39,7 +39,7 @@ export default class Ch7Extras {
       for (const [n, at, secs] of plan) if (F.height(n) > 8) this.tl.after(at, () => F.play(n, { secs }));
     }
     if (id === 'ch7_08') F.stopAll();
-    if (id === 'ch7_11') this.tl.after(this.G.params.has('fast') ? 0.3 : 3.2, () => this.shatter());   // "...And it was wrong."
+    if (id === 'ch7_11') this.tl.after(this.G.params.has('fast') ? 0.3 : 3.9, () => this.shatter());   // "...And it was wrong."
   }
 
   shatter() {
@@ -103,7 +103,7 @@ export default class Ch7Extras {
     this.sputnik.visible = T > 20 && T < 36;
     // the words, far ahead
     const w = clamp01((T - 30) / 3);
-    this.title.position.copy(c).addScaledVector(f, 14).add(_a.set(0, 1.2, 0));
+    this.title.position.copy(c).addScaledVector(f, 13).add(_a.set(0, 3.4, 0));   // above Astra, who floats ahead of you
     for (const t of [this.t1, this.t2]) t.material.opacity = w * (T > 41 ? clamp01(1 - (T - 41) / 2) : 1);
   }
 
@@ -143,8 +143,8 @@ export default class Ch7Extras {
 // Sputnik 1: a shiny ball with four long whip antennas swept back
 function makeSputnik() {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.29, 24, 16), new THREE.MeshStandardMaterial({ color: 0xe8e8ec, metalness: 0.95, roughness: 0.18, fog: false })));
-  const am = new THREE.MeshStandardMaterial({ color: 0xcfcfd4, metalness: 0.9, roughness: 0.3, fog: false });
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.29, 24, 16), new THREE.MeshStandardMaterial({ color: 0xf0f0f4, emissive: 0x30343c, metalness: 0.45, roughness: 0.3, fog: false })));
+  const am = new THREE.MeshBasicMaterial({ color: 0xb8bcc4, fog: false });
   for (const [x, y] of [[0.12, 0.12], [-0.12, 0.12], [0.12, -0.12], [-0.12, -0.12]]) {
     const a = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 2.6, 4).translate(0, -1.3, 0), am);
     a.position.set(x, y, -0.2); a.rotation.set(-Math.PI / 2 + 0.35, 0, 0); a.rotation.z = Math.atan2(y, x) - Math.PI / 2; a.rotateX(0.3);

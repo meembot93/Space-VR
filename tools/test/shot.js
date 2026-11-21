@@ -19,16 +19,23 @@ const [n, line, secs, az, el, out, fov = '75', q = ''] = process.argv.slice(2);
   if (process.env.SLOW) await page.evaluate(() => { window.__slow = 1; });
   await page.evaluate((line) => {
     window.__at = -1;
+    G.events.on('extra', (d) => { if (d.k === line) window.__at = G.t; });
     G.events.on('narrating', (d) => { if (d.on && d.id === line) { window.__at = G.t; if (window.__slow) G.params.delete('fast'); } });
     window.__skip = setInterval(() => { if (window.__at < 0) G.narration.skip(); }, 150);
   }, line);
   await page.waitForFunction(() => window.__at >= 0, null, { timeout: 300000, polling: 100 });
+  if (process.env.PRE) await page.evaluate((e) => eval(e), process.env.PRE);   // PRE='js' runs once the line starts
   await page.waitForFunction((s) => G.t - window.__at > s, Number(secs), { timeout: 600000, polling: 100 });
   await page.evaluate(([az, el, fov]) => {
     const D = Math.PI / 180, P = G.player;
     P.yaw = -az * D - P.dolly.rotation.y; P.pitch = el * D; G.camera.fov = fov; G.camera.updateProjectionMatrix();
     G.paused = true; G.narration.pause(true);
   }, [Number(az), Number(el), Number(fov)]);
+  // LOOK='js expression giving a world-space Vector3' points the view at it (e.g. an extras object)
+  if (process.env.LOOK) await page.evaluate((e) => {
+    const p = eval(e), c = G.camera.getWorldPosition(new p.constructor()), d = p.clone().sub(c).normalize(), P = G.player;
+    P.yaw = Math.atan2(-d.x, -d.z) - P.dolly.rotation.y; P.pitch = Math.asin(d.y);
+  }, process.env.LOOK);
   if (small) await page.setViewportSize({ width: 1000, height: 640 });
   await page.waitForTimeout(600);
   console.log(await page.evaluate(() => JSON.stringify({ mod: G.extras.mod?.constructor.name, go: G.extras.mod?.go, burst: G.extras.mod?.burst, figT: G.extras.mod?.figT, t: G.t, started: G.extras.started })));

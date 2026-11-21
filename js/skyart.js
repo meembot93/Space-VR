@@ -3,7 +3,7 @@
 //
 // Each figure is drawn on a flat patch of sky centred on `center` [right ascension, declination] in
 // degrees (J2000), seen from the ground with celestial north up: x to the right (west), y up (north),
-// both in degrees. tools/sky/figures.py draws a figure over its stars to check it lines up.
+// both in degrees. tools/sky/figure_dump.mjs prints a figure's strokes (to plot over a star chart and check it lines up).
 //
 // A figure has parts; a part has strokes (lists of x, y points, smoothed into curves unless sharp)
 // and can turn around a pivot, on top of its parent part. `move(t)` gives the angles (radians) for

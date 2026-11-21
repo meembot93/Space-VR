@@ -11,7 +11,7 @@ import { seabedHeight } from '../chapters/antikythera.js';
 import { rumble, awe, shimmer, Timeline, clamp01, ease } from './fx.js';
 
 const BIG = 55;   // how many times bigger the gears get
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 
 export default class Ch6Extras {
   constructor(G, chapter) {
@@ -53,10 +53,14 @@ export default class Ch6Extras {
     if (!this.giant.visible) return;
     const g = ease(this.grow), box = this.ch.box;
     const from = box ? box.getWorldPosition(_a) : _a.set(0, 1, 0), cam = G.camera.getWorldPosition(_b);
+    // the gears' faces turn toward you, and the front ones stop a couple of metres short of your face
+    const toCam = _c.copy(cam).sub(from).setY(0).normalize(), scale = 1 + (BIG - 1) * g * g;
+    _d.copy(cam).addScaledVector(toCam, -0.085 * scale);
     const parent = this.giant.parent; parent.updateWorldMatrix(true, false);
-    this.giant.position.lerpVectors(from, cam, g); parent.worldToLocal(this.giant.position);
-    this.giant.scale.setScalar(1 + (BIG - 1) * g * g);
-    if (box) this.giant.quaternion.copy(box.getWorldQuaternion(_q)); else this.giant.quaternion.identity();
+    this.giant.position.lerpVectors(from, _d, g); parent.worldToLocal(this.giant.position);
+    this.giant.scale.setScalar(scale);
+    _q.setFromUnitVectors(_e.set(0, 0, 1), toCam);
+    if (box) this.giant.quaternion.copy(box.getWorldQuaternion(_q2)).slerp(_q, g); else this.giant.quaternion.copy(_q);
     this.mat.opacity = Math.min(1, g * 1.4) * 0.92; this.edge.opacity = g * 0.18;
     // turning: the faster gears spin like wheels, the big ones slowly
     this.spin += dt * 0.35;
