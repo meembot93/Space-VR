@@ -27,19 +27,21 @@ export function makeCard(w, h, worldW, style = {}) {
   mesh.renderOrder = 990; mesh.visible = false;
   const S = { bg: 'rgba(8,12,28,0.72)', border: 'rgba(255,214,120,0.85)', color: '#fff6dc', font: 'Georgia, serif', size: 46, ...style };
   let cur = null;
-  mesh.userData.set = (text, small = '') => {
-    const key = text + '|' + small; if (key === cur) return; cur = key;
+  mesh.userData.set = (text, small = '', speaker = '') => {
+    const key = text + '|' + small + '|' + speaker; if (key === cur) return; cur = key;
     const g = tex.userData.ctx; g.clearRect(0, 0, w, h);
     if (!text) { mesh.visible = false; tex.needsUpdate = true; return; }
     g.font = `${S.size}px ${S.font}`;
     const lines = wrap(g, text, w - 80);
-    const lh = S.size * 1.22, smallH = small ? S.size * 0.8 : 0;
-    const boxH = Math.min(h - 8, lines.length * lh + 44 + smallH);
+    const lh = S.size * 1.22, smallH = small ? S.size * 0.8 : 0, nameH = speaker ? S.size * 0.85 : 0;
+    const boxH = Math.min(h - 8, lines.length * lh + 44 + smallH + nameH);
     const y0 = (h - boxH) / 2;
     g.fillStyle = S.bg; g.beginPath(); g.roundRect(4, y0, w - 8, boxH, 26); g.fill();
     g.strokeStyle = S.border; g.lineWidth = 3; g.stroke();
     g.fillStyle = S.color; g.textAlign = 'center'; g.textBaseline = 'middle';
-    lines.forEach((ln, i) => g.fillText(ln, w / 2, y0 + 22 + lh * (i + 0.5)));
+    // who's talking, in gold above the words (the guide star is called Astra)
+    if (speaker) { g.font = `bold ${S.size * 0.62}px ${S.font}`; g.fillStyle = '#ffd77a'; g.fillText(speaker, w / 2, y0 + 16 + nameH * 0.5); g.font = `${S.size}px ${S.font}`; g.fillStyle = S.color; }
+    lines.forEach((ln, i) => g.fillText(ln, w / 2, y0 + 22 + nameH + lh * (i + 0.5)));
     if (small) { g.font = `italic ${S.size * 0.6}px ${S.font}`; g.fillStyle = 'rgba(255,230,170,0.75)'; g.fillText(small, w / 2, y0 + boxH - smallH * 0.75); }
     tex.needsUpdate = true;
   };
@@ -73,10 +75,10 @@ export class UI {
     return new Promise((ok) => { this.fadeDone = ok; if (this.fade === v) { this.fadeDone = null; ok(); } });
   }
 
-  subtitle(text, small = '') {
+  subtitle(text, small = '', speaker = '') {
     this.subText = text;
-    this.sub.userData.set(this.subsOn ? text : '', small);
-    if (this.domSub) { this.domSub.textContent = this.subsOn ? text : ''; this.domSub.style.display = this.subsOn && text && this.G.mode === 'desktop' ? 'block' : 'none'; }
+    this.sub.userData.set(this.subsOn ? text : '', small, speaker);
+    if (this.domSub) { this.domSub.textContent = this.subsOn ? (speaker ? speaker + ': ' : '') + text : ''; this.domSub.style.display = this.subsOn && text && this.G.mode === 'desktop' ? 'block' : 'none'; }
   }
   showHint(text, secs = 5) {
     this.hintT = secs; this.hint.userData.set(text);

@@ -1,10 +1,13 @@
-// Every narration line in Era 1, numbered. The guide star says them, in Meem's voice.
+// Every narration line in Era 1, numbered. Astra, the guide star, says them, in Meem's voice.
 //
 // Recording: each line is its own short clip named by its number, e.g. ch2_05.mp3, in
 // sounds/narration/ (see docs/RECORDING.md). Until a clip exists, the line shows as a subtitle
 // for about as long as it would take to say. No generated voices, ever.
 //
 // Text comes from the Era 1 plan doc (chapter narration scripts). Change it here and in the doc.
+// The guide star's name (chosen by Meem). Shown over every narration subtitle.
+export const GUIDE_NAME = 'Astra';
+
 export const LINES = {
   // ---------- Chapter 2: Stonehenge at dawn ----------
   ch2_01: 'Twenty-five thousand years later, the world has changed. The ice has melted. And people have discovered something that changes everything: farming.',

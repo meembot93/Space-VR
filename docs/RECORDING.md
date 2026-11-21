@@ -1,6 +1,6 @@
 # Recording the narration
 
-Every line the guide says has a number, like `ch2_05`. Record each line as its own short clip on
+Every line Astra (the guide star) says has a number, like `ch2_05`. Record each line as its own short clip on
 your phone, in a quiet room (a closet full of clothes works great), and name the file with the
 number (`ch2_05.m4a`). Drop them in your project folder; Claude adds them to the game with
 `tools/narration/import.py`, which trims the silence and evens out the volume.
