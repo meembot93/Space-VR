@@ -103,7 +103,8 @@ export function groundHeight(x, z) {
   const vm = vmound(x, z);
   h += 2.35 * smooth(1.05, 0.7, vm);
   // desert to the west, rising to the plateau where the pyramids are
-  h += smooth(-330, -560, x) * (26 + (N1(x / 160, z / 160) - 0.5) * 10) + smooth(-330, -520, x) * (N2(x / 25, z / 25) - 0.5) * 2.5;
+  // (a long, even slope up to the plateau, so nothing hides the pyramids' feet from the village)
+  h += smooth(-330, -1250, x) * 30 + smooth(-330, -700, x) * (N1(x / 160, z / 160) - 0.5) * 3 + smooth(-330, -520, x) * (N2(x / 25, z / 25) - 0.5) * 1.5;
   // low desert hills far to the east (kept low so the horizon is clear for Sirius and the Sun)
   h += smooth(990, 1600, x) * (7 + N1(x / 200 + 9, z / 200) * 7);
   return h;
@@ -166,6 +167,47 @@ function nebraTex() {
     g.fillStyle = '#16302a';
     for (let i = 0; i < 39; i++) { const a = i / 39 * 6.283; g.beginPath(); g.arc(c + Math.cos(a) * (R - 7), c + Math.sin(a) * (R - 7), 3, 0, 6.283); g.fill(); }
   });
+}
+
+// The polished casing of a finished pyramid: smooth white limestone with faint courses and joints,
+// a little weathering, sand drifted at the foot, and a pale capstone at the very top
+function pyramidTex() {
+  const t = canvasTex(512, 512, (g, w, h) => {
+    const r = rng(19);
+    g.fillStyle = '#f4eedf'; g.fillRect(0, 0, w, h);
+    // courses: thin horizontal joints, closer together toward the top (the face narrows)
+    for (let i = 0; i < 70; i++) {
+      const y = h - i / 70 * h;
+      g.fillStyle = `rgba(120,105,80,${0.16 + r() * 0.1})`; g.fillRect(0, y, w, 1.6);
+      for (let x = r() * 30; x < w; x += 18 + r() * 26) { g.fillStyle = 'rgba(120,105,80,0.12)'; g.fillRect(x, y - h / 70, 1.2, h / 70); }
+      if (r() < 0.5) { g.fillStyle = `rgba(255,252,240,${r() * 0.25})`; g.fillRect(0, y - h / 70, w, h / 70 * 0.6); }
+    }
+    // gentle streaks and patches
+    for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(150,130,100,${r() * 0.08})`; g.fillRect(r() * w, r() * h, 6 + r() * 30, 20 + r() * 80); }
+    // sand drifted against the bottom
+    const sand = g.createLinearGradient(0, h, 0, h * 0.9); sand.addColorStop(0, 'rgba(196,160,104,0.9)'); sand.addColorStop(1, 'rgba(196,160,104,0)');
+    g.fillStyle = sand; g.fillRect(0, h * 0.9, w, h * 0.1);
+    // the capstone (pyramidion): pale, gleaming
+    g.fillStyle = '#f6e6b4'; g.fillRect(0, 0, w, h * 0.045);
+    g.fillStyle = 'rgba(160,130,70,0.6)'; g.fillRect(0, h * 0.045, w, 2);
+  });
+  t.anisotropy = 8; return t;
+}
+// The bare core of the unfinished pyramid: rough limestone blocks in courses
+function coreTex() {
+  const t = canvasTex(256, 256, (g, w, h) => {
+    const r = rng(23);
+    g.fillStyle = '#d8c49a'; g.fillRect(0, 0, w, h);
+    const rows = 4;
+    for (let row = 0; row < rows; row++) {
+      const y = row * h / rows;
+      for (let x = (row % 2) * 20 - 20; x < w; x += 34 + r() * 14) {
+        g.fillStyle = `rgba(${150 + r() * 60},${130 + r() * 50},${90 + r() * 40},0.55)`; g.fillRect(x + 1.5, y + 1.5, 32, h / rows - 3);
+      }
+      g.fillStyle = 'rgba(70,55,35,0.75)'; g.fillRect(0, y, w, 2.5);
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
 }
 
 // ---------- Sounds made here (bell, night creatures, the flood) ----------
@@ -438,24 +480,125 @@ export default class Nile {
     this.egypt.add(tk.mesh(), fk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
   }
 
-  // The pyramids on the desert edge, fresh white limestone, gleaming when the Sun reaches them
+  // The pyramids of Giza on the desert edge, as they stood around 2500 BC (closer than in real life,
+  // so you can see them well). Khufu's Great Pyramid and Khafre's are finished: smooth, polished white
+  // limestone casing over stepped stone courses, with a capstone that catches the first light.
+  // Menkaure's is still being built: red granite casing on its lowest courses, the bare stepped
+  // core above, and a mud-brick ramp up its side for hauling blocks. Around them: the queens'
+  // pyramids, rows of flat-topped mastaba tombs, temples, causeways, and the Sphinx.
   buildPyramids() {
-    const k = new Kit();
-    const pyr = (x, z, base, h, col) => {
-      const y = groundHeight(x, z) - 2;
-      const g = new THREE.ConeGeometry(base / Math.SQRT2, h, 4, 1); g.rotateY(Math.PI / 4);
-      k.add(g, col, [x, y + h / 2, z]);
+    const OX = 180;   // (the whole complex moved nearer the village than the real 15 km, so it looms)
+    const base0 = (x, z, half) => Math.min(groundHeight(x - half, z - half), groundHeight(x + half, z - half), groundHeight(x - half, z + half), groundHeight(x + half, z + half), groundHeight(x, z)) - 0.5;
+    // Each face its own shade, so the four sides read apart even in flat dawn light
+    const FACE = [1.0, 0.86, 0.74, 0.9];   // east, north, west, south
+    const tex = pyramidTex(), ctex = coreTex();
+    const cased = [], core = [], plain = new Kit();
+    // one smooth four-sided pyramid (with texture coordinates: u along the base, v up the face)
+    const facePyr = (out, x, y, z, base, h, tint, top = 1) => {
+      const b = base / 2, apex = [x, y + h * top, z];
+      const corners = [[x + b, z - b], [x + b, z + b], [x - b, z + b], [x - b, z - b]];   // NE SE SW NW
+      const faces = [[0, 1, 0], [3, 0, 1], [2, 3, 2], [1, 2, 3]]; // [from, to, shade index]: east, north, west, south
+      for (const [f, t, si] of faces) {
+        const [ax, az] = corners[f], [bx, bz] = corners[t];
+        const pos = top === 1
+          ? [ax, y, az, bx, y, bz, ...apex]
+          : [ax, y, az, bx, y, bz, x + (bx - x) * (1 - top), y + h * top, z + (bz - z) * (1 - top), ax, y, az, x + (bx - x) * (1 - top), y + h * top, z + (bz - z) * (1 - top), x + (ax - x) * (1 - top), y + h * top, z + (az - z) * (1 - top)];
+        const uv = top === 1 ? [0, 0, 1, 0, 0.5, 1] : [0, 0, 1, 0, 1 - top / 2, top, 0, 0, 1 - top / 2, top, top / 2, top];
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        g.computeVertexNormals();
+        const c = new THREE.Color(tint).multiplyScalar(FACE[si]), n = pos.length / 3;
+        g.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: n * 3 }, (_, k) => [c.r, c.g, c.b][k % 3]), 3));
+        out.push(g);
+      }
     };
-    // Khufu (the Great Pyramid), Khafre, Menkaure, and three small queens' pyramids
-    pyr(-1000, -520, 230, 146, 0xe8dcc0);
-    pyr(-1230, -330, 215, 143, 0xe2d4b6);
-    pyr(-1420, -140, 105, 65, 0xd8c8a6);
-    for (let i = 0; i < 3; i++) pyr(-860, -440 + i * 60, 48, 30, 0xd6c8aa);
-    // the causeway and valley temple below, at the edge of the fields
-    k.box(14, 4, 420, 0xcfc0a0, [-700, groundHeight(-700, -420) + 1, -420], [0, 1.1, 0]);
-    k.box(40, 9, 40, 0xcfc0a0, [-520, groundHeight(-520, -330) + 3, -330]);
-    const m = k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0x1a1712 }));
-    this.egypt.add(m);
+    // a stepped core: courses of blocks, each a little smaller (for the pyramid still being built)
+    const steps = (out, x, y, z, base, h, from, to, n, tint) => {
+      for (let i = 0; i < n; i++) {
+        const k0 = from + (to - from) * i / n, k1 = from + (to - from) * (i + 1) / n;
+        const w = base * (1 - k0) - 1.2, hh = h * (k1 - k0);
+        const g = new THREE.BoxGeometry(w, hh, w);
+        // texture: block joints scale with the step's size
+        const uv = g.attributes.uv; for (let j = 0; j < uv.count; j++) uv.setXY(j, uv.getX(j) * w / 12, uv.getY(j) * hh / 6);
+        g.translate(x, y + h * k0 + hh / 2, z);
+        const nrm = g.attributes.normal, cols = [];
+        for (let j = 0; j < nrm.count; j++) {
+          const nx = nrm.getX(j), nz = nrm.getZ(j), si = nx > 0.5 ? 0 : nz < -0.5 ? 1 : nx < -0.5 ? 2 : nz > 0.5 ? 3 : 0;
+          const c = new THREE.Color(tint).multiplyScalar(FACE[si] * (0.92 + (i % 3) * 0.04)); cols.push(c.r, c.g, c.b);
+        }
+        g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+        out.push(g);
+      }
+    };
+    const enclosure = (x, y, z, half) => {
+      for (const [ox, oz, w, d] of [[0, -half, half * 2, 3], [0, half, half * 2, 3], [-half, 0, 3, half * 2], [half, 0, 3, half * 2]]) plain.box(w, 5, d, 0xd4c6a4, [x + ox, y + 2.5, z + oz]);
+      // the paved court round the pyramid
+      plain.box(half * 2 - 4, 0.6, half * 2 - 4, 0xdccfae, [x, y + 0.3, z]);
+    };
+    const giza = [
+      // name, x, z, base, height, tint
+      ['Khufu', -760 + OX, -380, 230, 146, 0xf2ead6],
+      ['Khafre', -930 + OX, -205, 215, 143, 0xeee4cc],
+    ];
+    this.pyramidTops = [];
+    for (const [, x, z, b, h, tint] of giza) {
+      const y = base0(x, z, b / 2);
+      facePyr(cased, x, y, z, b, h, tint);
+      enclosure(x, y, z, b / 2 + 14);
+      this.pyramidTops.push(new THREE.Vector3(x, y + h, z));
+      // the mortuary temple on the east side, and its causeway down toward the river
+      plain.box(46, 10, 40, 0xd8cbaa, [x + b / 2 + 40, y + 5, z]);
+      const x0 = x + b / 2 + 63, x1 = -560 + OX, L = x1 - x0;
+      for (let k = 0; k < 6; k++) { const sx = x0 + L * (k + 0.5) / 6; plain.box(L / 6 + 0.5, 4, 9, 0xd0c29e, [sx, groundHeight(sx, z) + 1.2, z]); }
+    }
+    // Menkaure's pyramid, half built: red granite courses, then the stepped core, a ramp, no top yet
+    {
+      const x = -1060 + OX, z = -40, b = 105, h = 65, y = base0(x, z, b / 2);
+      facePyr(cased, x, y, z, b, h, 0xb8786a, 0.16);                                   // granite casing (lowest 16 courses)
+      steps(core, x, y, z, b, h, 0.16, 0.62, 14, 0xcdb48a);                             // the core, built so far
+      enclosure(x, y, z, b / 2 + 12);
+      // a mud-brick ramp up the east side, as long as it needs to be to reach the working level
+      const rise = h * 0.62, rl = 150, xt = x + b * 0.19, xf = xt + rl, len = Math.hypot(rl, rise);
+      const rg = new THREE.BoxGeometry(len, 3, 14); rg.rotateZ(-Math.atan2(rise, rl));
+      plain.add(rg, 0x8e6e4a, [(xt + xf) / 2, y + rise / 2 - 1.2, z]);
+      // its sloping sides of mud brick, down to the ground
+      for (let k = 0; k < 6; k++) { const f = (k + 0.5) / 6, hh = rise * (1 - f); plain.box(rl / 6 + 0.3, hh, 15, 0x7e6040, [xt + rl * f, y + hh / 2 - 1.5, z]); }
+      // blocks waiting at the foot of the ramp
+      const r = rng(71);
+      for (let i = 0; i < 26; i++) plain.box(2.4, 1.3, 1.6, 0xcdb48a, [x + b * 0.19 + rl + 6 + r() * 30, base0(x + rl, z, 20) + 0.65, z - 15 + r() * 30], [0, r() * 3, 0]);
+    }
+    // the queens' pyramids beside Khufu's, small and stepped-and-cased
+    for (let i = 0; i < 3; i++) { const qx = -600 + OX, qz = -450 + i * 58, y = base0(qx, qz, 25); facePyr(cased, qx, y, qz, 48, 30, 0xeae0c8); }
+    // rows of mastaba tombs (flat-topped, sloping sides) west and east of the Great Pyramid
+    const r = rng(83);
+    for (const [ox, oz, cols2, rows] of [[-920 + OX, -560, 6, 5], [-605 + OX, -330, 3, 6]]) {
+      for (let a = 0; a < cols2; a++) for (let c = 0; c < rows; c++) {
+        const mx = ox + a * 26, mz = oz + c * 34, my = base0(mx, mz, 10);
+        const g = new THREE.CylinderGeometry(7.5 * Math.SQRT1_2, 9.5 * Math.SQRT1_2, 6, 4, 1); g.rotateY(Math.PI / 4); g.scale(1, 1, 1.9);
+        plain.add(g, 0xd2c3a0, [mx, my + 3, mz], [0, 0, 0], [1, 1, 1], 0.9 + r() * 0.15);
+      }
+    }
+    // the Sphinx: a lion lying down with a king's head, carved from the bedrock, looking east
+    {
+      const sx = -640 + OX, sz = -160, sy = base0(sx, sz, 30);
+      plain.box(46, 6, 15, 0xc8a878, [sx - 8, sy + 3, sz]);                      // the rock cut round it
+      plain.box(36, 11, 12, 0xd2b484, [sx - 6, sy + 9, sz]);                     // body
+      plain.box(18, 4, 4, 0xd2b484, [sx + 18, sy + 5, sz - 3.5]); plain.box(18, 4, 4, 0xd2b484, [sx + 18, sy + 5, sz + 3.5]); // paws
+      plain.box(9, 11, 9, 0xd2b484, [sx + 8, sy + 18, sz]);                      // chest and head
+      plain.add(new THREE.CylinderGeometry(2, 7.5, 10, 4, 1), 0xc0a070, [sx + 7, sy + 19, sz], [0, Math.PI / 4, 0], [0.7, 1, 1.4]); // the nemes headdress
+      plain.box(40, 12, 34, 0xd8cbaa, [sx + 45, sy + 6, sz]);                    // the Sphinx temple in front
+    }
+    // the valley temples at the edge of the green, where boats tied up
+    plain.box(42, 10, 42, 0xd8cbaa, [-520 + OX, groundHeight(-520 + OX, -330) + 4, -330]);
+    // (glowing faintly by themselves: pale limestone stays visible under the stars)
+    const mat = new THREE.MeshPhongMaterial({ map: tex, vertexColors: true, flatShading: true, shininess: 70, specular: 0x7a7060, emissive: 0x4a4436, emissiveMap: tex });
+    const cm = new THREE.MeshLambertMaterial({ map: ctex, vertexColors: true, flatShading: true, emissive: 0x1e1a14 });
+    const merge = (list, m) => { const kk = new Kit(); kk.parts.push(...list); return new THREE.Mesh(kk.geometry(), m); };
+    this.pyrMat = mat;
+    this.egypt.add(merge(cased, mat), merge(core, cm), plain.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0x1a1712 })));
+    // a small glint on each capstone when the Sun first reaches it
+    this.capGlints = this.pyramidTops.map((p) => { const sp = new THREE.Sprite(glowMat('rgba(255,236,190,1)')); sp.position.copy(p); sp.scale.setScalar(26); sp.material.opacity = 0; this.egypt.add(sp); return sp; });
   }
 
   // Your roof: a low wall all round, mats, jars, the bell on its frame and the priest's sighting post
@@ -843,6 +986,12 @@ export default class Nile {
       const name = y < 0.42 ? 'Flood' : y < 0.72 ? 'Growing' : 'Harvest';
       if (name !== this.season) { this.season = name; G.ui.showHint(name, 4); if (name === 'Flood') rush(G.audio, 0.5); }
     }
+    // the first sunlight touches the pyramids' capstones before anything else
+    for (const g of this.capGlints) g.material.opacity = smooth(-1.5, 0.5, sunEl) * (1 - smooth(4, 10, sunEl)) * 0.8;
+    // ...and the white casing blushes rose-gold in the first sunlight, like real limestone at dawn
+    const glow = smooth(-2.5, 0.5, sunEl) * (1 - smooth(5, 14, sunEl));
+    this.pyrMat.color.setRGB(1, 1 - 0.16 * glow, 1 - 0.34 * glow);
+    this.pyrMat.emissive.setRGB(0.29 + 0.12 * glow, 0.27 + 0.06 * glow, 0.21);
     // Village lamps and people
     this.lamps.material.opacity = 0.15 + 0.85 * s.lights * (1 - smooth(-2, 6, sunEl) * 0.8);
     this.lamp.material.opacity = 0.8 + 0.2 * Math.sin(t * 13) * Math.sin(t * 5);
