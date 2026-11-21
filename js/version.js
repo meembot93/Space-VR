@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 14;
-export const CHANGES = ['Richer starry skies', 'Colour Milky Way', 'Shooting stars'];
+export const VERSION = 16;
+export const CHANGES = ['Richer starry skies', 'Colour Milky Way', 'Shooting stars', 'Chapter menu icons'];
