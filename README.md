@@ -48,7 +48,9 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
   `tools/lineup.html?model=builder` previews every pose. Models: docs/ASSETS.md.
 - `js/player.js`: you, your hands, the controls. Chapters add grabbable things to `G.interactables`.
 - `js/net/`: multiplayer and voice chat, adapted from Broadside VR.
-- Sound effects and ambience are synthesized with WebAudio.
+- Sound effects and ambience are synthesized with WebAudio. Background music (`js/music.js`) is a
+  soft generated score unless `sounds/music/index.json` lists a track for the chapter, e.g.
+  `{ "ch2": "stonehenge.mp3" }`: drop in Meem's own music or a free track whose license allows any use.
 
 ## Testing
 

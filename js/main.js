@@ -10,6 +10,7 @@ import { Guide } from './guide.js';
 import { Director, CHAPTERS } from './chapters.js';
 import { makeWorld } from './world.js';
 import { Net } from './net/net.js';
+import { Music } from './music.js';
 import { VERSION } from './version.js';
 
 const params = new URLSearchParams(location.search);
@@ -44,6 +45,7 @@ G.narration = new Narration(G);
 G.guide = new Guide(G);
 G.director = new Director(G);
 G.net = new Net(G);
+G.music = new Music(G);
 G.player.setupVR(renderer);
 
 // ---------- Settings on the title screen (remembered on this headset) ----------
@@ -101,8 +103,8 @@ G.onNetEvent = (name, d) => {
   if (name === 'say') G.narration.say(d.id);
   else if (name === 'sfx') sfx(d.k);
   else if (name === 'placePlayers') placeMe(d);
-  else if (name === 'chapterStart') { G.ui.fadeIn(2.5); }
-  else if (name === 'chapterEnd') chapterEnded();
+  else if (name === 'chapterStart') { G.ui.fadeIn(2.5); G.music.play('ch' + d.n); }
+  else if (name === 'chapterEnd') { chapterEnded(); G.music.stop(5); }
   else if (name === 'kids') G.setKids(d.on);
 };
 function placeMe(d) {
@@ -197,6 +199,8 @@ function chapterEnded() {
   }, 6000);
 }
 G.events.on('chapterEnd', chapterEnded);
+G.events.on('chapterStart', (d) => G.music.play('ch' + d.n));
+G.events.on('chapterEnd', () => G.music.stop(5));
 
 // ---------- Play with friends ----------
 const nameIn = document.getElementById('nameIn'), codeIn = document.getElementById('codeIn');
@@ -294,6 +298,7 @@ function tick() {
   if (G.mode) G.player.update(dt);
   G.director.update(dt);
   G.narration.update(dt);
+  G.music.update(dt);
   G.guide.update(dt);
   G.net.update(dt);
   G.ui.update(dt);
