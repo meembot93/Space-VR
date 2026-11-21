@@ -135,7 +135,7 @@ export default class Stonehenge {
   constructor(G) {
     this.G = G;
     this.root = new THREE.Group(); G.scene.add(this.root);
-    this.start = { pos: at(68, 34), yaw: 0 };
+    this.start = { pos: at(96, 34), yaw: 0 }; // east of the circle, clear of the crowd
     // Shared progress (sent to friends' headsets)
     this.s = {
       phase: 'arrive', // arrive, walk, explain, pull, raise, gap, sunrise, lapse, journal, done
@@ -453,7 +453,7 @@ export default class Stonehenge {
       onMouse(h, dx, dy) { if (dy > 0) G.act({ type: 'pull', amount: Math.min(0.4, dy * 0.004) }); },
       onKey() { G.act({ type: 'pull', amount: 0.35 }); },
     };
-    // The journal page the guide hands you at the end: touch it to finish the chapter
+    // The journal page Astra hands you at the end: touch it to finish the chapter
     this.pageIt = {
       hint: 'Touch the journal page (TRIGGER or GRIP)',
       deskHint: 'Click the journal page',

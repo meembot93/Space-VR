@@ -2,8 +2,8 @@
 
 A storytelling VR experience for Meta Quest, played in the Quest Browser (WebXR + three.js r170):
 a playable documentary through the history of looking up at the sky. Era 1 follows people from
-a Stone Age campfire to Ptolemy's model of the heavens, in 7 chapters, with a small glowing star
-as your guide. The guide narrates in Meem's voice. Plan: the "Era 1 Plan: Ancient Sky Watchers" doc.
+a Stone Age campfire to Ptolemy's model of the heavens, in 7 chapters, with Astra, a small glowing star,
+as your guide. Astra narrates in Meem's voice. Plan: the "Era 1 Plan: Ancient Sky Watchers" doc.
 
 ## Play
 
@@ -42,7 +42,7 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
 - `js/narration.js` + `js/script.js`: every narration line, numbered. Meem's recorded clip plays if
   it exists (`sounds/narration/`), otherwise the line shows as a subtitle for about as long as it
   takes to say. No generated voices. How to record: docs/RECORDING.md.
-- `js/guide.js`: the guide star (Meem's `models/star_guide.glb`).
+- `js/guide.js`: Astra, the guide star (Meem's `models/star_guide.glb`).
 - `js/people.js`: characters. Meem's Tripo models (rigged, Mixamo bone names, no animation clips)
   are posed in code: idle, haul, point, cheer. Anyone without a model yet is a plain "clay" stand-in.
   `tools/lineup.html?model=builder` previews every pose. Models: docs/ASSETS.md.

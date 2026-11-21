@@ -1,4 +1,4 @@
-// The guide: a small glowing star with friendly eyes that floats beside you through every
+// The guide, Astra: a small glowing star with friendly eyes that floats beside you through every
 // chapter. Every narration line is the guide talking (in Meem's voice), so it glows brighter
 // while it speaks. Chapters can send it to hover by something (flyTo) and call it back (follow).
 //

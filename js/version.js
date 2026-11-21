@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 1;
-export const CHANGES = ['first build', 'Stonehenge at dawn', 'guide star'];
+export const VERSION = 2;
+export const CHANGES = ['guide star named Astra', 'name over subtitles'];
