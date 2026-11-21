@@ -95,7 +95,7 @@ export class UI {
   setPaused(on) {
     this.paused = on;
     const vr = this.G.mode !== 'desktop';
-    this.pauseCard.userData.set(on ? 'Paused' : '', on ? (vr ? 'Press A or X to carry on' : 'Press P to carry on') : '');
+    this.pauseCard.userData.set(on ? 'Paused' : '', on ? (vr ? 'A or X: carry on.  Hold a thumbstick in: reset height' : 'Press P to carry on') : '');
     if (this.domHint) { this.domHint.textContent = on ? 'Paused. Press P to carry on.' : ''; this.domHint.style.display = on && !vr ? 'block' : 'none'; }
   }
 

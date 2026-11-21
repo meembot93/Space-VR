@@ -87,6 +87,10 @@ function choice(id, key, def, apply) {
 G.setKids = (on) => { G.kids = !!on; G.events.emit('kids', { on: G.kids }); for (const b of document.querySelectorAll('#rating button')) b.classList.toggle('on', (b.dataset.v === 'kids') === G.kids); };
 choice('rating', 'rating', params.get('rating') || 'kids', (v) => G.setKids(v !== 'adults'));
 choice('turning', 'turn', 'snap', (v) => { G.player.smoothTurn = v === 'smooth'; });
+// Seated (default) or Standing. Seated lifts your eyes to a grown-up's standing height when VR
+// starts, so sitting down or being small doesn't put you near the ground. Either way, holding a
+// thumbstick in for a second resets your height (js/player.js).
+choice('posture', 'posture', params.get('posture') || 'seated', (v) => G.player.setSeated(v === 'seated'));
 choice('subs', 'subs', 'on', (v) => { G.ui.subsOn = v === 'on'; G.ui.subtitle(G.ui.subText || ''); });
 
 // Chapter list: only chapters that are built can be picked
@@ -209,6 +213,7 @@ vrBtn.addEventListener('click', async () => {
     await renderer.xr.setSession(session);
     G.player.onSession(session);
     G.mode = 'vr'; camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0);
+    G.player.onVRStart();
     session.addEventListener('end', () => { G.mode = null; overlay.style.display = 'flex'; });
     begin();
   } catch (e) { note.textContent = 'Could not start VR: ' + e.message; }

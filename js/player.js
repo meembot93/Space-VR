@@ -2,6 +2,7 @@
 // hands. Same controls as Broadside VR:
 //   left stick: walk     right stick: snap turn (45°) or smooth turn
 //   grip (side button): grab      trigger: use / point
+//   hold either thumbstick pressed in for 1 second: reset your height (see calibrate below)
 // Things you can grab or touch register themselves in G.interactables (see below), so a
 // chapter just adds objects there and gets called back.
 //
@@ -17,6 +18,8 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const UP = new THREE.Vector3(0, 1, 0);
 const REACH = 0.22;      // how close a hand must be to grab something (metres)
 const WALK = 1.8;        // walking speed (metres a second), a comfortable stroll
+const EYE = 1.6;         // the eye height the story is built for (a grown-up standing)
+const HOLD = 1;          // seconds to hold a thumbstick in to reset your height
 
 // A simple soft glove for each hand
 export function buildGlove(color = 0xe8d2b0) {
@@ -43,12 +46,16 @@ export class Player {
     this.hands = []; this.snapLatch = false; this.smoothTurn = false;
     this.yaw = 0; this.pitch = 0; this.keys = {};
     this.frozen = false;   // chapters can hold you still (e.g. during a cutscene)
+    // Height: in VR the floor is your real floor, so sitting down (or being small) puts your eyes
+    // low. `lift` raises the whole rig (eyes and hands together). Seated mode sets it on its own
+    // when VR starts; holding a thumbstick in sets it again any time.
+    this.seated = false; this.lift = 0; this.calibT = -1; this.holdT = 0;
     this.deskHand = { side: 'desk', pos: new THREE.Vector3(), held: null, hover: null, desk: true };
   }
 
   // Stand at x, z facing compass yaw (radians, 0 = looking north / -Z)
   placeAt(x, z, yaw = 0) {
-    this.dolly.position.set(x, this.G.world.height(x, z), z);
+    this.dolly.position.set(x, this.G.world.height(x, z) + this.lift, z);
     this.dolly.rotation.set(0, yaw, 0);
     this.yaw = 0; this.pitch = 0;
     for (const h of [...this.hands, this.deskHand]) this.release(h);
@@ -113,6 +120,7 @@ export class Player {
   updateVR(dt) {
     const session = this.renderer?.xr.getSession();
     const srcs = session ? Array.from(session.inputSources) : [];
+    let sticks = false;
     for (const h of this.hands) {
       if (!h.src || !srcs.includes(h.src)) { const s2 = srcs.find((x) => h.side && x.handedness === h.side); if (s2) h.src = s2; }
       h.gp = h.src?.gamepad || null;
@@ -138,6 +146,8 @@ export class Player {
       const by = btn(5);
       if (by && !h.by) this.G.net?.voice.setMuted(!this.G.net.voice.muted);
       h.by = by;
+      // Thumbstick pressed in (held for a second resets your height, see updateHeight)
+      if (btn(3)) sticks = true;
       h.glove.scale.set(1, sq ? 0.75 : 1, sq ? 0.85 : 1);
       h.glove.userData.mat.emissive.setHex(h.hover || h.held ? 0x4a3a10 : 0x000000);
       if (!h.gp || this.frozen) continue;
@@ -149,6 +159,7 @@ export class Player {
         else if (Math.abs(sx) < 0.3) this.snapLatch = false;
       }
     }
+    this.updateHeight(dt, sticks);
   }
 
   // Walk relative to where you're looking (x: right, y: forward is negative, like the stick)
@@ -181,7 +192,40 @@ export class Player {
     const R = W.bounds, dc = Math.hypot(x, z);
     if (dc > R) { x *= R / dc; z *= R / dc; }
     this.dolly.position.x += x - _a.x; this.dolly.position.z += z - _a.z;
-    this.dolly.position.y = W.height(x, z);
+    this.dolly.position.y = W.height(x, z) + this.lift;
+  }
+
+  // ---------- Height ----------
+  // Seated (true) or Standing (false), from the title screen. Seated sets your height as soon as
+  // the headset sees where your head is; Standing uses your real height.
+  setSeated(on) {
+    this.seated = !!on;
+    if (this.seated) this.calibT = this.G.mode === 'vr' ? 0 : -1;
+    else { this.lift = 0; this.calibT = -1; }
+  }
+  // Called when VR starts: Seated waits a moment for the headset to settle, then sets the height
+  onVRStart() { this.lift = 0; this.calibT = this.seated ? 0 : -1; this.holdT = 0; }
+  // Raise your eyes to a grown-up's standing height (never lower them: tall people keep theirs).
+  // Returns false if the headset doesn't know where your head is yet.
+  calibrate(tell = true) {
+    const head = this.G.camera.position.y;   // in VR: your eyes above your real floor
+    if (!(head > 0.25 && head < 2.5)) return false;
+    this.lift = clamp(EYE - head, 0, 1.3);
+    if (tell) {
+      this.G.ui.showHint('Height reset', 2.5);
+      for (const h of this.hands) this.haptic(h, 0.6, 80);
+    }
+    return true;
+  }
+  updateHeight(dt, sticks) {
+    // Seated: set the height once the head has been tracked for half a second
+    if (this.calibT >= 0) {
+      if (this.G.camera.position.y > 0.25) this.calibT += dt; else this.calibT = 0;
+      if (this.calibT > 0.5 && this.calibrate(false)) this.calibT = -1;
+    }
+    // Hold a thumbstick in: reset
+    if (sticks) { this.holdT += dt; if (this.holdT >= HOLD && this.holdT - dt < HOLD) this.calibrate(); }
+    else this.holdT = 0;
   }
 
   // ---------- Desktop (for testing without a headset) ----------
