@@ -65,23 +65,27 @@ export function groundHeight(x, z) {
   return h;
 }
 
-// A rough, chunky stone: a subdivided box rounded off and dented with noise (flat-shaded)
+// A rough, chunky stone: a finely subdivided box rounded off, dented with noise, and scored with
+// the shallow vertical grooves real sarsens have (flat-shaded, so every facet catches the light)
+const STONE_DETAIL = 2.6;        // how many more facets than the simplest version
 function roughStone(w, h, d, seed, segs = [3, 6, 2]) {
-  const g = new THREE.BoxGeometry(w, h, d, ...segs);
-  const p = g.attributes.position, r = rng(seed), n = noise2(seed);
-  const off = r() * 100;
+  const sg = segs.map((n) => Math.max(2, Math.round(n * STONE_DETAIL)));
+  const g = new THREE.BoxGeometry(w, h, d, ...sg);
+  const p = g.attributes.position, r = rng(seed), n = noise2(seed), n2 = noise2(seed + 17);
+  const off = r() * 100, flute = 3 + r() * 3, fph = r() * 6;
   for (let i = 0; i < p.count; i++) {
     let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     // round the edges: pull corners in
     const nx = x / (w / 2), ny = y / (h / 2), nz = z / (d / 2);
-    const k = 1 - 0.18 * (Math.abs(nx * nz)) - 0.08 * Math.abs(nx * ny * nz);
+    const k = 1 - 0.18 * (Math.abs(nx * nz)) - 0.08 * Math.abs(nx * ny * nz) - 0.05 * Math.abs(ny) ** 6;
     x *= k; z *= k;
-    // taper toward the top a little, and dent
+    // taper toward the top a little, and dent: big lumps, small pits, and vertical weathering grooves
     const top = (ny + 1) / 2;
     x *= 1 - top * 0.12; z *= 1 - top * 0.08;
-    const dn = (n(x * 1.3 + off, y * 1.3 + z) - 0.5) * 0.22;
+    const dn = (n(x * 1.3 + off, y * 1.3 + z) - 0.5) * 0.22 + (n2(x * 4.1 + z * 3.3, y * 3.7) - 0.5) * 0.07
+      + Math.sin((x + z) * flute + fph + n(y * 0.4, x) * 2) * 0.018;
     x += Math.sign(x) * dn; z += Math.sign(z) * dn * 0.8;
-    if (ny > 0.99) y += (n(x * 2 + off, z * 2) - 0.5) * 0.25;
+    if (ny > 0.99) y += (n(x * 2 + off, z * 2) - 0.5) * 0.25 + (n2(x * 5, z * 5) - 0.5) * 0.05;
     p.setXYZ(i, x, y + h / 2, z);
   }
   g.computeVertexNormals();
@@ -170,7 +174,7 @@ export default class Stonehenge {
 
   // ---------- Building the place ----------
   buildGround() {
-    const SIZE = 900, SEG = 150;
+    const SIZE = 900, SEG = 175;
     const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI / 2);
     const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color();
     const grass = new THREE.Color(0x5f7d3a), grass2 = new THREE.Color(0x7a8f44), chalk = new THREE.Color(0xd8d4c0), wheat = new THREE.Color(0xb59a52), dirt = new THREE.Color(0x7a6448);
@@ -200,21 +204,37 @@ export default class Stonehenge {
     const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
     this.root.add(m);
 
-    // Grass tufts scattered around (one instanced mesh)
+    // Grass clumps: thin leaning blades, thickest where you walk, plus a scatter of wild flowers
+    const v = [], rb = rng(3);
+    for (let i = 0; i < 7; i++) {
+      const a = i / 7 * 6.28 + rb(), w = 0.018 + rb() * 0.012, hgt = 0.22 + rb() * 0.22, lean = 0.06 + rb() * 0.1;
+      const cx = Math.cos(a) * 0.04, cz = Math.sin(a) * 0.04, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
+      v.push(cx - px, 0, cz - pz, cx + px, 0, cz + pz, cx + Math.cos(a) * lean, hgt, cz + Math.sin(a) * lean);
+    }
     const blade = new THREE.BufferGeometry();
-    const v = []; for (let i = 0; i < 3; i++) { const a = i * 2.1, s = Math.sin(a) * 0.08, cz = Math.cos(a) * 0.08; v.push(-s, 0, -cz, s, 0, cz, s * 0.3, 0.2, cz * 0.3); }
     blade.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); blade.computeVertexNormals();
-    const N = 4000, tufts = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ color: 0x8aa850, side: THREE.DoubleSide }), N);
-    const r = rng(5), mm = new THREE.Matrix4(), cc = new THREE.Color();
+    const N = 6500, tufts = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), N);
+    const r = rng(5), mm = new THREE.Matrix4(), cc = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
     for (let i = 0; i < N; i++) {
-      const az = r() * 360, rad = 6 + Math.pow(r(), 0.7) * 110, pos = at(az, rad);
+      const az = r() * 360, rad = 4.5 + Math.pow(r(), 1.6) * 120, pos = at(az, rad);
       pos.y = groundHeight(pos.x, pos.z);
-      _q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6.28);
-      const s = 0.5 + r() * 0.8;
-      mm.compose(pos, _q, _a.set(s, s * (0.7 + r() * 0.8), s)); tufts.setMatrixAt(i, mm);
-      tufts.setColorAt(i, cc.setHex(0x6f8f3e).lerp(new THREE.Color(0xa0a058), r() * 0.5));
+      _q.setFromAxisAngle(up, r() * 6.28);
+      const sc = 0.7 + r() * 0.8;
+      mm.compose(pos, _q, _a.set(sc, sc * (0.7 + r() * 0.7), sc)); tufts.setMatrixAt(i, mm);
+      tufts.setColorAt(i, cc.setHex(0x5d7f34).lerp(new THREE.Color(0xa3a65a), r() * 0.6));
     }
     this.root.add(tufts);
+    const NF = 1400, flowers = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.035, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 }), NF);
+    const fc = [0xf4f0e0, 0xf2d24a, 0xb48ad8, 0xf0f0ff];
+    for (let i = 0; i < NF; i++) {
+      // little patches of the same colour together
+      const patch = i / 20 | 0, pr = rng(900 + patch), paz = pr() * 360, prad = 8 + pr() * 90;
+      const pos = at(paz, prad).add(_b.set((r() - 0.5) * 6, 0, (r() - 0.5) * 6));
+      pos.y = groundHeight(pos.x, pos.z) + 0.18 + r() * 0.12;
+      mm.compose(pos, _q.identity(), _a.setScalar(0.7 + r() * 0.6)); flowers.setMatrixAt(i, mm);
+      flowers.setColorAt(i, cc.setHex(fc[patch % 4]));
+    }
+    this.root.add(flowers);
   }
 
   buildStones() {
@@ -287,32 +307,92 @@ export default class Stonehenge {
     for (let i = 0; i < 9; i++) {
       const a = r() * 6.28, d = 8 + r() * 26, x = center.x + Math.cos(a) * d, z = center.z + Math.sin(a) * d, y = groundHeight(x, z);
       const rad = 3.2 + r() * 1.6, wall = 1.5 + r() * 0.3;
-      k.cyl(rad, rad, wall, 12, 0xb8a07a, [x, y + wall / 2, z]);
-      k.cyl(0.05, rad + 0.6, rad * 1.15, 12, 0xc2a35a, [x, y + wall + rad * 0.55, z]);
+      k.cyl(rad, rad, wall, 22, 0xb8a07a, [x, y + wall / 2, z]);
+      k.cyl(0.05, rad + 0.6, rad * 1.15, 22, 0xc2a35a, [x, y + wall + rad * 0.55, z]);
       const toC = Math.atan2(-x, -z);
       k.box(0.9, 1.2, 0.3, 0x3a2a1a, [x + Math.sin(toC) * rad, y + 0.6, z + Math.cos(toC) * rad], [0, toC, 0]);
       G.world.blockers.push({ x, z, r: rad + 0.3 });
       (this.chimneys ||= []).push(new THREE.Vector3(x, y + wall + rad * 1.1, z));
     }
-    // A few clumps of trees on the far slopes (not toward the sunrise)
-    for (let i = 0; i < 26; i++) {
-      const az = 170 + r() * 200, d = 140 + r() * 200, p = at(az, d); p.y = groundHeight(p.x, p.z);
-      const s = 0.8 + r() * 0.8;
-      k.cyl(0.25 * s, 0.35 * s, 3 * s, 5, 0x5a4430, [p.x, p.y + 1.5 * s, p.z]);
-      for (let j = 0; j < 3; j++) k.ball(2.2 * s, 0, 0x3f5a2c, [p.x + (r() - 0.5) * 2 * s, p.y + (3.5 + r() * 1.5) * s, p.z + (r() - 0.5) * 2 * s]);
-    }
+    // Trees (built below, after the village's own mesh)
     // Wooden sledges, spare rollers and rope coils left near the circle
     for (let i = 0; i < 5; i++) {
       const p = at(AXIS + 30 + i * 9, 27 + r() * 4); p.y = groundHeight(p.x, p.z);
       k.cyl(0.14, 0.14, 2.8, 6, 0x7a5a38, [p.x, p.y + 0.14, p.z], [Math.PI / 2, 0, r() * 3]);
     }
     this.root.add(k.mesh());
+    this.buildTrees();
     // Smoke rising from the roofs (a handful of soft sprites per house)
     this.smoke = [];
     const sm = new THREE.SpriteMaterial({ map: canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(200,200,205,0.55)'); gr.addColorStop(1, 'rgba(200,200,205,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }), transparent: true, depthWrite: false });
     for (const c of this.chimneys) for (let j = 0; j < 4; j++) {
       const s = new THREE.Sprite(sm); s.userData = { base: c, t: j / 4 }; this.root.add(s); this.smoke.push(s);
     }
+  }
+
+  // Full-size trees, 9 to 16 m tall like real oaks and ash: a few copses and lone trees on the
+  // slopes away from the sunrise, and a dark belt of woodland along the far horizon.
+  buildTrees() {
+    const r = rng(31), G = this.G;
+    const trunks = new Kit(), leaves = [];
+    const dark = new THREE.Color(0x2c4320), mid = new THREE.Color(0x456a2e), light = new THREE.Color(0x7a9a48), tmp = new THREE.Color();
+    const okAz = (az) => { const a = ((az % 360) + 360) % 360; return a > 165 || a < 15; }; // keep the sunrise side open
+    const village = at(150, 165);
+    const tree = (x, z, s) => {
+      const y = groundHeight(x, z) - 0.2, lean = (r() - 0.5) * 0.08, trunkH = 3.4 * s;
+      trunks.add(new THREE.CylinderGeometry(0.28 * s, 0.5 * s, trunkH, 9, 2), 0x4a3a2a, [x, y + trunkH / 2, z], [lean, r() * 6, lean]);
+      // main boughs reaching up and out into the crown
+      const nb = 3 + (r() * 2 | 0);
+      for (let i = 0; i < nb; i++) {
+        const a = i / nb * 6.28 + r(), out = 1.2 * s, len = 3.2 * s;
+        trunks.add(new THREE.CylinderGeometry(0.1 * s, 0.2 * s, len, 6), 0x4e3e2c,
+          [x + Math.cos(a) * out * 0.6, y + trunkH + len * 0.3, z + Math.sin(a) * out * 0.6], [Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7]);
+      }
+      // the crown: overlapping lumpy blobs, darker underneath, sunlit on top
+      const cy = y + trunkH + 3.4 * s, nBlob = 7 + (r() * 4 | 0);
+      for (let i = 0; i < nBlob; i++) {
+        const a = r() * 6.28, d = (i === 0 ? 0 : 1.5 + r() * 1.6) * s, rad = (2.1 + r() * 1.2) * s;
+        const g = new THREE.IcosahedronGeometry(rad, 1), p = g.attributes.position;
+        const nz = noise2(400 + leaves.length);
+        for (let j = 0; j < p.count; j++) { const vx = p.getX(j), vy = p.getY(j), vz = p.getZ(j), b = 0.82 + nz(vx * 0.9 + 5, vz * 0.9 + vy) * 0.36; p.setXYZ(j, vx * b, vy * b * 0.92, vz * b); }
+        g.translate(x + Math.cos(a) * d, cy + (i === 0 ? 0.6 * s : (r() - 0.45) * 3.4 * s), z + Math.sin(a) * d);
+        leaves.push(g);
+      }
+      if (Math.hypot(x, z) < G.world.bounds + 5) G.world.blockers.push({ x, z, r: 0.6 * s });
+    };
+    // copses of trees, and some lone trees standing out in the grass
+    for (let c = 0; c < 9; c++) {
+      let az, d, p; do { az = 165 + r() * 210; d = 85 + r() * 230; p = at(az, d); } while (Math.hypot(p.x - village.x, p.z - village.z) < 50);
+      const n = 4 + (r() * 9 | 0);
+      for (let i = 0; i < n; i++) { const a = r() * 6.28, rr = Math.sqrt(r()) * (8 + n * 1.6); tree(p.x + Math.cos(a) * rr, p.z + Math.sin(a) * rr, 0.85 + r() * 0.45); }
+    }
+    for (let i = 0; i < 16; i++) {
+      const az = 160 + r() * 220, d = 70 + r() * 150, p = at(az, d);
+      if (!okAz(az) || Math.hypot(p.x - village.x, p.z - village.z) < 45) continue;
+      tree(p.x, p.z, 0.9 + r() * 0.5);
+    }
+    // a few trees around the village, for shade
+    for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = 42 + r() * 18; tree(village.x + Math.cos(a) * d, village.z + Math.sin(a) * d, 0.9 + r() * 0.3); }
+    // far woodland: long low dark humps along the horizon (cheap: big rough blobs)
+    for (let az = 172; az < 372; az += 2.6) {
+      if (r() < 0.25) continue;
+      const d = 400 + r() * 40, p = at(az, d), rad = 10 + r() * 9;
+      const g = new THREE.IcosahedronGeometry(rad, 1); g.scale(1.3, 0.55 + r() * 0.2, 1.3);
+      g.translate(p.x, groundHeight(p.x, p.z) + rad * 0.35, p.z); leaves.push(g);
+    }
+    // colour the leaves vertex by vertex (shade and sun), then merge into one mesh
+    const lk = new Kit();
+    for (const g of leaves) {
+      g.computeBoundingBox(); const bb = g.boundingBox, h = bb.max.y - bb.min.y;
+      const out = lk.add(g, 0xffffff), p = out.attributes.position, c = out.attributes.color;
+      const tone = r();
+      for (let j = 0; j < p.count; j++) {
+        const t = (p.getY(j) - bb.min.y) / h;
+        tmp.copy(dark).lerp(mid, clamp(t * 1.4, 0, 1)).lerp(light, clamp((t - 0.6) * 1.6, 0, 1) * (0.5 + tone * 0.5));
+        c.setXYZ(j, tmp.r, tmp.g, tmp.b);
+      }
+    }
+    this.root.add(trunks.mesh(), lk.mesh());
   }
 
   buildMovingStone() {
@@ -403,8 +483,9 @@ export default class Stonehenge {
     // Where the Sun rises through the year: a dotted line along the horizon, winter to summer
     this.path = new THREE.Group();
     const dot = glowSprite('rgba(255,210,140,1)');
-    for (let az = AXIS; az <= WINTER; az += 4) {
-      const s = new THREE.Sprite(dot); dirFromAzEl(az, 0.6, s.position).multiplyScalar(300); s.scale.setScalar(az === AXIS || az > WINTER - 4 ? 16 : 7); this.path.add(s);
+    // (small, even dots: a big one at either end looked like a second Sun)
+    for (let az = AXIS + 4; az <= WINTER - 4; az += 4) {
+      const s = new THREE.Sprite(dot); dirFromAzEl(az, -0.2, s.position).multiplyScalar(300); s.scale.setScalar(3.2); this.path.add(s);
     }
     const label = (text, az) => {
       const t = canvasTex(256, 80, (g, w, h) => { g.font = 'bold 44px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(255,240,210,0.95)'; g.fillText(text, w / 2, h / 2); });
@@ -531,6 +612,7 @@ export default class Stonehenge {
     const mid = at(AXIS + 180, 1.5);
     placeAll(mid, this.faceToward(mid, at(AXIS, 50)));
     s.phase = 'gap'; s.mist = 0.5;
+    s.guide = at(AXIS - 24, 8, 2.3).toArray();   // Astra waits beside the gap, not in front of it
     await G.ui.fadeIn(1.2);
     await D.say('ch2_07');
     s.phase = 'sunrise'; G.events.emit('sfx', { k: 'swell' });
@@ -632,7 +714,7 @@ export default class Stonehenge {
     // Sun path along the horizon
     this.pathV = damp(this.pathV || 0, s.path, 2, dt);
     this.path.visible = this.pathV > 0.01;
-    for (const m of this.pathMats) m.opacity = this.pathV;
+    for (const m of this.pathMats) m.opacity = this.pathV * (m === this.pathMats[0] ? 0.6 : 1);
     // Stand-here ring
     this.ringV = damp(this.ringV || 0, s.ring, 3, dt);
     this.ring.position.copy(s.phase === 'pull' ? this.pullSpot() : this.ringSpot).setY(groundHeight(this.ring.position.x, this.ring.position.z) + 0.05);

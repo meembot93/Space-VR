@@ -54,13 +54,33 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   // Wait for the walk, then walk forward with the left stick and check we moved
   await until(() => G.director.chapter?.s.phase === 'walk');
   await shot('1_arrive');
-  const before = await page.evaluate(() => G.camera.getWorldPosition(new G.camera.position.constructor()).toArray());
+  const before = await page.evaluate(() => [...G.camera.getWorldPosition(new G.camera.position.constructor()).toArray(), G.t]);
   await page.evaluate(() => __xr.controllers.left.updateAxes('thumbstick', 0, -1));
   await page.waitForTimeout(1200);
   await page.evaluate(() => __xr.controllers.left.updateAxes('thumbstick', 0, 0));
-  const after = await page.evaluate(() => G.camera.getWorldPosition(new G.camera.position.constructor()).toArray());
-  const walked = Math.hypot(after[0] - before[0], after[2] - before[2]);
-  check(walked > 0.4, `left stick walks (${walked.toFixed(2)} m in 1.2 s)`);
+  const after = await page.evaluate(() => [...G.camera.getWorldPosition(new G.camera.position.constructor()).toArray(), G.t]);
+  // (game time, not wall time: the software-rendered test browser runs at only a few frames a second)
+  const walked = Math.hypot(after[0] - before[0], after[2] - before[2]), gameT = after[3] - before[3];
+  check(walked > 0.6 * 1.8 * gameT && walked > 0.1, `left stick walks (${walked.toFixed(2)} m in ${gameT.toFixed(2)} s of game time)`);
+  // Astra rests out in front of you (about 7 m away), not off at the edge of your view
+  await page.waitForTimeout(2500);
+  const astra = await page.evaluate(() => {
+    const V = G.camera.position.constructor, c = G.camera.getWorldPosition(new V()), f = G.camera.getWorldDirection(new V());
+    const d = G.guide.root.position.clone().sub(c); const dist = d.length();
+    return { dist, ang: Math.acos(d.normalize().dot(f)) * 180 / Math.PI };
+  });
+  check(astra.dist > 5 && astra.dist < 9 && astra.ang < 25, `Astra waits in front of you (${astra.dist.toFixed(1)} m away, ${astra.ang.toFixed(0)}° from the middle of your view)`);
+  // Pause with X, carry on with A
+  const el0 = await page.evaluate(() => { clearInterval(window.__skip); return G.director.chapter.s.sunEl; });
+  const press = (hand, b) => page.evaluate(async ([hand, b]) => { __xr.controllers[hand].updateButtonValue(b, 1); await new Promise((r) => setTimeout(r, 150)); __xr.controllers[hand].updateButtonValue(b, 0); await new Promise((r) => setTimeout(r, 150)); }, [hand, b]);
+  await press('left', 'x-button');
+  const p1 = await page.evaluate(() => G.paused);
+  await page.waitForTimeout(1500);
+  const el1 = await page.evaluate(() => G.director.chapter.s.sunEl);
+  await press('right', 'a-button');
+  const p2 = await page.evaluate(() => G.paused);
+  check(p1 === true && p2 === false && Math.abs(el1 - el0) < 0.02, `X pauses the story and A carries on (paused: ${p1}, then ${p2})`);
+  await skipLines();
   // Snap turn with the right stick
   const yaw0 = await page.evaluate(() => G.player.dolly.rotation.y);
   await page.evaluate(() => __xr.controllers.right.updateAxes('thumbstick', 1, 0));

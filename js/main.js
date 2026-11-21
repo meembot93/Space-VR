@@ -25,6 +25,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
 renderer.xr.setFoveation(1);
+// Draw the headset view a bit sharper than the browser's default (closer to the Quest's real screens)
+renderer.xr.setFramebufferScaleFactor(Number(params.get('sharp')) || 1.2);
 document.body.appendChild(renderer.domElement);
 G.renderer = renderer;
 
@@ -86,7 +88,10 @@ for (const c of CHAPTERS) {
 
 // ---------- Actions: everything a player does to the story goes through here ----------
 // On the host it goes straight to the chapter; a friend's headset sends it to the host.
-G.applyAction = (a) => G.director.chapter?.act(a, G.players.find((p) => p.id === a.player)) || false;
+G.applyAction = (a) => {
+  if (a.type === 'pause') { G.setPaused(!G.paused); return true; }
+  return G.director.chapter?.act(a, G.players.find((p) => p.id === a.player)) || false;
+};
 G.act = (a) => {
   if (G.isHost) return G.applyAction({ player: G.player.id, ...a });
   G.net.sendAction(a); return true;
@@ -106,6 +111,25 @@ G.onNetEvent = (name, d) => {
   else if (name === 'chapterStart') { G.ui.fadeIn(2.5); G.music.play('ch' + d.n); }
   else if (name === 'chapterEnd') { chapterEnded(); G.music.stop(5); }
   else if (name === 'kids') G.setKids(d.on);
+  else if (name === 'pause') setPaused(d.on, true);
+};
+
+// ---------- Pause (A or X in VR, P on desktop) ----------
+// Everything in the story stops: Astra's voice, the Sun, the builders. You can still look around.
+// In a group, anyone can pause and it pauses for everybody (the host decides).
+function setPaused(on, fromHost) {
+  on = !!on;
+  if (on === !!G.paused) return;
+  G.paused = on;
+  G.narration.pause(on);
+  G.player.frozen = on;
+  G.ui.setPaused(on);
+  if (G.isHost && !fromHost) G.events.emit('pause', { on });
+}
+G.setPaused = (on) => setPaused(on);
+G.togglePause = () => {
+  if (!G.started || !G.director.chapter) return;
+  if (G.isHost) setPaused(!G.paused); else G.net.sendAction({ type: 'pause' });
 };
 function placeMe(d) {
   const seat = parseInt(G.player.id.split(':')[1]) || 0;
@@ -146,6 +170,7 @@ if (navigator.xr && navigator.xr.isSessionSupported) {
 let loading = G.director.load(chapterPick).catch((e) => { note.textContent = e.message; });
 
 async function begin() {
+  setPaused(false);
   overlay.style.display = 'none';
   endCard.style.display = 'none';
   G.audio.init();
@@ -296,7 +321,7 @@ function tick() {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   G.t += dt;
   if (G.mode) G.player.update(dt);
-  G.director.update(dt);
+  if (!G.paused) G.director.update(dt);
   G.narration.update(dt);
   G.music.update(dt);
   G.guide.update(dt);
