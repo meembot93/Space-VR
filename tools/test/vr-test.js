@@ -37,7 +37,7 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   // The emulated Quest 3, installed before the game's own code runs
   await page.addInitScript({ path: require.resolve('iwer/build/iwer.min.js') });
   await page.addInitScript(() => { const d = new IWER.XRDevice(IWER.metaQuest3); d.installRuntime({ forceInstall: true }); window.__xr = d; });
-  await page.goto(`http://localhost:${port}/index.html?fast`);
+  await page.goto(`http://localhost:${port}/index.html?fast&chapter=2`);
   await page.waitForFunction(() => !document.getElementById('vrBtn').disabled, null, { timeout: 15000 });
   check(true, 'Enter VR button is enabled with a (virtual) headset');
   await page.click('#vrBtn');
@@ -70,6 +70,21 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
     return { dist, ang: Math.acos(d.normalize().dot(f)) * 180 / Math.PI };
   });
   check(astra.dist > 5 && astra.dist < 9 && astra.ang < 25, `Astra waits in front of you (${astra.dist.toFixed(1)} m away, ${astra.ang.toFixed(0)}° from the middle of your view)`);
+  // Point the right controller at Vega: its name comes up
+  const star = await page.evaluate(async () => {
+    const sf = G.sky.starField, V = G.camera.position.constructor, P = G.player;
+    let vi; for (const [i, l] of sf.labels) if (l.name === 'Vega') vi = i;
+    const w = new V(sf.dirs[vi * 3], sf.dirs[vi * 3 + 1], sf.dirs[vi * 3 + 2]).applyMatrix4(sf.toWorld.clone().setPosition(0, 0, 0));
+    // aim the controller (in the rig's own space) along that direction
+    const local = w.clone().transformDirection(P.dolly.matrixWorld.clone().invert());
+    const q = new G.camera.quaternion.constructor().setFromUnitVectors(new V(0, 0, -1), local.normalize());
+    const c = __xr.controllers.right; c.position.set(0.25, 1.2, -0.3); c.quaternion.set(q.x, q.y, q.z, q.w);
+    await new Promise((r) => setTimeout(r, 2500));
+    const res = { name: G.stargazing.cur?.name, con: G.stargazing.cur?.conName, alt: Math.asin(w.y) * 180 / Math.PI, night: sf.opacity };
+    c.quaternion.set(0, 0, 0, 1);
+    return res;
+  });
+  check(star.name === 'Vega' || star.alt < 10, `pointing at a star shows its name (${star.name} in ${star.con}, ${star.alt.toFixed(0)}° up)`);
   // Pause with X, carry on with A
   const el0 = await page.evaluate(() => { clearInterval(window.__skip); return G.director.chapter.s.sunEl; });
   const press = (hand, b) => page.evaluate(async ([hand, b]) => { __xr.controllers[hand].updateButtonValue(b, 1); await new Promise((r) => setTimeout(r, 150)); __xr.controllers[hand].updateButtonValue(b, 0); await new Promise((r) => setTimeout(r, 150)); }, [hand, b]);

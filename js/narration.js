@@ -3,7 +3,7 @@
 //
 // Which clips exist is listed in sounds/narration/index.json, e.g. { "ch2_01": "ch2_01.mp3" }.
 // tools/narration/import.py writes that file when it adds Meem's recordings.
-import { LINES, GUIDE_NAME } from './script.js';
+import { LINES, GUIDE_NAME, SPEAKERS } from './script.js';
 
 const DIR = new URL('../sounds/narration/', import.meta.url).href;
 
@@ -45,7 +45,7 @@ export class Narration {
     let buf = null;
     if (this.has(id) && this.G.audio.ctx) { try { buf = await this.load(id); } catch (e) { buf = null; } }
     if (this.cur !== token) return;
-    this.G.ui.subtitle(text, buf ? '' : this.G.debug ? `(placeholder: recording ${id} not added yet)` : '', GUIDE_NAME);
+    this.G.ui.subtitle(text, buf ? '' : this.G.debug ? `(placeholder: recording ${id} not added yet)` : '', SPEAKERS[id] || GUIDE_NAME);
     this.G.events.emit('narrating', { id, on: true });
     await new Promise((ok) => {
       token.done = ok;

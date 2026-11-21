@@ -1,9 +1,10 @@
 // One sky for every chapter: a gradient dome that runs from deep night through dawn to day,
-// thousands of stars and the Milky Way, the Sun and the Moon. Chapters only set the Sun's
+// the real stars and Milky Way (stars.js), the Sun and the Moon. Chapters only set the Sun's
 // position (and the Moon's), and everything else (sky colours, light, fog, stars fading)
 // follows from it. World axes: -Z is north, +X is east, +Y is up.
 import * as THREE from 'three';
 import { clamp, lerp } from './util.js';
+import { StarField } from './stars.js';
 
 const D2R = Math.PI / 180;
 // A direction from compass bearing (degrees clockwise from north) and height above the horizon
@@ -45,6 +46,8 @@ void main() {
 const SKY_FS = `
 uniform vec3 zenith, horizon, glow, sunDir;
 uniform float glowAmt, night, milky;
+uniform sampler2D mwTex;
+uniform mat3 toStar;
 varying vec3 vDir;
 float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float noise(vec3 x) {
@@ -61,54 +64,19 @@ void main() {
   float s = max(dot(d, sunDir), 0.0);
   float band = 1.0 - smoothstep(0.0, 0.55, abs(h - 0.03));
   col = mix(col, glow, clamp(pow(s, 6.0) * glowAmt * (0.35 + 0.65 * band) + pow(s, 60.0) * glowAmt * 0.6, 0.0, 1.0));
-  // The Milky Way: a soft, patchy band across the night sky
-  vec3 gp = normalize(vec3(0.62, 0.48, -0.62));
-  float g = 1.0 - abs(dot(d, gp));
-  float mw = smoothstep(0.82, 1.0, g) * (0.55 + 0.45 * noise(d * 9.0)) * (0.6 + 0.4 * noise(d * 23.0));
-  col += vec3(0.55, 0.6, 0.8) * mw * milky * night * 0.18 * smoothstep(-0.05, 0.25, d.y);
+  // The Milky Way, from a real map of its glow (turned with the stars)
+  vec3 e = toStar * d;
+  vec2 uv = vec2(atan(e.y, e.x) / 6.2831853 + 0.5, asin(clamp(e.z, -1.0, 1.0)) / 3.14159265 + 0.5);
+  uv.x = fract(uv.x + 0.5);
+  float mwv = texture2D(mwTex, uv).r;
+  float fbm = noise(e * 18.0) * 0.5 + noise(e * 41.0) * 0.3 + noise(e * 97.0) * 0.2;
+  float mw = pow(mwv, 1.15) * (0.25 + 1.1 * fbm) + mwv * 0.12;
+  col += vec3(0.6, 0.64, 0.82) * mw * milky * night * 0.17 * smoothstep(-0.02, 0.3, d.y);
   // Below the horizon: fade into the ground haze
   col = mix(col, horizon * 0.85, smoothstep(0.0, -0.12, d.y));
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`;
-
-function makeStars(n, seed = 1) {
-  let s = seed; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), size = new Float32Array(n);
-  const gp = new THREE.Vector3(0.62, 0.48, -0.62).normalize(), v = new THREE.Vector3();
-  for (let i = 0; i < n; i++) {
-    // Pick a random direction; about a third crowd toward the Milky Way's band
-    for (;;) {
-      v.set(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1);
-      if (v.lengthSq() > 1 || v.lengthSq() < 0.01) continue;
-      v.normalize();
-      if (i % 3 === 0 && Math.abs(v.dot(gp)) > 0.18 + rnd() * 0.2) continue;
-      if (v.y < -0.05) continue;
-      break;
-    }
-    pos.set([v.x * 900, v.y * 900, v.z * 900], i * 3);
-    const b = Math.pow(rnd(), 4.5); // a few bright stars, many faint ones
-    const tint = rnd();
-    const c = tint < 0.15 ? [1, 0.82, 0.65] : tint < 0.3 ? [0.75, 0.85, 1] : [1, 1, 1];
-    const k = 0.35 + b * 0.65;
-    col.set([c[0] * k, c[1] * k, c[2] * k], i * 3);
-    size[i] = 1.2 + b * 3.2;
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.setAttribute('size', new THREE.BufferAttribute(size, 1));
-  const m = new THREE.ShaderMaterial({
-    uniforms: { opacity: { value: 1 }, scale: { value: 1 } },
-    vertexShader: `attribute float size; attribute vec3 color; varying vec3 vC; uniform float scale;
-      void main(){ vC = color; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; gl_PointSize = size * scale; }`,
-    fragmentShader: `varying vec3 vC; uniform float opacity;
-      void main(){ vec2 c = gl_PointCoord - 0.5; float a = smoothstep(0.5, 0.1, length(c)); gl_FragColor = vec4(vC * opacity * a, 1.0); }`,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  });
-  const p = new THREE.Points(g, m); p.frustumCulled = false; p.renderOrder = -9;
-  return p;
-}
 
 function glowTexture(inner = 'rgba(255,250,230,1)', mid = 'rgba(255,200,120,0.35)') {
   const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -118,23 +86,54 @@ function glowTexture(inner = 'rgba(255,250,230,1)', mid = 'rgba(255,200,120,0.35
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
+// Draw the Moon's face with the right part lit (northern-hemisphere view: waxing = lit on the right)
+function drawMoon(c, phase) {
+  const g = c.getContext('2d'), W = c.width, r = W * 0.36, cx = W / 2;
+  g.clearRect(0, 0, W, W);
+  // a faint halo
+  const hal = g.createRadialGradient(cx, cx, r, cx, cx, W / 2); hal.addColorStop(0, `rgba(200,215,255,${0.25 * Math.sin(Math.PI * phase)})`); hal.addColorStop(1, 'rgba(200,215,255,0)');
+  g.fillStyle = hal; g.fillRect(0, 0, W, W);
+  // the dark side, just visible (earthshine)
+  g.fillStyle = 'rgba(70,78,96,0.55)'; g.beginPath(); g.arc(cx, cx, r, 0, 7); g.fill();
+  // the lit part: half a disc plus/minus an ellipse for the terminator
+  const k = Math.cos(phase * 2 * Math.PI);           // 1 new .. -1 full
+  const waxing = phase < 0.5;
+  g.save(); g.beginPath(); g.arc(cx, cx, r, 0, 7); g.clip();
+  // lit between the bright limb and the terminator (an ellipse edge that sweeps across over the month)
+  g.fillStyle = '#f2f0e6'; g.beginPath();
+  const side = waxing ? 1 : -1, N = 48;
+  for (let i = 0; i <= N; i++) { const a = -Math.PI / 2 + Math.PI * i / N; g.lineTo(cx + side * Math.cos(a) * r, cx + Math.sin(a) * r); }
+  for (let i = N; i >= 0; i--) { const a = -Math.PI / 2 + Math.PI * i / N; g.lineTo(cx + side * k * Math.cos(a) * r, cx + Math.sin(a) * r); }
+  g.fill();
+  // seas: a few soft grey patches
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(120,120,128,0.35)';
+  for (const [x, y, s] of [[-0.25, -0.3, 0.22], [0.15, -0.15, 0.26], [0.25, 0.25, 0.18], [-0.1, 0.2, 0.14], [-0.35, 0.1, 0.12]]) { g.beginPath(); g.arc(cx + x * r, cx + y * r, s * r, 0, 7); g.fill(); }
+  g.restore();
+}
+
 export class Sky {
   constructor(scene) {
     this.scene = scene;
     this.uni = {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() }, glow: { value: new THREE.Color() },
       sunDir: { value: new THREE.Vector3(0, -1, 0) }, glowAmt: { value: 1 }, night: { value: 1 }, milky: { value: 1 },
+      mwTex: { value: null }, toStar: { value: new THREE.Matrix3() },
     };
+    // The real stars (see stars.js); chapters set the place and era with sky.setPlace()
+    this.starField = new StarField();
+    this.uni.mwTex.value = this.starField.mwTex;
+    this.uni.toStar.value = this.starField.toStar;
     const dome = this.dome = new THREE.Mesh(new THREE.SphereGeometry(1000, 32, 16),
       new THREE.ShaderMaterial({ uniforms: this.uni, vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false }));
     dome.frustumCulled = false; dome.renderOrder = -10;
-    this.stars = makeStars(3200);
+
     // Sun: a bright disk plus a soft halo, drawn as sprites on the sky
     this.sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.sun.scale.setScalar(170); this.sun.renderOrder = -8;
     this.moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('rgba(240,244,255,1)', 'rgba(160,180,220,0.18)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.moon.scale.setScalar(70); this.moon.visible = false; this.moon.renderOrder = -8;
-    this.group = new THREE.Group(); this.group.add(dome, this.stars, this.sun, this.moon);
+    this.group = new THREE.Group(); this.group.add(dome, this.starField.group, this.sun, this.moon);
     scene.add(this.group);
 
     // Lights: soft sky/ground fill plus the Sun
@@ -147,6 +146,7 @@ export class Sky {
     this.fogFar = 700;
     this.sunAz = 50; this.sunEl = -20;
     this.sunSize = 1;     // the Sun can be drawn a bit bigger than life for drama
+    this.showLines = true; // faint constellation figures at night
     this.set(50, -20);
   }
 
@@ -158,7 +158,8 @@ export class Sky {
     keyColor(el, 1, U.zenith.value); keyColor(el, 2, U.horizon.value); keyColor(el, 3, U.glow.value);
     U.glowAmt.value = clamp((el + 16) / 14, 0, 1);
     const night = U.night.value = clamp((-el - 4) / 10, 0, 1);
-    this.stars.material.uniforms.opacity.value = clamp((-el - 2) / 10, 0, 1);
+    this.starField.opacity = clamp((-el - 1.5) / 7, 0, 1);
+    this.starField.lineOpacity = this.showLines ? 0.13 : 0;
     this.sun.position.copy(d).multiplyScalar(900);
     this.sun.visible = el > -3;
     this.sun.scale.setScalar(120 * this.sunSize);
@@ -178,17 +179,32 @@ export class Sky {
     this.night = night;
   }
 
-  update(dt, camPos) {
+  // Where and when on Earth (see stars.js): { lat, year, sunLon }
+  setPlace(p) { this.starField.setPlace(p); }
+
+  update(dt, camPos, t = 0) {
     // The sky is always centred on you
     this.group.position.copy(camPos);
+    this.starField.update(this.sunAz, this.sunEl, t);
     const F = this.scene.fog;
     F.far = lerp(this.fogFar, 140, this.mist);
     F.near = lerp(40, 4, this.mist);
   }
 
-  setMoon(az, el, size = 1) {
-    this.moon.visible = el > -2;
+  // The Moon at bearing az, height el. phase: 0 new, 0.25 first quarter (right half lit),
+  // 0.5 full, 0.75 last quarter. Pass phase = null for just a soft glow.
+  setMoon(az, el, size = 1, phase = null) {
+    this.moon.visible = el > -2 && (phase == null || Math.abs(phase - Math.round(phase)) > 0.02);
     dirFromAzEl(az, el, this.moon.position).multiplyScalar(900);
-    this.moon.scale.setScalar(70 * size);
+    if (phase != null) {
+      if (!this.moonDisc) {
+        const c = document.createElement('canvas'); c.width = c.height = 256;
+        this.moonCanvas = c; this.moonDisc = new THREE.CanvasTexture(c); this.moonDisc.colorSpace = THREE.SRGBColorSpace;
+        this.moon.material.map = this.moonDisc; this.moon.material.blending = THREE.NormalBlending; this.moon.material.needsUpdate = true;
+      }
+      if (this.moonPhase == null || Math.abs(this.moonPhase - phase) > 0.004) { this.moonPhase = phase; drawMoon(this.moonCanvas, phase); this.moonDisc.needsUpdate = true; }
+      this.moon.scale.setScalar(26 * size);
+    } else this.moon.scale.setScalar(70 * size);
   }
+  hideMoon() { this.moon.visible = false; }
 }

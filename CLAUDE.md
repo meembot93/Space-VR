@@ -10,3 +10,10 @@
   300-500k tris per scene, few draw calls. Stand-ins in `js/people.js` until a model arrives.
 - Run `tools/test` (IWER headset emulator) after changing controls or a chapter's story.
 - Meem has no game-dev background: give click-by-click steps for anything they must do.
+- Sky (js/sky.js + js/stars.js, real catalog in data/): in a chapter's constructor call
+  `G.sky.setPlace({ lat, year, sunLon })` (year negative = BC, sunLon 0 spring / 90 midsummer /
+  180 autumn / 270 midwinter). Then `G.sky.set(az, el)` places the Sun and the stars turn to match;
+  `G.sky.sunAzAt(el)`-style help is on `G.sky.starField` (sunAzAt, find, dirOf). Moon:
+  `G.sky.setMoon(az, el, size, phase)` (phase 0 new .. 0.5 full) or `hideMoon()`. Pointing at stars
+  to get names (js/stargazing.js) works by itself at night. Shared helpers: js/shapes.js (rng, noise2, roughStone).
+- Chapters run in order: when one ends, the next `ready` chapter in js/chapters.js loads and plays.

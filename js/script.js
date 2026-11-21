@@ -4,12 +4,23 @@
 // sounds/narration/ (see docs/RECORDING.md). Until a clip exists, the line shows as a subtitle
 // for about as long as it would take to say. No generated voices, ever.
 //
-// Text comes from the Era 1 plan doc (chapter narration scripts). Change it here and in the doc.
+// Final wording: Chapter 1 from narration/ch1/LINES.md, Chapters 3-7 and the bridges from
+// ERA1_RECORDING_SHEET.md (Meem's recording sheets), Chapter 2 from the Era 1 plan doc.
 // The guide star's name (chosen by Meem). Shown over every narration subtitle.
 export const GUIDE_NAME = 'Astra';
 
 export const LINES = {
-  // ---------- Chapter 2: Stonehenge at dawn ----------
+  ch1_01: "Hello. I'm Astra. I've been watching people watch the sky for a very long time, and I'd love to show you how it all began.",
+  ch1_02: "Thirty thousand years ago, there were no cities. No farms. No roads. No books. The world was in the grip of an Ice Age, and people lived in small groups, following herds of reindeer and wild horses across frozen plains.",
+  ch1_03: "But there was one thing they had that we've almost lost. Look up.",
+  ch1_04: "No streetlights. No glow from a city. Just thousands and thousands of stars, and the Milky Way stretched across the sky like a river of light. For these people, the night sky wasn't a background. It was the biggest, brightest thing in their whole world.",
+  ch1_05: "Somebody, long ago, picked up a piece of bone and a sharp stone. And they started to keep track of something.",
+  ch1_06: "Tonight the Moon is just a sliver. Make a mark.",
+  ch1_07: "Each night it grows a little. Mark it again. And again. Half a Moon now... bigger... bigger...",
+  ch1_08: "The full Moon. Bright enough to walk by, bright enough to hunt by. If you knew when it was coming, you could plan for it.",
+  ch1_09: "Then it shrinks, night after night, until it's gone completely. A few dark nights... and then, there it is again. A thin sliver, right back where it started.",
+  ch1_10: "Count your marks. About twenty-nine. Every time, the same. The Moon keeps time.",
+  ch1_11: "Bones like this one have been found in caves in France and Africa. We can't be completely sure what the marks mean. But many scientists think they might be the very first calendars. The first time a human being looked up, noticed a pattern, and wrote it down. Everything that comes after, every telescope, every rocket, starts right here.",
   ch2_01: 'Twenty-five thousand years later, the world has changed. The ice has melted. And people have discovered something that changes everything: farming.',
   ch2_02: 'Now families don’t wander. They stay in one place, plant seeds, raise animals. But farming comes with a big question. When do you plant? Too early, and frost kills your crops. Too late, and they won’t grow in time.',
   ch2_03: 'These people found their answer in the Sun.',
@@ -20,4 +31,61 @@ export const LINES = {
   ch2_08: 'There it is. The first light of the longest day, shining straight into the heart of the circle. Just like they planned it.',
   ch2_09: 'The Sun will wander away, all the way across the horizon and back. But next summer, on this same morning, it will rise right here again. And the year after that. And the year after that.',
   ch2_10: 'Stonehenge has stood for over four thousand years. We still don’t know everything it was used for. But we know this: the people who built it were watching the sky very, very carefully.',
+  ch3_01: "At almost the same time, two thousand miles away, a very different people are watching the sky. This is Egypt, about forty-five hundred years ago.",
+  ch3_02: "Those are the pyramids, brand new. The biggest buildings humans have ever made, and they'll stay that way for almost four thousand years. The Egyptians lined them up with north so precisely that engineers today are still amazed.",
+  ch3_03: "But the most important thing in Egypt isn't the pyramids. It's this river. The Nile. On both sides is desert, where nothing grows. Everyone lives right here along the water.",
+  ch3_04: "Once a year, the Nile floods. It spreads over the fields and leaves behind thick black mud, perfect for growing food. If you know when the flood is coming, you can get ready. If you don't, you could lose everything.",
+  ch3_05: "For most of the year, there's one star you can't see at all. It's hidden in the Sun's glare. Its name is Sirius, the brightest star in the night sky. Watch the horizon, just before the Sun comes up...",
+  ch3_06: "There! Sirius is back. The Egyptians called her Sopdet. When she returns, the flood is close.",
+  ch3_07: "Ring the bell. Time to get ready!",
+  ch3_08: "The Egyptians made this morning the start of their new year. They counted three hundred and sixty-five days, split into three seasons: Flood, Growing, and Harvest.",
+  ch3_09: "The calendar we use today still has that same basic shape. And it all started with a star and a river.",
+  br3_01: "Far to the north, in what is now Germany, someone hammered the sky into metal. A bronze disk with a golden Sun, a Moon, and a little cluster of stars. It's the oldest picture of the night sky we've ever found. Hold it up. Can you find those same stars above you?",
+  ch4_01: "Babylon. Around twenty-seven hundred years ago, one of the greatest cities in the world.",
+  ch4_02: "People here had been writing for thousands of years. Not with paper, but with clay. They pressed a reed into wet clay to make little wedge-shaped marks, then let it dry as hard as stone.",
+  ch4_03: "The king believed the sky sent messages from the gods. So he paid expert sky-watchers to climb up here every single night and write down everything they saw. Where the Moon was. Which planets were out. Every eclipse, every comet, even the weather.",
+  ch4_04: "Tonight, it's your turn. Write down the Moon.",
+  ch4_05: "Now, here's the amazing part. These notes go back hundreds of years. One watcher retired, the next one took over, and the records never stopped.",
+  ch4_06: "Look at the eclipses. Lay them side by side... and a pattern appears. Every eighteen years or so, the eclipses come back in almost the same order. Like a song repeating.",
+  ch4_07: "If the pattern is right... there should be an eclipse tonight.",
+  ch4_08: "To most people, an eclipse was scary. Something was swallowing the Moon! But up here, the sky-watchers weren't scared. They knew it was coming.",
+  ch4_09: "That's Earth's shadow covering the Moon. And the red glow? That's sunlight bending through Earth's air, like all the sunsets in the world shining on the Moon at once.",
+  ch4_10: "For thousands of years, people watched the sky. The Babylonians did something new. They predicted it. And some of their ideas are still with us: sixty minutes in an hour, three hundred and sixty degrees in a circle, and the twelve signs of the zodiac. All from here.",
+  ch5_01: "Greece. About twenty-three hundred and fifty years ago. In the city of Athens, people are trying something brand new: voting on their own laws. And a group of thinkers are asking questions about everything. What is the world made of? Why do things fall? And what shape is the Earth?",
+  ch5_02: "Sailors had noticed something strange. When a ship sails away, it doesn't just get smaller. It sinks, bottom first, below the horizon, as if it's going over a hill. A thinker named Aristotle noticed something else.",
+  ch5_03: "Remember the eclipse in Babylon? That's Earth's shadow on the Moon. Watch the edge.",
+  ch5_04: "It's curved. Every eclipse, every time, the shadow is curved.",
+  ch5_05: "Try it yourself. Hold up the plate. From the front, a round shadow. But turn it, and the shadow becomes a thin line. Now the ball. Turn it any way you like. Always a circle.",
+  ch5_06: "Only one shape always casts a round shadow. A ball. Aristotle was right: the Earth is round. And educated people have known it ever since.",
+  ch5_07: "About a hundred years later, in the great city of Alexandria, a librarian named Eratosthenes read an interesting report. In a town far to the south called Syene, on the longest day of the year, at exactly noon, the Sun shone straight down to the bottom of a deep well.",
+  ch5_08: "Straight down. No shadow at all.",
+  ch5_09: "But here in Alexandria, on that same day at the same time, a stick does cast a shadow. Just a little one. Why? Because the Earth is curved. The two places are tilted toward the Sun at different angles.",
+  ch5_10: "Eratosthenes measured it. About seven degrees. That's about one-fiftieth of a full circle. So the distance between the two cities must be one-fiftieth of the way around the whole Earth.",
+  ch5_11: "He knew how far apart the cities were. Multiply by fifty... and he had the size of the entire planet. About forty thousand kilometers around.",
+  ch5_12: "Today, with satellites, we know the real answer: about forty thousand kilometers. Over two thousand years ago, with a stick, a shadow and a bit of math, Eratosthenes measured the whole world. And he was almost exactly right.",
+  br5_01: "Around the same time, far to the east in China, court astronomers were watching too. They wrote down a comet streaking across the sky. Today we call it Halley's Comet, and it keeps coming back, about every seventy-six years.",
+  br5_02: "A Greek astronomer named Hipparchus made one of the first star catalogs, sorting about eight hundred and fifty stars from brightest to faintest. Astronomers still use his brightness scale today. Can you sort them too?",
+  ch6_01: "Let's jump forward to the year nineteen-oh-one. A storm has pushed a boat of Greek sponge divers to shelter near a tiny island called Antikythera. One diver goes down... and comes back up shouting that he's seen people lying on the seafloor.",
+  ch6_02: "They weren't people. They were statues. Bronze and marble, lying in the sand. The divers had found a shipwreck more than two thousand years old.",
+  ch6_03: "This ship sank more than two thousand years ago. Rome was becoming the most powerful empire in the world, and rich Romans loved Greek treasures. This ship was probably carrying them across the sea: statues, glass, pottery, coins.",
+  ch6_04: "And this. It doesn't look like much. A lump of green, crusty bronze. The divers almost ignored it.",
+  ch6_05: "But look closer. Tiny teeth. Little wheels, smaller than a coin, hidden inside. Gears.",
+  ch6_06: "For more than a hundred years, scientists puzzled over it. Using X-rays, they finally saw inside. At least thirty bronze gears, fitted together in a wooden box the size of a shoebox.",
+  ch6_07: "Turn the handle. Each turn moves the days forward. On the front, the Sun and Moon travel through the signs of the zodiac. This little ball turns to show the Moon's shape: new, half, full. And on the back... the eclipse pattern from Babylon. The machine can tell you when the next eclipse will come.",
+  ch6_08: "Nothing this complicated would be built again for more than a thousand years. That's why some people call it the world's first computer. Someone, two thousand years ago, took everything people knew about the sky and built it into a machine you could hold in your hands.",
+  ch7_01: "Alexandria, Egypt. About eighteen hundred and seventy years ago. Rome now rules a giant empire, from Britain all the way to here. But in Alexandria, scholars are still reading, writing and arguing about the sky.",
+  ch7_02: "Think about everything people have learned so far. The Moon has a cycle. The Sun walks along the horizon. Stars can tell the seasons. Eclipses can be predicted. The Earth is a ball, and we even know how big it is.",
+  ch7_03: "One scholar, Claudius Ptolemy, decided to put it all together into one enormous book. A complete model of the heavens.",
+  ch7_04: "In Ptolemy's universe, the Earth sits perfectly still, right in the center. Around it, the Moon, the Sun, the planets and the stars each ride on their own invisible crystal sphere, turning around and around.",
+  ch7_05: "But there was a problem. Follow Mars. Most of the time it moves one way across the sky. Then it slows down... stops... and goes backward, before turning around again. How could that happen if it's just going in a circle?",
+  ch7_06: "Ptolemy's answer: Mars rides on a small circle, which rides on a big circle. Like a ride at a fair, spinning while it goes around. Now look. The loop matches the real sky.",
+  ch7_07: "It worked. With Ptolemy's tables, you could figure out where any planet would be, years in advance. His book became so famous it was called the Almagest: \"The Greatest.\" For fourteen hundred years, people across Europe, the Middle East and Africa used it.",
+  ch7_08: "And yet... about four hundred years before Ptolemy, a Greek astronomer named Aristarchus had asked a strange question.",
+  ch7_09: "What if the Sun is in the middle?",
+  ch7_10: "Almost nobody listened. It seemed ridiculous. After all, we can't feel the Earth moving... can we?",
+  ch7_11: "Ptolemy's model was beautiful. It was useful. And it was wrong.",
+  ch7_12: "The answer would take more than a thousand years, and sky watchers all over the world, to find. But that's the next part of our story.",
 };
+
+// Lines spoken by someone other than Astra (a different voice in the recording)
+export const SPEAKERS = { ch7_09: 'Aristarchus' };
