@@ -12,7 +12,7 @@ put it in `models/`, and list it in `models/index.json` under the name the code 
 | `star_guide` | star_guide.glb | the guide, every chapter | in |
 | `builder` | stonehenge_builder.glb | Ch 2 haulers, pit team and crowd | in |
 | `storyteller` | ice_age_storyteller.glb | Ch 1 | received, waits for Ch 1 |
-| `priest` | egyptian_priest.glb | Ch 3 | received, waits for Ch 3 |
+| `priest` | egyptian_priest.glb | Ch 3 priest-astronomer | in |
 
 Fields: `file`, `height` (metres; the model is scaled to it, feet on the ground), optional
 `turn` (degrees, if it faces the wrong way), optional `center` (true: centred on its middle, for
