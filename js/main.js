@@ -126,6 +126,7 @@ G.onNetEvent = (name, d) => {
   else if (name === 'chapterEnd') { chapterEnded(); G.music.stop(5); }
   else if (name === 'kids') G.setKids(d.on);
   else if (name === 'pause') setPaused(d.on, true);
+  else if (name === 'extra') G.events.emit('extra', d);   // a wow moment the host started (js/extras.js)
 };
 
 // ---------- Pause (A or X in VR, P on desktop) ----------

@@ -5,12 +5,13 @@
 //   constructor(G, chapter)   build anything it needs (hidden until its moment)
 //   line(id)                  a narration line just started, on every headset (id like 'ch4_09')
 //   lineEnd(id)               ...and finished
+//   extra(d)                  the host did G.events.emit('extra', d): sent to every headset
 //   async after(id, D)        host only: runs after a line, before the story carries on. Return a
 //                             promise (e.g. D.wait(6)) to hold the story while something plays.
 //   async outro(D)            host only: after the chapter's story, before "End of Chapter"
 //   update(dt, t)             every frame (stops while paused)
 //   dispose()
-// Line timing: this.since(id) gives seconds since that line began (or -1), so a moment can land on
+// Line timing: G.since(id) gives seconds since that line began (or -1), so a moment can land on
 // a word in the middle of a line.
 const MODULES = {
   1: () => import('./wow/ch1.js'),
@@ -28,6 +29,8 @@ export class Extras {
     G.events.on('narrating', ({ id, on }) => {
       if (on) { this.started[id] = G.t; this.call('line', id); } else this.call('lineEnd', id);
     });
+    // the host starts some moments that aren't tied to a line (e.g. the finale): every headset plays them
+    G.events.on('extra', (d) => this.call('extra', d));
     G.since = (id) => (this.started[id] == null ? -1 : G.t - this.started[id]);
   }
 

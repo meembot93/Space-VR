@@ -6,10 +6,14 @@
 //   G.skyFigures.play('hunter', { secs: 14 })   draw it in, act for 14 s, fade out (returns a handle)
 //   G.skyFigures.stop('hunter')                  fade it out now
 //   G.skyFigures.height('hunter')                its centre's height above the horizon (degrees)
+//   G.skyFigures.define(name, fig)               add a figure made in code (frame 'horizon' = fixed to
+//                                                the land, x = compass bearing, y = height; day: true
+//                                                to show in daylight; strokes may carry their own alpha a)
 // One draw call per figure on screen; they only show while the stars are out.
 import * as THREE from 'three';
 import { FIGURES, layout } from './skyart.js';
 import { eqVec } from './stars.js';
+import { dirFromAzEl } from './sky.js';
 
 const D2R = Math.PI / 180, RF = 860, HALF = 0.3; // distance out on the sky (m), half line width (degrees)
 const COS_E = Math.cos(23.4393 * D2R), SIN_E = Math.sin(23.4393 * D2R);
@@ -30,7 +34,7 @@ class Figure {
   constructor(name, fig, parent) {
     this.name = name; this.fig = fig;
     // the patch of sky it's drawn on: centre, and right (west) / up (north) directions there
-    const c = this.c = eqVec(fig.center[0], fig.center[1]);
+    const c = this.c = eqVec(...(fig.center || [0, 89]));
     const e = new THREE.Vector3(0, 0, 1).cross(c).normalize();
     this.r = e.clone().negate(); this.n = c.clone().cross(e).normalize();
     this.strokes = [];
@@ -61,6 +65,7 @@ class Figure {
 
   // A point on this patch of sky (x, y in degrees) as a position on the star sphere
   at(x, y, out) {
+    if (this.fig.frame === 'horizon') return dirFromAzEl(x, y, out).multiplyScalar(RF); // x = compass bearing, y = height
     if (this.fig.frame === 'ecliptic') {
       // x = minus ecliptic longitude, y = ecliptic latitude (J2000)
       const l = -x * D2R, b = y * D2R, cb = Math.cos(b);
@@ -74,6 +79,7 @@ class Figure {
     if (this.on && this.t > this.life) this.on = false;
     this.fade = Math.max(0, Math.min(1, this.fade + dt * (this.on ? 0.8 : -0.5)));
     this.draw = Math.min(1, this.draw + dt / (this.drawSecs || 2.5));
+    if (this.fig.day) sky = 1;   // drawn in daylight too (e.g. the Sun's paths)
     this.mesh.visible = this.fade > 0.001 && sky > 0.05;
     if (!this.mesh.visible) return;
     this.mat.uniforms.opacity.value = this.fade * Math.min(1, sky * 1.3) * (this.bright || 1) * (0.92 + 0.08 * Math.sin(this.t * 2.3));
@@ -86,13 +92,15 @@ class Figure {
       const start = (si / N) * 0.6, local = (this.draw - start) / 0.4;
       for (let i = 0; i < k; i++) {
         const i0 = Math.max(0, i - 1), i1 = Math.min(k - 1, i + 1);
-        let tx = p[i1 * 2] - p[i0 * 2], ty = p[i1 * 2 + 1] - p[i0 * 2 + 1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+        // (on the horizon frame a degree of bearing shrinks toward the zenith: measure in true degrees)
+        const kx = this.fig.frame === 'horizon' ? Math.max(0.05, Math.cos(p[i * 2 + 1] * D2R)) : 1;
+        let tx = (p[i1 * 2] - p[i0 * 2]) * kx, ty = p[i1 * 2 + 1] - p[i0 * 2 + 1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
         const u = i / (k - 1);
         const tw = s.taper === 'start' ? 0.25 + 0.75 * u : s.taper ? 1 - 0.8 * u : 1;
         const hw = HALF * s.w * tw;
-        this.at(p[i * 2] - ty * hw, p[i * 2 + 1] + tx * hw, _v); this.pos.set([_v.x, _v.y, _v.z], (v + i) * 6);
-        this.at(p[i * 2] + ty * hw, p[i * 2 + 1] - tx * hw, _v); this.pos.set([_v.x, _v.y, _v.z], (v + i) * 6 + 3);
-        const a = Math.max(0, Math.min(1, (local - u) * 6 + 1));
+        this.at(p[i * 2] - ty * hw / kx, p[i * 2 + 1] + tx * hw, _v); this.pos.set([_v.x, _v.y, _v.z], (v + i) * 6);
+        this.at(p[i * 2] + ty * hw / kx, p[i * 2 + 1] - tx * hw, _v); this.pos.set([_v.x, _v.y, _v.z], (v + i) * 6 + 3);
+        const a = Math.max(0, Math.min(1, (local - u) * 6 + 1)) * (s.a ?? 1);
         this.alpha[(v + i) * 2] = this.alpha[(v + i) * 2 + 1] = a;
       }
       v += k;
@@ -114,11 +122,13 @@ export class SkyFigures {
   play(name, opts = {}) {
     const fig = FIGURES[name]; if (!fig) { console.warn('No sky figure', name); return null; }
     let F = this.figs.get(name);
-    if (!F) { F = new Figure(name, fig, this.G.sky.starField.group); this.figs.set(name, F); }
+    if (!F) { F = new Figure(name, fig, fig.frame === 'horizon' ? this.G.sky.group : this.G.sky.starField.group); this.figs.set(name, F); }
     if (!F.on || F.fade < 0.05) { F.t = 0; F.draw = 0; }
     F.on = true; F.life = F.t + (opts.secs ?? 14); F.drawSecs = opts.drawSecs || 2.5; F.bright = opts.bright || 1;
     return F;
   }
+  // Add a figure made in code (same shape as the ones in js/skyart.js), e.g. by a chapter's extras
+  define(name, fig) { FIGURES[name] = fig; const F = this.figs.get(name); if (F) { F.dispose(); this.figs.delete(name); } }
   stop(name) { const F = this.figs.get(name); if (F) F.on = false; }
   stopAll() { for (const F of this.figs.values()) F.on = false; }
   clear() { for (const F of this.figs.values()) F.dispose(); this.figs.clear(); }

@@ -11,7 +11,7 @@ import { Voice } from './voice.js';
 import { VERSION } from '../version.js';
 
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O (they look like 1 and 0)
-const FORWARD = ['say', 'sfx', 'placePlayers', 'chapterStart', 'chapterEnd', 'kids', 'pause'];
+const FORWARD = ['say', 'sfx', 'placePlayers', 'chapterStart', 'chapterEnd', 'kids', 'pause', 'extra'];
 
 export class Net {
   constructor(G) {

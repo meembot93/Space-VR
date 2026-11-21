@@ -97,3 +97,23 @@ export class Timeline {
     for (const e of [...this.q]) if (this.t >= e.t) { this.q.splice(this.q.indexOf(e), 1); try { e.fn(); } catch (err) { console.error(err); } }
   }
 }
+
+// A floating text label that always faces you (a sprite). height: world height of one line.
+export function textSprite(text, height = 1, { color = '#fff3d6', font = 'Georgia, serif', glow = 'rgba(255,200,120,0.6)' } = {}) {
+  const c = document.createElement('canvas'), g = c.getContext('2d'), px = 64;
+  g.font = `${px}px ${font}`; const w = Math.ceil(g.measureText(text).width) + 40;
+  c.width = w; c.height = px + 36;
+  g.font = `${px}px ${font}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.shadowColor = glow; g.shadowBlur = 16; g.fillStyle = color; g.fillText(text, w / 2, c.height / 2);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, fog: false }));
+  s.scale.set(height * w / c.height, height, 1); s.renderOrder = 5;
+  return s;
+}
+
+// Sputnik's famous radio "beep... beep...": n short beeps, a little more than half a second apart
+export function beeps(G, n = 6, vol = 0.18) {
+  const A = G.audio; if (!A.ctx) return;
+  const o = A.out(null, vol);
+  for (let i = 0; i < n; i++) A.tone(o, { type: 'square', f: 1000, peak: 0.12, a: 0.005, d: 0.28, t0: i * 0.62 });
+}
