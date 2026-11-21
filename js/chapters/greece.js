@@ -140,6 +140,130 @@ function colonnade(k, cx, cz, yaw, n, spacing, h, rad, stone, roof, depth = 4, y
   } else k.box(w + rad * 3.4, 0.25, depth + 0.6, roof, [bx, y + h + 0.57, bz], [0, yaw, 0]);
 }
 
+// ---------- A classic Doric temple, at real scale ----------
+// Built along x (its front, with the door, faces +x: Greek temples face the sunrise), centred
+// on the origin, standing on y = 0. Sizes default to the Temple of Hephaestus in Athens (finished
+// about 415 BC, still standing today): 6 by 13 columns on a 13.7 by 31.8 m platform, 5.7 m columns.
+// Painted the way Greek temples really were: blue triglyphs, red and blue bands, a blue pediment
+// with marble figures. Returns { geo, columns: [[x, z]], cella: { x0, x1, w }, top } for blockers.
+const MARBLE = 0xece4d0, MARBLE2 = 0xe0d6be, PAINT_BLUE = 0x2c4c86, PAINT_RED = 0xa8382c, TILE = 0xb4603e;
+function doricTemple({ L = 31.8, W = 13.7, nL = 13, nW = 6, colH = 5.7, colD = 1.02, seg = 32, figures = true } = {}) {
+  const k = new Kit(), r = rng(808);
+  const steps = 3, stepH = 0.36, stepW = 0.5, base = steps * stepH;
+  // the stepped platform (krepidoma)
+  for (let i = 0; i < steps; i++) { const o = (steps - 1 - i) * stepW * 2; k.box(L + o, stepH, W + o, i === steps - 1 ? MARBLE : MARBLE2, [0, stepH * (i + 0.5), 0]); }
+  // columns: fluted shafts with a gentle swell (entasis), a cushion capital (echinus) and a square slab (abacus)
+  const inset = colD * 0.62, sx = (L - 2 * inset) / (nL - 1), sz = (W - 2 * inset) / (nW - 1);
+  const shaftH = colH - 0.5, R0 = colD / 2;
+  const shaft = () => {
+    const g = new THREE.CylinderGeometry(R0 * 0.78, R0, shaftH, seg, 6, true), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = y / shaftH + 0.5;
+      const a = Math.atan2(z, x), flute = 1 - 0.07 * Math.pow(Math.abs(Math.cos(a * seg / 4)), 0.6);  // 20-ish shallow grooves
+      const sw = 1 + 0.03 * Math.sin(Math.PI * t);
+      p.setXYZ(i, x * flute * sw, y, z * flute * sw);
+    }
+    g.computeVertexNormals(); return g;
+  };
+  const columns = [];
+  const column = (x, z, scale = 1) => {
+    const y0 = base;
+    k.add(shaft(), MARBLE, [x, y0 + shaftH / 2, z], 0, scale);
+    k.cyl(R0 * 0.8, R0 * 0.8, 0.06, seg / 2, 0xc8b898, [x, y0 + shaftH - 0.1, z]);                  // necking groove
+    k.add(new THREE.CylinderGeometry(R0 * 1.22, R0 * 0.8, 0.3, seg / 2, 1), MARBLE, [x, y0 + shaftH + 0.15, z]); // echinus
+    k.box(colD * 1.3, 0.2, colD * 1.3, MARBLE, [x, y0 + shaftH + 0.4, z]);                             // abacus
+    columns.push([x, z]);
+  };
+  for (let i = 0; i < nL; i++) for (let j = 0; j < nW; j++) {
+    if (i !== 0 && i !== nL - 1 && j !== 0 && j !== nW - 1) continue;
+    column(-L / 2 + inset + i * sx, -W / 2 + inset + j * sz);
+  }
+  // the walled inner room (cella) with its porch: two columns between the wall ends (in antis)
+  const cw = W - 2 * inset - 2 * sz * 0.95, cx0 = -L / 2 + inset + sx * 1.9, cx1 = L / 2 - inset - sx * 2.2;
+  const top = base + colH;
+  const wallH = colH + 0.6;
+  k.box(cx1 - cx0, wallH, 0.7, MARBLE2, [(cx0 + cx1) / 2, base + wallH / 2, -cw / 2 + 0.35]);
+  k.box(cx1 - cx0, wallH, 0.7, MARBLE2, [(cx0 + cx1) / 2, base + wallH / 2, cw / 2 - 0.35]);
+  k.box(0.7, wallH, cw, MARBLE2, [cx0 + 0.35, base + wallH / 2, 0]);
+  const dx = cx1 - sx * 1.1;   // the front wall of the cella, set back behind its porch
+  for (const sgn of [-1, 1]) k.box(0.7, wallH, cw / 2 - 1.5, MARBLE2, [dx, base + wallH / 2, sgn * (cw / 4 + 0.75)]);
+  k.box(0.7, wallH - 5.2, 3, MARBLE2, [dx, base + 5.2 + (wallH - 5.2) / 2, 0]);
+  k.box(0.12, 5.2, 3, 0x1a120a, [dx + 0.3, base + 2.6, 0]);                   // the dark doorway
+  k.box(0.1, 5.2, 1.0, 0x8a6a2a, [dx + 0.6, base + 2.6, -1.25], [0, 0.9, 0]);  // bronze doors, opened inward
+  k.box(0.1, 5.2, 1.0, 0x8a6a2a, [dx + 0.6, base + 2.6, 1.25], [0, -0.9, 0]);
+  for (const z of [-cw / 2 + 0.35, cw / 2 - 0.35]) k.box(0.9, wallH, 0.9, MARBLE, [cx1, base + wallH / 2, z]);   // wall ends (antae)
+  for (const z of [-cw / 6, cw / 6]) column(cx1, z);
+  // the entablature: architrave, the frieze of triglyphs and metopes, the projecting cornice
+  const archH = colH * 0.15, frzH = colH * 0.16, corH = 0.42, deep = colD * 1.3;
+  const ring = (y, h, out, color) => {
+    k.box(L - 2 * inset + deep + 2 * out, h, deep + out, color, [0, y + h / 2, -W / 2 + inset + (-out) / 2]);
+    k.box(L - 2 * inset + deep + 2 * out, h, deep + out, color, [0, y + h / 2, W / 2 - inset + out / 2]);
+    k.box(deep + out, h, W - 2 * inset, color, [-L / 2 + inset - out / 2, y + h / 2, 0]);
+    k.box(deep + out, h, W - 2 * inset, color, [L / 2 - inset + out / 2, y + h / 2, 0]);
+  };
+  const yA = top;
+  ring(yA, archH, 0, MARBLE);
+  ring(yA + archH - 0.1, 0.1, 0.06, PAINT_RED);                                    // the painted band (taenia)
+  const yF = yA + archH;
+  ring(yF, frzH, -0.08, 0xd8ccb0);                                                 // metopes, set back a little
+  // triglyphs: one over every column and one between, painted blue, with their grooves
+  const tri = (x, z, rotY) => {
+    const w = colD * 0.62;
+    k.box(w, frzH, 0.16, PAINT_BLUE, [x, yF + frzH / 2, z], [0, rotY, 0]);
+    for (const o of [-w / 6, w / 6]) k.box(0.05, frzH * 0.86, 0.04, 0x1a2c50, [x + Math.cos(rotY) * o, yF + frzH * 0.45, z - Math.sin(rotY) * o], [0, rotY, 0]);
+  };
+  const ez = W / 2 - inset + deep / 2 - 0.02, ex = L / 2 - inset + deep / 2 - 0.02;
+  for (let i = 0; i <= (nL - 1) * 2; i++) { const x = -L / 2 + inset + i * sx / 2; tri(x, ez, 0); tri(x, -ez, 0); }
+  for (let j = 0; j <= (nW - 1) * 2; j++) { const z = -W / 2 + inset + j * sz / 2; tri(ex, z, Math.PI / 2); tri(-ex, z, Math.PI / 2); }
+  // a few metopes carved with figures (Theseus and Heracles at the Hephaisteion): small reliefs on the front
+  for (let j = 0; j < (nW - 1) * 2; j++) {
+    const z = -W / 2 + inset + (j + 0.5) * sz / 2;
+    k.box(0.08, frzH * 0.6, sz * 0.22, 0xf0e8d4, [ex - 0.02, yF + frzH * 0.5, z + sz * 0.05]);
+    k.ball(0.12, 0, 0xf0e8d4, [ex - 0.02, yF + frzH * 0.78, z + sz * 0.05]);
+    k.box(0.06, frzH * 0.45, sz * 0.08, 0x9a3a2a, [ex - 0.01, yF + frzH * 0.4, z - sz * 0.13]);
+  }
+  const yC = yF + frzH;
+  ring(yC, 0.08, 0.1, PAINT_BLUE);
+  ring(yC + 0.08, corH, 0.32, MARBLE);                                             // the cornice
+  const yR = yC + 0.08 + corH;                                                     // where the roof and the pediments begin
+  // the pediments: a low triangle at each end, its back wall painted blue, with figures standing in it
+  const halfW = W / 2 - inset + deep / 2 + 0.32, ph = halfW * 0.27;
+  for (const end of [-1, 1]) {
+    const x = end * (L / 2 - inset + deep / 2 + 0.1);
+    const tym = new THREE.Shape(); tym.moveTo(-halfW + 0.3, 0); tym.lineTo(halfW - 0.3, 0); tym.lineTo(0, ph - 0.12); tym.lineTo(-halfW + 0.3, 0);
+    const tg = new THREE.ExtrudeGeometry(tym, { depth: 0.5, bevelEnabled: false }); tg.rotateY(Math.PI / 2); tg.translate(-0.25 - end * 0.12, 0, 0);
+    k.add(tg, 0x4a6a9a, [x, yR, 0]);
+    // the raking cornices along the two sloping edges
+    const slope = Math.atan2(ph, halfW), len = Math.hypot(halfW, ph) + 0.25;
+    for (const side of [-1, 1]) k.box(0.95, 0.36, len, MARBLE, [x + end * 0.12, yR + ph / 2 + 0.1, side * halfW / 2], [side * slope, 0, 0]);
+    // statues in the pediment, tallest in the middle where there's room
+    if (figures) for (let f = -5; f <= 5; f++) {
+      if (f === 0) continue;
+      const z = f * halfW / 6, hh = (ph - 0.25) * (1 - Math.abs(z) / halfW) * 0.85;
+      if (hh < 0.35) continue;
+      const lean = (r() - 0.5) * 0.3;
+      k.box(0.32, hh * 0.62, 0.42, 0xf2ead8, [x + end * 0.05, yR + hh * 0.31, z], [lean, 0, 0]);
+      k.ball(0.15, 0, 0xf2ead8, [x + end * 0.05, yR + hh * 0.62 + 0.1, z + lean * 0.3]);
+    }
+    const cg = new THREE.ConeGeometry(0.4, 1.0, 6); k.add(cg, MARBLE, [x + end * 0.1, yR + ph + 0.45, 0]);              // acroteria
+    for (const side of [-1, 1]) k.add(new THREE.ConeGeometry(0.25, 0.7, 5), MARBLE, [x + end * 0.1, yR + 0.4, side * (halfW - 0.2)]);
+  }
+  // the roof: two slopes of terracotta tiles, with rows of cover tiles and little upright antefixes at the eaves
+  const roofL = 2 * (L / 2 - inset + deep / 2 + 0.1), slope = Math.atan2(ph, halfW), sl = Math.hypot(halfW, ph);
+  for (const side of [-1, 1]) {
+    k.box(roofL, 0.22, sl + 0.25, TILE, [0, yR + ph / 2 + 0.13, side * halfW / 2], [side * slope, 0, 0]);
+    for (let x = -roofL / 2 + 0.35; x < roofL / 2; x += 0.72) {
+      const cv = new THREE.CylinderGeometry(0.1, 0.1, sl + 0.2, 5, 1, false, 0, Math.PI); cv.rotateX(Math.PI / 2); cv.rotateZ(Math.PI / 2);
+      k.add(cv, 0xa0503a, [x, yR + ph / 2 + 0.25, side * halfW / 2], [side * slope, 0, 0]);
+      k.box(0.14, 0.32, 0.06, MARBLE, [x, yR + 0.35, side * (halfW + 0.1)]);
+    }
+  }
+  k.box(roofL, 0.16, 0.32, 0xa0503a, [0, yR + ph + 0.12, 0]);                       // the ridge
+  // the coffered ceiling between the colonnade and the room (so you don't see into the roof)
+  k.box(L - 2 * inset, 0.25, W - 2 * inset, 0xc8bca0, [0, yA + archH + frzH - 0.15, 0]);
+  return { geo: k.geometry(), columns, cella: { x0: cx0, x1: cx1, w: cw, door: dx }, top: yR + ph, L, W, base };
+}
+
 // A flat-roofed mud-brick or whitewashed house
 function house(k, x, z, w, d, h, yaw, wall, y = 0) {
   k.box(w, h, d, wall, [x, y + h / 2, z], [0, yaw, 0]);
@@ -310,11 +434,18 @@ export default class Greece {
 
   // --- Athens: an olive grove on a hill above the sea, at night ---
   buildGrove() {
-    const H = (x, z) => {
+    // The temple of Hephaestus stands on a low terrace to the west-north-west, its front to the east
+    const TC = this.templeAt = new THREE.Vector3(-40, 0, -21), TL = 31.8, TW = 13.7, TERR = 0.9;
+    const H0 = (x, z) => {
       let h = (N1(x / 40, z / 40) - 0.5) * 1.5 * clamp((Math.hypot(x, z) - 12) / 30, 0, 1);
       if (z > 22) h -= Math.min(30, (z - 22) * 0.16 + Math.pow(Math.max(0, z - 60) / 60, 2) * 4);   // down to the sea in the south
       if (z < -30) h += (-z - 30) * 0.06 * (0.6 + N2(x / 60, z / 60));                              // hills to the north
       return h;
+    };
+    const H = (x, z) => {
+      const d = Math.max(Math.abs(x - TC.x) - TL / 2 - 7, Math.abs(z - TC.z) - TW / 2 - 6);   // outside the terrace (m)
+      const k = clamp(d / 12, 0, 1), kk = k * k * (3 - 2 * k);
+      return lerp(TERR, H0(x, z), kk);
     };
     const S = this.addSet('grove', H, 60); S.fogFar = 1400; S.place = { lat: 38, year: -350, sunLon: 90 };
     const g = S.g;
@@ -322,6 +453,11 @@ export default class Greece {
     g.add(buildGround(1100, 150, H, (x, y, z, c) => {
       c.copy(dry).lerp(dry2, N2(x / 9, z / 9)); if (N3(x / 5, z / 5) > 0.62) c.lerp(soil, 0.6);
       if (y < -24) c.lerp(_col.setHex(0x9a8a6a), 0.7); // rocky shore
+      // the paved terrace round the temple, and the path up to it
+      const tx = Math.abs(x - TC.x) - TL / 2 - 6, tz = Math.abs(z - TC.z) - TW / 2 - 5;
+      if (Math.max(tx, tz) < 0) c.setHex(((Math.floor(x / 1.4) + Math.floor(z / 1.4)) & 1) ? 0xa89e86 : 0x9a907a);
+      const pz = TC.z + (x - TC.x - TL / 2) * ((0 - TC.z) / (-TC.x - TL / 2)), onPath = x > TC.x + TL / 2 && x < 0 && Math.abs(z - pz) < 1.6;
+      if (onPath) c.setHex(0x9a8e74);
     }));
     // The sea, reaching to the horizon
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: 0x1a2a48 }));
@@ -335,9 +471,11 @@ export default class Greece {
 
     // Olive trees all around (but not in the way of the sea view or the lamp table)
     const trunks = new Kit(), leaves = new Kit(), r = rng(5);
-    for (let i = 0; i < 46; i++) {
-      const a = r() * 360, d = 7 + r() * 45, p = at(a, d);
+    for (let i = 0; i < 70; i++) {
+      const a = r() * 360, d = 7 + r() * 48, p = at(a, d);
       if ((a > 120 && a < 210 && d < 40) || Math.hypot(p.x, p.z + 4) < 6) continue;
+      if (Math.abs(p.x - TC.x) < TL / 2 + 9 && Math.abs(p.z - TC.z) < TW / 2 + 8) continue;
+      if (p.x > TC.x && p.x < 2 && Math.abs(p.z - TC.z * (1 - (p.x - TC.x) / -TC.x)) < 5) continue;
       olive(trunks, leaves, p.x, H(p.x, p.z), p.z, 0.85 + r() * 0.4, 100 + i);
       S.blockers.push({ x: p.x, z: p.z, r: 0.5 });
     }
@@ -365,11 +503,58 @@ export default class Greece {
     for (let i = 0; i < 26; i++) { const x = -14 + i * 1.1; k.box(1.1, 0.5 + r() * 0.2, 0.6, 0x8a8068, [x, 0.25 + H(x, 9) * 0.9, 9 + Math.sin(i) * 0.3], [0, r() * 0.2, 0]); }
     for (const [x, z] of [[-1.6, -4.6], [-2.2, -4.4]]) k.cyl(0.25, 0.18, 0.8, 10, 0xa86a40, [x, 0.4, z]), k.ball(0.3, 1, 0xa86a40, [x, 0.75, z], 0, [1, 0.8, 1]);
     // Athens far off on its hill: the Acropolis rock, with the Parthenon on top, and the town below
-    const ac = at(305, 520), ay = H(ac.x, ac.z);
+    const ac = at(326, 540), ay = H(ac.x, ac.z);
     k.cyl(70, 95, 46, 14, 0x6a6050, [ac.x, ay + 18, ac.z]);
-    colonnade(k, ac.x, ac.z, 0.4, 8, 4.2, 10, 0.9, 0xcfc4a8, 0xbab09a, 16, ay + 41);
+    const par = doricTemple({ L: 69.5, W: 30.9, nL: 17, nW: 8, colH: 10.4, colD: 1.9, seg: 12, figures: false });
+    par.geo.rotateY(0.4); par.geo.translate(ac.x, ay + 40.5, ac.z); g.add(new THREE.Mesh(par.geo, FLAT));
     for (let i = 0; i < 40; i++) { const a = r() * 6.28, d = 95 + r() * 90; house(k, ac.x + Math.cos(a) * d, ac.z + Math.sin(a) * d, 6 + r() * 6, 6 + r() * 5, 4 + r() * 2, a, 0xb8ac90, H(ac.x + Math.cos(a) * d, ac.z + Math.sin(a) * d) - 1); }
-    g.add(k.mesh(), trunks.mesh(), leaves.mesh());
+    // ---- The temple ----
+    const T = doricTemple();
+    T.geo.translate(TC.x, TERR - 0.05, TC.z);
+    // marble glows faintly in the moonlight (a touch of its own light so it never goes muddy)
+    const marbleMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0x2a241a });
+    this.temple = new THREE.Mesh(T.geo, marbleMat); g.add(this.temple);
+    for (const [x, z] of T.columns) S.blockers.push({ x: TC.x + x, z: TC.z + z, r: 0.6 });
+    for (let x = T.cella.x0; x <= T.cella.door; x += 1.6) for (let z = -T.cella.w / 2 + 1; z <= T.cella.w / 2 - 1; z += 1.6) S.blockers.push({ x: TC.x + x, z: TC.z + z, r: 1.0 });
+    const front = this.templeFront = new THREE.Vector3(TC.x + TL / 2, TERR, TC.z);
+    // the altar out in front of the steps, where offerings burned, and two bronze fire bowls on tripods
+    k.box(3.2, 1.2, 1.6, 0xd8ceb6, [front.x + 9, TERR + 0.6, TC.z]); k.box(3.5, 0.15, 1.9, 0xe8e0cc, [front.x + 9, TERR + 1.25, TC.z]);
+    S.blockers.push({ x: front.x + 9, z: TC.z - 0.8, r: 1.1 }, { x: front.x + 9, z: TC.z + 0.8, r: 1.1 });
+    this.fires = [];
+    const bowl = (x, z, y) => {
+      for (let i = 0; i < 3; i++) { const a = i * 2.09; k.cyl(0.03, 0.03, y, 5, 0x5a4020, [x + Math.cos(a) * 0.25, y / 2, z + Math.sin(a) * 0.25], [Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12]); }
+      k.add(new THREE.SphereGeometry(0.42, 10, 4, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 0x8a6a2a, [x, y + 0.38, z]);
+      this.fires.push(new THREE.Vector3(x, y + 0.55, z));
+    };
+    bowl(front.x + 2.2, TC.z - 5.2, TERR + 1.1); bowl(front.x + 2.2, TC.z + 5.2, TERR + 1.1);
+    this.fires.push(new THREE.Vector3(front.x + 9, TERR + 1.55, TC.z));
+    for (const f of this.fires.slice(0, 2)) S.blockers.push({ x: f.x, z: f.z, r: 0.5 });
+    // tall dark cypresses framing the terrace, a few statues on plinths along the path
+    const cyp = new Kit();
+    for (let i = 0; i < 14; i++) {
+      const side = i % 2 ? 1 : -1, x = TC.x - TL / 2 + (i >> 1) * 6.5 - 2, z = TC.z + side * (TW / 2 + 7.5 + r() * 2);
+      const h = 9 + r() * 4, y = H(x, z);
+      cyp.cyl(0.15, 0.22, 1.5, 6, 0x4a3a2a, [x, y + 0.75, z]);
+      const c = new THREE.ConeGeometry(1.1, h, 8, 3); const cp = c.attributes.position; for (let j = 0; j < cp.count; j++) { const yy = cp.getY(j) / h + 0.5; const b = 1 + 0.25 * Math.sin(yy * Math.PI) ; cp.setX(j, cp.getX(j) * b); cp.setZ(j, cp.getZ(j) * b); }
+      cyp.add(c, i % 3 ? 0x24331e : 0x2a3a22, [x, y + 1 + h / 2, z]);
+      S.blockers.push({ x, z, r: 0.8 });
+    }
+    for (let i = 0; i < 3; i++) {
+      const t = 0.3 + i * 0.22, x = lerp(front.x + 12, -3, t), z = lerp(TC.z, 0, t) + 3.2;
+      const y = H(x, z);
+      k.box(0.9, 1.1, 0.9, 0xd8ceb6, [x, y + 0.55, z]);
+      // a marble figure (a herm-like statue): body, head, arm
+      k.cyl(0.2, 0.26, 1.3, 8, 0xeee6d2, [x, y + 1.75, z]); k.ball(0.15, 1, 0xeee6d2, [x, y + 2.55, z]);
+      k.cyl(0.06, 0.06, 0.6, 5, 0xeee6d2, [x + 0.25, y + 2.0, z], [0, 0, 0.6]);
+      S.blockers.push({ x, z, r: 0.7 });
+    }
+    g.add(k.mesh(), trunks.mesh(), leaves.mesh(), cyp.mesh());
+    // firelight on the temple front: one warm light for the bowls and the altar, plus the flames
+    this.templeLight = new THREE.PointLight(0xff9a50, 30, 34, 1.4); this.templeLight.position.set(front.x + 5, TERR + 3.2, TC.z); g.add(this.templeLight);
+    const fm = glowMat('rgba(255,170,70,1)');
+    this.fireSprites = this.fires.map((f, i) => { const sp = new THREE.Sprite(fm); sp.position.copy(f); sp.scale.setScalar(i === 2 ? 1.8 : 1.3); g.add(sp); return sp; });
+    // a soft warm glow inside the open door (lamps burning by the statue of the god)
+    const dg = new THREE.Sprite(glowMat('rgba(255,180,90,1)', 0.7)); dg.position.set(TC.x + T.cella.door - 1.5, TERR + T.base + 2.5, TC.z); dg.scale.set(4, 5, 1); g.add(dg);
     // little lights in the town and on the temple
     this.townLights = [];
     const tm = glowMat('rgba(255,170,80,1)');
@@ -430,7 +615,7 @@ export default class Greece {
 
     // Aristotle, by the table
     this.aristotle = this.person(S, 'aristotle', new THREE.Vector3(1.4, 0, -3.1), new THREE.Vector3(0, 0, -1.5));
-    S.start = { pos: new THREE.Vector3(0, 0, 0.5), look: at(MOON_AZ, 50) };
+    S.start = { pos: new THREE.Vector3(0, 0, 0.5), look: new THREE.Vector3(TC.x + TL / 2, 0, TC.z) };
     S.lampSpot = { pos: new THREE.Vector3(0.05, 0, -2.75), look: new THREE.Vector3(0.05, 0, -6) };
   }
 
@@ -808,7 +993,7 @@ export default class Greece {
     const S = this.sets.grove;
     placeAll(S.start.pos, S.start.look);
     await G.ui.fadeIn(2.5);
-    s.guide = _a.copy(this.acropolis).sub(S.start.pos).setLength(16).add(S.start.pos).setY(5).toArray();
+    s.guide = _a.copy(this.templeFront).add(_b.set(7, 9.5, 5)).toArray();   // over the temple's front, beside its pediment
     await D.say('ch5_01');
     s.phase = 'ship';
     s.guide = at(185, 14, 2.5).toArray();
@@ -1008,6 +1193,14 @@ export default class Greece {
     // The flame flickers
     const fl = 1 + Math.sin(t * 13) * 0.06 + Math.sin(t * 7.3) * 0.05;
     this.lampLight.intensity = 2.2 * fl; this.flame.scale.setScalar(0.2 * fl);
+    // the temple's fires
+    const ff = 1 + Math.sin(t * 9.1) * 0.08 + Math.sin(t * 5.3 + 1) * 0.07;
+    this.templeLight.intensity = 30 * ff;
+    this.fireSprites.forEach((sp, i) => sp.scale.setScalar((i === 2 ? 1.8 : 1.3) * (1 + Math.sin(t * 11 + i * 2) * 0.1)));
+    if (G.audio.ctx) {
+      this.crackleT = (this.crackleT || 0) - dt;
+      if (this.crackleT <= 0) { this.crackleT = 0.15 + Math.random() * 0.5; G.audio.noise(G.audio.out(this.fires[(Math.random() * 3) | 0], 0.25, 3), { type: 'highpass', f: 1500 + Math.random() * 2000, peak: 0.3, a: 0.002, d: 0.04 }); }
+    }
     // Plate and ball: in a hand, where the host says, on the table, or showing themselves (demo)
     const demo = s.demo;
     let pf = null, bf = null;
