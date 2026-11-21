@@ -14,6 +14,12 @@ Built so far: **Chapter 2, Stonehenge at dawn** (the test chapter). Arrive on th
 before sunrise, walk into the almost-finished circle, help the builders haul the last stone in
 with the rope (grip it and pull hand over hand), and watch the midsummer Sun rise through the gap.
 
+**Chapter 3, Sirius over the Nile.** Stand on a priest's rooftop in Egypt, 2500 BC, before dawn, with
+the new pyramids behind you and the Nile in front. Watch the east and point at Sirius the moment she
+rises again after months hidden in the Sun's glare (worked out for the real date and place), ring the
+bell to wake the village, and watch a whole Egyptian year go by: Flood, Growing, Harvest. Then the
+bridge: hold the Nebra sky disk up to the Pleiades on a German hilltop. Test: `npm run test:ch3` in tools/test.
+
 Address-bar options for testing: `?fast` (placeholder lines and timelines run quickly),
 `?debug` (shows which narration clips are still missing; N skips a line on desktop),
 `?chapter=2`, `?labels` (tags every stand-in model "PLACEHOLDER"), `?autostart` (desktop).

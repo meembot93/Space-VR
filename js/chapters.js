@@ -16,7 +16,7 @@
 export const CHAPTERS = [
   { n: 1, title: 'Campfire, 30,000 years ago', ready: true, load: () => import('./chapters/campfire.js') },
   { n: 2, title: 'Stonehenge at dawn', ready: true, load: () => import('./chapters/stonehenge.js') },
-  { n: 3, title: 'Sirius over the Nile', ready: false },
+  { n: 3, title: 'Sirius over the Nile', ready: true, load: () => import('./chapters/nile.js') },
   { n: 4, title: 'Babylon predicts an eclipse', ready: false },
   { n: 5, title: 'Greece proves the Earth is round', ready: false },
   { n: 6, title: 'Diving for the Antikythera machine', ready: false },
