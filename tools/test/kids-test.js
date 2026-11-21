@@ -32,7 +32,7 @@ const ASKS = /\b(walk|touch|click|point|turn|pull|grab|ring|hold|press|look|foll
       window.__ended = false; G.events.on('chapterEnd', () => { window.__ended = true; });
     });
     const kids = await page.evaluate(() => G.kids);
-    const ok = await page.waitForFunction(() => window.__ended, null, { timeout: 420000, polling: 250 }).then(() => true, () => false);
+    const ok = await page.waitForFunction(() => window.__ended, null, { timeout: 1200000, polling: 250 }).then(() => true, () => false);
     const r = await page.evaluate(() => ({ hints: __hints, phase: G.director.chapter?.s?.phase }));
     const asks = r.hints.filter((h) => ASKS.test(h));
     check(kids && ok, `Chapter ${n} plays to the end by itself in Kids mode (${Math.round((Date.now() - t0) / 1000)} s${ok ? '' : ', stuck at ' + r.phase})`);

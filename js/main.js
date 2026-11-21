@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { UI } from './ui.js';
 import { Narration } from './narration.js';
 import { Guide } from './guide.js';
+import { CHAPTER_ICONS } from './icons.js';
 import { Director, CHAPTERS } from './chapters.js';
 import { makeWorld } from './world.js';
 import { Net } from './net/net.js';
@@ -85,7 +86,7 @@ let chapterPick = Number(params.get('chapter')) || CHAPTERS.find((c) => c.ready)
 const chapList = document.getElementById('chapters');
 for (const c of CHAPTERS) {
   const b = document.createElement('button');
-  b.textContent = `${c.n}. ${c.title}${c.ready ? '' : ' (coming soon)'}`;
+  b.innerHTML = `<span class="ico">${CHAPTER_ICONS[c.n] || ''}</span><span>${c.n}. ${c.title}${c.ready ? '' : ' (coming soon)'}</span>`;
   b.disabled = !c.ready; b.classList.toggle('on', c.n === chapterPick);
   b.addEventListener('click', () => { if (!G.isHost) return; chapterPick = c.n; for (const o of chapList.children) o.classList.toggle('on', o === b); });
   chapList.appendChild(b);
@@ -332,6 +333,21 @@ document.addEventListener('pointerlockchange', () => {
   if (G.mode === 'desktop' && !document.pointerLockElement) G.ui.showHint('Click to look around again', 2);
 });
 
+// ---------- Keeping the starry sky sharp and smooth ----------
+// Stars are drawn a set number of pixels wide, so they need to know how big a pixel is. And if
+// frames start running late while the stars are out, draw fewer of the Milky Way's dust stars
+// (they come back slowly once things are smooth again). ?fulldetail turns that off (for measuring).
+let frameMin = 1 / 72, frameAvg = 1 / 72, frameLast = 0;
+function starDetail(now) {
+  const sf = G.sky.starField, raw = frameLast ? (now - frameLast) / 1000 : 1 / 72; frameLast = now;
+  sf.pxAng = G.mode === 'vr' ? 0.0008 : (camera.fov * Math.PI / 180) / Math.max(300, innerHeight);
+  if (raw > 0.25 || params.has('fulldetail')) return;           // a hiccup (loading), not a trend
+  frameMin = Math.min(frameMin * 1.001, raw); frameAvg += (raw - frameAvg) * 0.08;
+  if (sf.opacity < 0.05 || !G.mode) return;
+  if (frameAvg > frameMin * 1.22) sf.detail = Math.max(0.15, sf.detail - raw * 0.5);
+  else sf.detail = Math.min(1, sf.detail + raw * 0.03);
+}
+
 // ---------- Main loop ----------
 let last = performance.now();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -348,6 +364,7 @@ function tick() {
   G.net.update(dt);
   G.ui.update(dt);
   camera.getWorldPosition(_a);
+  starDetail(now);
   G.sky.update(dt, _a, G.t);
   if (G.mode) G.stargazing.update(dt);
   camera.getWorldDirection(_b); _c.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(_q));

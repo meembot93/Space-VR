@@ -15,7 +15,9 @@
   180 autumn / 270 midwinter). Then `G.sky.set(az, el)` places the Sun and the stars turn to match;
   `G.sky.sunAzAt(el)`-style help is on `G.sky.starField` (sunAzAt, find, dirOf). Moon:
   `G.sky.setMoon(az, el, size, phase)` (phase 0 new .. 0.5 full) or `hideMoon()`. Pointing at stars
-  to get names (js/stargazing.js) works by itself at night. Shared helpers: js/shapes.js (rng, noise2, roughStone).
+  to get names (js/stargazing.js) works by itself at night. Stars are glowing cards (2 tris each);
+  the Milky Way's star dust fills each scene's leftover budget to ~520k tris (`G.sky.budget`, re-checked
+  every 2 s) and thins itself if frames run late (`starField.detail`; `?fulldetail` turns that off). Shared helpers: js/shapes.js (rng, noise2, roughStone).
 - Chapters run in order: when one ends, the next `ready` chapter in js/chapters.js loads and plays.
 - Kids mode (default, picked on the title page) is fully hands-free; Adults is interactive. In a chapter's
   run(): wait on player actions with `D.auto(cond, step, {after, timeout})`, show instructions with

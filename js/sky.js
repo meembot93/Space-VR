@@ -4,7 +4,7 @@
 // follows from it. World axes: -Z is north, +X is east, +Y is up.
 import * as THREE from 'three';
 import { clamp, lerp } from './util.js';
-import { StarField } from './stars.js';
+import { StarField, DUST_MAX } from './stars.js';
 
 const D2R = Math.PI / 180;
 // A direction from compass bearing (degrees clockwise from north) and height above the horizon
@@ -25,6 +25,7 @@ const KEYS = [
   [20, 0x5a8fd0, 0xbcd4ea, 0xfff0d0, 0xb8c8d8],
 ];
 const _ca = new THREE.Color(), _cb = new THREE.Color();
+const _mv = new THREE.Vector3(), _mt = new THREE.Vector3(), _my = new THREE.Vector3(), _mz = new THREE.Vector3(), _ms = new THREE.Vector3();
 function keyColor(el, idx, out) {
   if (el <= KEYS[0][0]) return out.setHex(KEYS[0][idx]);
   for (let i = 1; i < KEYS.length; i++) {
@@ -49,12 +50,6 @@ uniform float glowAmt, night, milky;
 uniform sampler2D mwTex;
 uniform mat3 toStar;
 varying vec3 vDir;
-float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float noise(vec3 x) {
-  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-             mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
-}
 void main() {
   vec3 d = normalize(vDir);
   float h = clamp(d.y, -0.2, 1.0);
@@ -64,14 +59,16 @@ void main() {
   float s = max(dot(d, sunDir), 0.0);
   float band = 1.0 - smoothstep(0.0, 0.55, abs(h - 0.03));
   col = mix(col, glow, clamp(pow(s, 6.0) * glowAmt * (0.35 + 0.65 * band) + pow(s, 60.0) * glowAmt * 0.6, 0.0, 1.0));
-  // The Milky Way, from a real map of its glow (turned with the stars)
+  // The Milky Way in colour (star clouds, dust lanes, nebulae), turned with the stars
   vec3 e = toStar * d;
   vec2 uv = vec2(atan(e.y, e.x) / 6.2831853 + 0.5, asin(clamp(e.z, -1.0, 1.0)) / 3.14159265 + 0.5);
   uv.x = fract(uv.x + 0.5);
-  float mwv = texture2D(mwTex, uv).r;
-  float fbm = noise(e * 18.0) * 0.5 + noise(e * 41.0) * 0.3 + noise(e * 97.0) * 0.2;
-  float mw = pow(mwv, 1.15) * (0.25 + 1.1 * fbm) + mwv * 0.12;
-  col += vec3(0.6, 0.64, 0.82) * mw * milky * night * 0.17 * smoothstep(-0.02, 0.3, d.y);
+  vec3 mw = texture2D(mwTex, uv).rgb;
+  float above = smoothstep(-0.02, 0.3, d.y);
+  col += (mw * mw * 0.55 + mw * 0.06) * milky * night * above;
+  // Airglow: the faint green-gold glow of the high air, a band just above the horizon on dark nights
+  float ag = exp(-pow((d.y - 0.1) / 0.09, 2.0));
+  col += vec3(0.05, 0.075, 0.04) * ag * night * 0.35;
   // Below the horizon: fade into the ground haze
   col = mix(col, horizon * 0.85, smoothstep(0.0, -0.12, d.y));
   gl_FragColor = vec4(col, 1.0);
@@ -122,7 +119,7 @@ export class Sky {
     };
     // The real stars (see stars.js); chapters set the place and era with sky.setPlace()
     this.starField = new StarField();
-    this.uni.mwTex.value = this.starField.mwTex;
+    this.uni.mwTex.value = this.starField.mwColor;
     this.uni.toStar.value = this.starField.toStar;
     const dome = this.dome = new THREE.Mesh(new THREE.SphereGeometry(1000, 32, 16),
       new THREE.ShaderMaterial({ uniforms: this.uni, vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false }));
@@ -133,7 +130,16 @@ export class Sky {
     this.sun.scale.setScalar(170); this.sun.renderOrder = -8;
     this.moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('rgba(240,244,255,1)', 'rgba(160,180,220,0.18)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.moon.scale.setScalar(70); this.moon.visible = false; this.moon.renderOrder = -8;
-    this.group = new THREE.Group(); this.group.add(dome, this.starField.group, this.sun, this.moon);
+    // Shooting stars: now and then on a dark night, a quick bright streak
+    const mc = document.createElement('canvas'); mc.width = 256; mc.height = 8;
+    const mg = mc.getContext('2d'), mgr = mg.createLinearGradient(0, 0, 256, 0);
+    mgr.addColorStop(0, 'rgba(160,200,255,0)'); mgr.addColorStop(0.85, 'rgba(220,235,255,0.7)'); mgr.addColorStop(1, 'rgba(255,255,255,1)');
+    mg.fillStyle = mgr; mg.fillRect(0, 2, 256, 4);
+    this.meteor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).translate(-0.5, 0, 0),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(mc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
+    this.meteor.visible = false; this.meteor.renderOrder = -8; this.meteor.frustumCulled = false;
+    this.meteorT = 4; this.meteorLife = 0;
+    this.group = new THREE.Group(); this.group.add(dome, this.starField.group, this.sun, this.moon, this.meteor);
     scene.add(this.group);
 
     // Lights: soft sky/ground fill plus the Sun
@@ -179,6 +185,22 @@ export class Sky {
     this.night = night;
   }
 
+  // Spend what's left of the triangle budget on the Milky Way's star dust: the chapter's own
+  // triangles (what's showing, re-checked every 2 s) plus the stars come to about BUDGET.
+  budget(scene, BUDGET = 520000) {
+    let tris = 0;
+    scene.traverseVisible((o) => {
+      if (o === this.group || !o.isMesh || !o.geometry) return;
+      let p = o.parent; while (p) { if (p === this.group) return; p = p.parent; }
+      const g = o.geometry, n = g.index ? g.index.count : g.attributes.position?.count || 0;
+      tris += Math.min(n, g.drawRange.count) / 3 * (o.isInstancedMesh ? o.count : 1);
+    });
+    const core = this.starField.coreTris || 83000;
+    this.starField.dustBudget = Math.max(20000, Math.min(DUST_MAX, Math.floor((BUDGET - tris - core) / 2)));
+    this.sceneTris = Math.round(tris);
+    return this.starField.dustBudget;
+  }
+
   // Where and when on Earth (see stars.js): { lat, year, sunLon }
   setPlace(p) { this.starField.setPlace(p); }
 
@@ -186,6 +208,9 @@ export class Sky {
     // The sky is always centred on you
     this.group.position.copy(camPos);
     this.starField.update(this.sunAz, this.sunEl, t);
+    this.updateMeteor(dt);
+    // re-check the budget now and then (models finish loading, chapters swap scenes)
+    if ((this.budgetT = (this.budgetT || 0) - dt) <= 0) { this.budgetT = 2; this.budget(this.scene); }
     const F = this.scene.fog;
     F.far = lerp(this.fogFar, 140, this.mist);
     F.near = lerp(40, 4, this.mist);
@@ -207,4 +232,37 @@ export class Sky {
     } else this.moon.scale.setScalar(70 * size);
   }
   hideMoon() { this.moon.visible = false; }
+
+  updateMeteor(dt) {
+    const m = this.meteor, night = this.starField.opacity * this.uni.milky.value;
+    if (this.meteorLife > 0) {
+      this.meteorLife -= dt;
+      const k = 1 - this.meteorLife / this.meteorDur;       // 0..1 along its path
+      const ang = this.meteorAng0 + this.meteorSpan * k;    // it slides along a great circle
+      _mv.copy(this.meteorA).multiplyScalar(Math.cos(ang)).addScaledVector(this.meteorB, Math.sin(ang));
+      m.position.copy(_mv).multiplyScalar(820);
+      // the streak points back along its path, facing the middle of the sky
+      _mt.copy(this.meteorB).multiplyScalar(Math.cos(ang)).addScaledVector(this.meteorA, -Math.sin(ang));
+      _mz.copy(_mv).negate(); _my.crossVectors(_mz, _mt);
+      m.matrix.makeBasis(_mt, _my, _mz).setPosition(m.position); m.matrixAutoUpdate = false;
+      const len = 30 + 70 * Math.sin(Math.PI * Math.min(1, k * 1.3));
+      m.matrix.scale(_ms.set(len, 1.3, 1));
+      m.material.opacity = Math.sin(Math.PI * k) * night;
+      m.visible = this.meteorLife > 0 && night > 0.05 && _mv.y > 0.05;
+      return;
+    }
+    m.visible = false;
+    if (night < 0.6) return;
+    this.meteorT -= dt;
+    if (this.meteorT > 0) return;
+    this.meteorT = 7 + Math.random() * 16;
+    // a random start high in the sky, heading off (mostly downward) on a great circle
+    const az = Math.random() * 360, el = 30 + Math.random() * 45;
+    this.meteorA = dirFromAzEl(az, el, new THREE.Vector3());
+    const dirAz = az + 60 + Math.random() * 240;
+    this.meteorB = dirFromAzEl(dirAz, el - 10 - Math.random() * 20, new THREE.Vector3());
+    this.meteorB.addScaledVector(this.meteorA, -this.meteorB.dot(this.meteorA)).normalize();
+    this.meteorAng0 = 0; this.meteorSpan = (8 + Math.random() * 14) * D2R;
+    this.meteorDur = this.meteorLife = 0.45 + Math.random() * 0.6;
+  }
 }
