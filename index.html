@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Starward: Era 1, Watchers of the Sky</title>
+<link rel="icon" href="data:,">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#03060f;font-family:Georgia,'Times New Roman',serif;color:#f4ead2}
+  canvas{display:block}
+  #overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:safe center;overflow-y:auto;
+    background:radial-gradient(ellipse at 50% 120%,#3a2a4a 0%,#101a3a 35%,#03060f 75%);z-index:10;text-align:center;padding:20px;box-sizing:border-box}
+  #stars{position:fixed;inset:0;z-index:-1;pointer-events:none}
+  #version{font-size:17px;color:#ffd77a;margin-bottom:10px;letter-spacing:1px}
+  h1{font-size:64px;margin:0;letter-spacing:10px;color:#ffe3a0;text-shadow:0 0 24px #ffb84a88;font-weight:normal}
+  .era{font-size:24px;margin:4px 0 2px;letter-spacing:3px;color:#cfd8ff}
+  .sub{opacity:.75;margin-bottom:22px;font-style:italic;font-size:17px}
+  button{font:inherit;font-size:22px;padding:13px 28px;margin:7px;border-radius:12px;border:2px solid #d8b66a;
+    background:#1c2448;color:#f4ead2;cursor:pointer}
+  button:hover{background:#2a3566}
+  button:disabled{opacity:.4;cursor:default}
+  .row{margin-top:8px;font-size:17px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px}
+  .row button{font-size:16px;padding:7px 14px;margin:3px;border-width:1px;opacity:.7}
+  .row button.on{opacity:1;background:#3a3a6a;border-color:#ffd77a;box-shadow:0 0 8px #ffd77a88}
+  .locked{opacity:.5;pointer-events:none}
+  #chapters{flex-direction:column;gap:0;margin-top:14px}
+  #chapters button{min-width:340px;text-align:left;font-size:16px;padding:6px 14px;margin:2px}
+  #chapters button:disabled{opacity:.35}
+  #note{margin-top:10px;font-size:15px;opacity:.75;min-height:20px}
+  #mp{margin-top:16px}
+  #mp input{font:inherit;font-size:18px;padding:8px 10px;border-radius:8px;border:2px solid #d8b66a;background:#0e1430;color:#f4ead2;width:130px}
+  #mp #codeIn{width:84px;text-transform:uppercase;letter-spacing:3px;text-align:center}
+  #mpNote{margin-top:6px;font-size:15px;min-height:20px;max-width:640px}
+  #voicePanel{margin-top:8px;font-size:16px;display:none;flex-direction:column;align-items:center;gap:4px}
+  #voicePanel button{font-size:15px;padding:5px 12px;margin:2px}
+  #voicePanel .row{display:flex;align-items:center;gap:8px}
+  #voicePanel input[type=range]{width:140px;accent-color:#d8b66a}
+  #room{font-size:30px;color:#ffd77a;letter-spacing:4px;margin-top:6px;display:none}
+  #endCard{display:none;margin:8px;font-size:18px;color:#ffe3a0}
+  .help{display:flex;gap:40px;margin-top:22px;font-size:14px;line-height:1.55;text-align:left;opacity:.85;flex-wrap:wrap;justify-content:center}
+  .help b{color:#ffe3a0}
+  #crosshair{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;
+    background:rgba(255,240,200,.7);z-index:5;display:none;pointer-events:none}
+  #crosshair.on{width:14px;height:14px;margin:-7px 0 0 -7px;background:rgba(255,214,120,.95);box-shadow:0 0 10px #ffd77a}
+  #dsub{position:fixed;left:50%;bottom:6%;transform:translateX(-50%);max-width:min(900px,90vw);padding:12px 22px;border-radius:14px;
+    background:rgba(8,12,28,.72);border:2px solid rgba(255,214,120,.8);font-size:22px;line-height:1.4;text-align:center;z-index:6;display:none;pointer-events:none}
+  #dhint{position:fixed;left:50%;top:12%;transform:translateX(-50%);max-width:80vw;padding:8px 18px;border-radius:12px;
+    background:rgba(30,20,6,.78);border:2px solid rgba(120,220,255,.9);color:#dff6ff;font-size:18px;z-index:6;display:none;pointer-events:none}
+</style>
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.js", "three/addons/": "./lib/addons/" } }
+</script>
+</head>
+<body>
+<div id="overlay">
+  <canvas id="stars"></canvas>
+  <div id="version">&nbsp;</div>
+  <h1>STARWARD</h1>
+  <div class="era">Era 1 &middot; Watchers of the Sky</div>
+  <div class="sub">Thirty thousand years of people looking up.</div>
+  <div>
+    <button id="vrBtn" disabled>Enter VR</button>
+    <button id="deskBtn">Try on desktop</button>
+  </div>
+  <div id="endCard"></div>
+  <div class="row" id="chapters"></div>
+  <div class="row" id="rating" data-host-only="1"><span>For:&nbsp;</span>
+    <button data-v="kids">Kids</button><button data-v="adults">Adults</button>
+  </div>
+  <div class="row" id="subs"><span>Subtitles:&nbsp;</span>
+    <button data-v="on">On</button><button data-v="off">Off</button>
+  </div>
+  <div class="row" id="turning"><span>Turning (right stick):&nbsp;</span>
+    <button data-v="snap">Snap</button><button data-v="smooth">Smooth</button>
+  </div>
+  <div class="row" id="mp"><span>Travel with friends:&nbsp;</span>
+    <input id="nameIn" maxlength="14" placeholder="Your name" autocomplete="off">
+    <button id="hostBtn">Host</button><span>&nbsp;or&nbsp;</span>
+    <input id="codeIn" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <button id="joinBtn">Join</button>
+  </div>
+  <div id="room"></div>
+  <div id="mpNote">Up to 4 travellers. One of you hosts; the others type the host's room code and join.</div>
+  <div id="voicePanel"></div>
+  <div id="note">Checking for VR support&hellip;</div>
+  <div class="help">
+    <div><b>Quest controls</b><br>
+      Left stick: walk<br>
+      Right stick: turn (snap or smooth)<br>
+      Grip (side button): grab, e.g. the rope<br>
+      Trigger: touch, e.g. the journal page<br>
+      B or Y: voice chat mic on / off</div>
+    <div><b>Desktop controls</b> (for testing)<br>
+      Click to look around with the mouse<br>
+      W A S D: walk (Shift: faster)<br>
+      Hold the mouse button on something to grab it<br>
+      E: use what you're looking at<br>
+      M: voice chat mic on / off</div>
+  </div>
+</div>
+<div id="crosshair"></div>
+<div id="dsub"></div>
+<div id="dhint"></div>
+<script>
+  // Twinkly stars behind the title
+  (() => { const c = document.getElementById('stars'), g = c.getContext('2d');
+    const draw = () => { c.width = innerWidth; c.height = innerHeight; g.clearRect(0, 0, c.width, c.height);
+      for (let i = 0; i < 260; i++) { const x = Math.random() * c.width, y = Math.random() * c.height * 0.85, r = Math.random() ** 3 * 1.8 + 0.3;
+        g.fillStyle = `rgba(255,${235 + Math.random() * 20 | 0},${200 + Math.random() * 55 | 0},${0.3 + Math.random() * 0.7})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } };
+    draw(); addEventListener('resize', draw); })();
+  // Show when this copy was published, so it's easy to tell an update arrived.
+  (() => { const d = new Date(document.lastModified), el = document.createElement('div');
+    el.textContent = 'Updated ' + d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    el.style.cssText = 'position:fixed;right:10px;bottom:8px;font-size:13px;opacity:.6;color:#f4ead2;font-family:Georgia,serif;z-index:20';
+    document.body.appendChild(el); })();
+  // Make every visit load the newest files (see sw.js).
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+ "star_guide": {
+  "file": "star_guide.glb",
+  "height": 0.3,
+  "center": true
+ },
+ "builder": {
+  "file": "stonehenge_builder.glb",
+  "height": 1.75,
+  "turn": 0
+ }
+}

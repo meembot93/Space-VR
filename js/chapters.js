@@ -1,0 +1,88 @@
+// The chapters of Era 1 and the director that runs them.
+//
+// A chapter module (js/chapters/*.js) exports a class with:
+//   constructor(G)          build the place: ground, models, people (and register interactables)
+//   start                   where you stand: { x, z, yaw }
+//   async run(D)            the story, written top to bottom with the director's helpers:
+//                             await D.say('ch2_03')         narration line (Meem's clip or subtitle)
+//                             await D.until(() => cond, s)  wait for something (or s seconds)
+//                             await D.wait(s)               just wait
+//   update(dt, t)           animate every frame (on every headset)
+//   act(a, player)          a player's action, e.g. { type: 'pull', amount } (host only)
+//   getState() / setState() the shared progress, as plain data, so friends' headsets match
+//   dispose()               remove everything
+//
+// In multiplayer only the host runs run(); friends get the state and the narration lines.
+export const CHAPTERS = [
+  { n: 1, title: 'Campfire, 30,000 years ago', ready: false },
+  { n: 2, title: 'Stonehenge at dawn', ready: true, load: () => import('./chapters/stonehenge.js') },
+  { n: 3, title: 'Sirius over the Nile', ready: false },
+  { n: 4, title: 'Babylon predicts an eclipse', ready: false },
+  { n: 5, title: 'Greece proves the Earth is round', ready: false },
+  { n: 6, title: 'Diving for the Antikythera machine', ready: false },
+  { n: 7, title: 'Ptolemy’s spinning sky', ready: false },
+];
+
+class Stop extends Error {}
+
+export class Director {
+  constructor(G) { this.G = G; this.chapter = null; this.n = 0; this.token = 0; }
+
+  // Build chapter n (every headset). Resolves when it's ready to play.
+  async load(n) {
+    const G = this.G, info = CHAPTERS.find((c) => c.n === n);
+    if (!info?.ready) throw new Error('Chapter ' + n + ' is not built yet');
+    this.stop();
+    if (this.chapter) { this.chapter.dispose(); this.chapter = null; }
+    G.interactables.length = 0;
+    const mod = await info.load();
+    this.chapter = new mod.default(G);
+    this.n = n; this.info = info;
+    G.narration.preload(`ch${n}_`);
+    return this.chapter;
+  }
+
+  // Run the story (host). Everyone's view fades in.
+  async play() {
+    const G = this.G, ch = this.chapter, token = ++this.token;
+    this.running = true;
+    G.events.emit('chapterStart', { n: this.n });
+    try {
+      await ch.run(this.helpers(token));
+      if (token === this.token) G.events.emit('chapterEnd', { n: this.n });
+    } catch (e) { if (!(e instanceof Stop)) console.error(e); }
+    if (token === this.token) this.running = false;
+  }
+
+  stop() { this.token++; this.running = false; this.G.narration.stop(); this.waits = []; }
+
+  helpers(token) {
+    const G = this.G, check = () => { if (token !== this.token) throw new Stop(); };
+    const D = {
+      say: async (id) => { check(); G.events.emit('say', { id }); await G.narration.say(id); check(); },
+      wait: (s) => D.until(() => false, s),
+      until: (cond, timeout = Infinity) => new Promise((ok, fail) => {
+        const w = { cond, left: timeout, ok, fail, token };
+        (this.waits ||= []).push(w);
+      }).then((r) => { check(); return r; }),
+      // say a line while something else happens: returns the promise without waiting
+      sayAsync: (id) => D.say(id).catch(() => {}),
+      check,
+    };
+    return D;
+  }
+
+  update(dt) {
+    if (this.waits?.length) {
+      for (const w of [...this.waits]) {
+        if (w.token !== this.token) { this.waits.splice(this.waits.indexOf(w), 1); w.fail(new Stop()); continue; }
+        w.left -= dt;
+        let done = false, timedOut = false;
+        try { done = !!w.cond(); } catch (e) { console.error(e); done = true; }
+        if (!done && w.left <= 0) { done = true; timedOut = true; }
+        if (done) { this.waits.splice(this.waits.indexOf(w), 1); w.ok(!timedOut); }
+      }
+    }
+    this.chapter?.update(dt, this.G.t);
+  }
+}

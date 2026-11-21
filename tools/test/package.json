@@ -1,0 +1,7 @@
+{
+  "name": "starward-tests",
+  "private": true,
+  "description": "Headset emulator test: runs Chapter 2 in Chromium with Meta's IWER WebXR emulator (a virtual Quest 3).",
+  "scripts": { "test": "node vr-test.js" },
+  "devDependencies": { "iwer": "2.8.0" }
+}

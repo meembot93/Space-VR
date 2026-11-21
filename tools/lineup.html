@@ -1,0 +1,42 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Starward people lineup</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#20263a;color:#eee;font-family:sans-serif}#info{position:fixed;left:10px;top:8px}</style>
+<script type="importmap">{ "imports": { "three": "../lib/three.module.js", "three/addons/": "../lib/addons/" } }</script>
+</head><body><div id="info">Lineup: the stand-ins (back) and a model (front) in each pose: idle, pull, point, cheer.<br>
+Add ?model=builder to show a model listed in models/index.json, or ?file=../models/x.glb&height=1.75</div>
+<script type="module">
+// Preview tool: every pose on the code stand-in and on one of Meem's Tripo models.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { makePerson, animatePerson, findRig } from '../js/people.js';
+import { loadModel } from '../js/models.js';
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x20263a);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.2)); const d = new THREE.DirectionalLight(0xffffff, 1.5); d.position.set(3, 5, 4); scene.add(d);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100); cam.position.set(0, 1.5, 7.5); cam.lookAt(0, 1, 0);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshLambertMaterial({ color: 0x556b3a })); ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const poses = ['idle', 'pull', 'point', 'cheer'], people = [];
+const target = new THREE.Vector3(-4, 2.5, 3);
+poses.forEach((pose, i) => { const P = makePerson({ seed: 10 + i }); P.g.position.set(-3 + i * 2, 0, -1.5); P.pose = pose; P.pointAt.copy(target); scene.add(P.g); people.push(P); });
+async function model() {
+  if (q.get('model')) return loadModel(q.get('model'));
+  if (!q.get('file')) return null;
+  const g = await new GLTFLoader().loadAsync(q.get('file'));
+  const s = g.scene, h = Number(q.get('height') || 1.75), box = new THREE.Box3().setFromObject(s), k = h / box.getSize(new THREE.Vector3()).y;
+  s.scale.multiplyScalar(k); return { scene: s };
+}
+const m = await model();
+if (m) {
+  const SkeletonUtils = await import('three/addons/utils/SkeletonUtils.js');
+  poses.forEach((pose, i) => {
+    const sc = SkeletonUtils ? SkeletonUtils.clone(m.scene) : m.scene.clone(true);
+    sc.scale.copy(m.scene.scale); sc.position.copy(m.scene.position);
+    const P = makePerson({ seed: 1 }); P.inner.clear(); P.inner.add(sc); P.rig = findRig(sc); P.arms = [];
+    P.g.position.set(-3 + i * 2, 0, 1.2); P.pose = pose; P.pointAt.copy(target); scene.add(P.g); people.push(P);
+    document.getElementById('info').innerHTML += i ? '' : `<br>Model rigged: ${!!P.rig}`;
+  });
+}
+const clock = new THREE.Clock(); let t = 0;
+r.setAnimationLoop(() => { const dt = Math.min(0.05, clock.getDelta()); t += dt; for (const P of people) animatePerson(P, t, dt); r.render(scene, cam); });
+</script></body></html>
