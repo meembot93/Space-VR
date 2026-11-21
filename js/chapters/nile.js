@@ -688,7 +688,7 @@ export default class Nile {
     const r = rng(31);
     for (let i = 0; i < 12; i++) {
       const spot = this.lampSpots[(i * 7 + 3) % this.lampSpots.length];
-      const P = makePerson({ seed: 50 + i * 5, tunic: [0xe8e0cc, 0xd8ccb0, 0xeee6d2][i % 3], skin: [0x8a5a3a, 0x7a4e32, 0x9a6844][i % 3], hair: 0x1a1410, beard: false });
+      const P = makePerson({ model: 'villager', seed: 50 + i * 5, tunic: [0xe8e0cc, 0xd8ccb0, 0xeee6d2][i % 3], skin: [0x8a5a3a, 0x7a4e32, 0x9a6844][i % 3], hair: 0x1a1410, beard: false });
       P.g.position.set(spot.x, groundHeight(spot.x, spot.z), spot.z); P.g.visible = false;
       P.home = P.g.position.clone();
       P.goal = new THREE.Vector3(50 + r() * 70, 0, P.home.z * 0.6 + (r() - 0.5) * 60);

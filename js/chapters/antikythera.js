@@ -486,7 +486,7 @@ export default class Antikythera {
     this.diverTop.g.position.set(1.0, DECK, 0.35); T.add(this.diverTop.g);
     this.crew = [];
     for (const [x, face] of [[-1.25, Math.PI / 2], [0.05, -Math.PI / 2]]) {
-      const P = makePerson({ seed: 50 + this.crew.length * 9, tunic: [0x5a6a8a, 0x8a7a5a][this.crew.length], beard: true, hair: 0x2a2018 });
+      const P = makePerson({ model: 'sailor', seed: 50 + this.crew.length * 9, tunic: [0x5a6a8a, 0x8a7a5a][this.crew.length], beard: true, hair: 0x2a2018 });
       P.g.position.set(x, DECK, 2.3); P.g.rotation.y = face; P.pose = 'pull'; T.add(P.g); this.crew.push(P);
     }
     // Bubbles coming up where the diver went down

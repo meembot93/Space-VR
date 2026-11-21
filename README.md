@@ -56,7 +56,7 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
 - `js/guide.js`: Astra, the guide star (Meem's `models/star_guide.glb`).
 - `js/people.js`: characters. Meem's Tripo models (rigged, Mixamo bone names, no animation clips)
   are posed in code: idle, haul, point, cheer. Anyone without a model yet is a plain "clay" stand-in.
-  `tools/lineup.html?model=builder` previews every pose. Models: docs/ASSETS.md.
+  `tools/lineup.html?model=builder` previews every pose. Models: docs/ASSETS.md; first-pass stand-in models are made by `tools/models/derive.mjs`.
 - `js/player.js`: you, your hands, the controls. Chapters add grabbable things to `G.interactables`.
 - `js/net/`: multiplayer and voice chat, adapted from Broadside VR.
 - `js/atmosphere.js`: golden-hour haze, ground mist, sea-breeze specks, moving firelight, dust in sunbeams (per chapter, reads chapter state only).
