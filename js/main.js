@@ -70,8 +70,9 @@ function choice(id, key, def, apply) {
   }
   apply(cur);
 }
-// Kids (default) or Adults. Era 1 has nothing that needs softening yet; later chapters read G.kids
-// (for example the eclipse in Chapter 4 is played as wonder, not fear). The host's setting applies to everyone.
+// Kids (default) or Adults, picked on the title page. Kids mode is hands-free: every chapter plays
+// itself (see D.auto in js/chapters.js) and the eclipse in Chapter 4 is wonder, not fear. Adults is
+// interactive. The host's setting applies to everyone.
 G.setKids = (on) => { G.kids = !!on; G.events.emit('kids', { on: G.kids }); for (const b of document.querySelectorAll('#rating button')) b.classList.toggle('on', (b.dataset.v === 'kids') === G.kids); };
 choice('rating', 'rating', params.get('rating') || 'kids', (v) => G.setKids(v !== 'adults'));
 choice('turning', 'turn', 'snap', (v) => { G.player.smoothTurn = v === 'smooth'; });

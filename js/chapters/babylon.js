@@ -720,6 +720,7 @@ export default class Babylon {
     const G = this.G, s = this.s, fast = G.params.has('fast');
     const placeAll = (pos, yaw) => G.events.emit('placePlayers', { x: pos.x, z: pos.z, yaw });
     const goTo = async (spot, face, hint) => {
+      if (D.kids) { await D.wait(fast ? 0.2 : 1); await D.goTo(spot, face); return; }   // Kids mode: a quick fade takes you there
       s.ring = 1; s.ringAt = [spot.x, spot.z];
       G.ui.showHint(hint, 8);
       const there = () => G.players.every((p) => { p.headPos?.(_a) ?? _a.copy(spot); return Math.hypot(_a.x - spot.x, _a.z - spot.z) < 1.1; });
@@ -741,8 +742,8 @@ export default class Babylon {
     const sayW = D.say('ch4_04');
     await goTo(this.writeSpot, this.faceToward(this.writeSpot, this.clay.position), 'Walk to the glowing ring by the writing table (left stick)');
     await sayW;
-    G.ui.showHint(G.mode === 'desktop' ? this.clayIt.deskHint : this.reedIt.hint, 9);
-    this.helpAt = G.t + (fast ? 4 : 45);
+    D.hint(G.mode === 'desktop' ? this.clayIt.deskHint : this.reedIt.hint, 9);
+    this.helpAt = G.t + (D.kids ? (fast ? 0.3 : 1.5) : fast ? 4 : 45);   // the sky-watcher writes it (Kids mode: right away)
     await D.until(() => s.marks.every(Boolean));
     this.helpAt = null;
     G.ui.showHint(''); s.watcher = 'tablet'; s.nod++;
@@ -752,8 +753,8 @@ export default class Babylon {
     const sayA = D.say('ch4_05');
     await goTo(this.archiveSpot, this.faceToward(this.archiveSpot, _a.set(this.deskX, 0, this.shrineFront)), 'Walk to the glowing ring by the shelves');
     await sayA;
-    G.ui.showHint(G.mode === 'desktop' ? this.oldIts[0].deskHint : this.oldIts[0].hint, 8);
-    this.helpAt = G.t + (fast ? 4 : 40);
+    D.hint(G.mode === 'desktop' ? this.oldIts[0].deskHint : this.oldIts[0].hint, 8);
+    this.helpAt = G.t + (D.kids ? (fast ? 0.3 : 1.5) : fast ? 4 : 40);
     await D.until(() => s.fetched.every(Boolean));
     this.helpAt = null;
     G.ui.showHint(''); s.watcher = 'idle';
@@ -772,9 +773,10 @@ export default class Babylon {
     s.phase = 'lookup'; s.watcher = 'moon';
     const md = this.moonDir;
     s.guide = [md.x * 5 + this.archiveSpot.x * 0.3, 1.6 + md.y * 5, md.z * 5 + this.archiveSpot.z * 0.3];
-    G.ui.showHint('Turn around and look up at the Moon', 8);
+    D.hint('Turn around and look up at the Moon', 8);
     const looking = () => { G.camera.getWorldDirection(_a); return _a.dot(md) > 0.9; };
-    await D.until(looking, fast ? 2 : 12);
+    if (D.kids) { await D.wait(fast ? 0.2 : 1.5); await D.goTo(this.archiveSpot, this.faceToward(this.archiveSpot, _b.copy(this.archiveSpot).add(md))); await D.wait(fast ? 0.2 : 1.5); }
+    else await D.until(looking, fast ? 2 : 12);
     G.ui.showHint('');
     s.phase = 'eclipse'; G.events.emit('sfx', { k: 'swell' });
     await D.until(() => s.ecl >= 0.22);
@@ -789,8 +791,8 @@ export default class Babylon {
     // The journal page
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
-    G.ui.showHint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
-    await D.until(() => s.journal === 2);
+    D.hint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
+    await D.auto(() => s.journal === 2, () => this.act({ type: 'touchPage' }), { after: fast ? 0.5 : 4 });
     G.ui.showHint('');
     G.events.emit('sfx', { k: 'page' });
     await D.wait(1.2);

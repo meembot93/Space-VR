@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 11;
-export const CHANGES = ['Chapter 6: Antikythera dive', 'Sponge boat and wreck', 'Turn the ancient computer'];
+export const VERSION = 12;
+export const CHANGES = ['Kids mode plays itself', 'Adults stays hands-on', 'No clicking for kids'];

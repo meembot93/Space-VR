@@ -7,6 +7,14 @@
 //                             await D.say('ch2_03')         narration line (Meem's clip or subtitle)
 //                             await D.until(() => cond, s)  wait for something (or s seconds)
 //                             await D.wait(s)               just wait
+//                             await D.auto(cond, step, o)   a player action that plays itself in Kids mode
+//                             D.hint(text, s)               an instruction; hidden in Kids mode
+//
+// Kids mode (G.kids, the default) is fully hands-free: the kid just watches. Every wait on the
+// player goes through D.auto: in Adults mode it waits for cond (up to o.timeout s, false if it ran
+// out); in Kids mode, after o.after s (default 2), step(dt) runs every frame until cond is true,
+// so Astra or the people do the action themselves. Use D.hint (not G.ui.showHint) for "do this"
+// hints, and D.goTo(pos, yaw) instead of asking a kid to walk somewhere.
 //   update(dt, t)           animate every frame (on every headset)
 //   act(a, player)          a player's action, e.g. { type: 'pull', amount } (host only)
 //   getState() / setState() the shared progress, as plain data, so friends' headsets match
@@ -62,12 +70,27 @@ export class Director {
     const D = {
       say: async (id) => { check(); G.events.emit('say', { id }); await G.narration.say(id); check(); },
       wait: (s) => D.until(() => false, s),
-      until: (cond, timeout = Infinity) => new Promise((ok, fail) => {
-        const w = { cond, left: timeout, ok, fail, token };
+      until: (cond, timeout = Infinity, step = null) => new Promise((ok, fail) => {
+        const w = { cond, left: timeout, ok, fail, token, step };
         (this.waits ||= []).push(w);
       }).then((r) => { check(); return r; }),
       // say a line while something else happens: returns the promise without waiting
       sayAsync: (id) => D.say(id).catch(() => {}),
+      // Kids mode: hands-free (see the top of this file)
+      get kids() { return !!G.kids; },
+      hint: (text, secs) => { if (!G.kids || !text) G.ui.showHint(G.kids ? '' : text, secs); },
+      auto: async (cond, step, { after = 2, timeout = Infinity } = {}) => {
+        if (!G.kids) return D.until(cond, timeout);
+        let t = 0;
+        await D.until(cond, Infinity, (dt) => { t += dt; if (t >= after) step?.(dt); });
+        return true;
+      },
+      // move everyone to a spot with a quick fade (instead of asking a kid to walk there)
+      goTo: async (pos, yaw) => {
+        await G.ui.fadeOut(0.6); check();
+        G.events.emit('placePlayers', { x: pos.x, z: pos.z, yaw });
+        await G.ui.fadeIn(0.8); check();
+      },
       check,
     };
     return D;
@@ -78,6 +101,7 @@ export class Director {
       for (const w of [...this.waits]) {
         if (w.token !== this.token) { this.waits.splice(this.waits.indexOf(w), 1); w.fail(new Stop()); continue; }
         w.left -= dt;
+        if (w.step) { try { w.step(dt); } catch (e) { console.error(e); } }
         let done = false, timedOut = false;
         try { done = !!w.cond(); } catch (e) { console.error(e); done = true; }
         if (!done && w.left <= 0) { done = true; timedOut = true; }

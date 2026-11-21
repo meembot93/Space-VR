@@ -716,12 +716,13 @@ export default class Ptolemy {
     s.guide = [0, 5.5, 2]; // Astra drifts up into the hall's light
     await D.say('ch7_01');
     s.guide = [-5.5, 3.2, 4]; // ...along the scroll cabinets
-    s.phase = 'walk'; s.ring = 1;
-    G.ui.showHint('Walk up the hall to the glowing ring (left stick)', 8);
+    s.phase = 'walk'; s.ring = D.kids ? 0 : 1;
+    D.hint('Walk up the hall to the glowing ring (left stick)', 8);
     await D.say('ch7_02');
     s.guide = null;
     const there = () => G.players.every((p) => { p.headPos?.(_a) ?? _a.copy(p.view?.head || SPOT); return Math.hypot(_a.x - SPOT.x, _a.z - SPOT.z) < 1.8; });
-    if (!(await D.until(there, fast ? 3 : 30))) {
+    if (D.kids) await D.goTo(SPOT, 0);   // Kids mode: a quick fade takes you there
+    else if (!(await D.until(there, fast ? 3 : 30))) {
       await G.ui.fadeOut(0.8); placeAll(SPOT, 0); await G.ui.fadeIn(1);
     }
     s.ring = 0; G.ui.showHint('');
@@ -730,8 +731,8 @@ export default class Ptolemy {
     await D.say('ch7_03');
     await D.until(() => s.scroll >= 1, 5);
     s.phase = 'touch'; s.arm = 1;
-    G.ui.showHint(G.mode === 'desktop' ? this.scrollIt.deskHint : this.scrollIt.hint, 8);
-    if (!(await D.until(() => s.phase === 'touched', fast ? 4 : 40))) s.phase = 'touched';
+    D.hint(G.mode === 'desktop' ? this.scrollIt.deskHint : this.scrollIt.hint, 8);
+    if (!(await D.auto(() => s.phase === 'touched', () => { s.phase = 'touched'; }, { after: fast ? 0.3 : 2.5, timeout: fast ? 4 : 40 }))) s.phase = 'touched';
     G.ui.showHint('');
     // The room goes dark: into Ptolemy's universe
     s.point = 0;
@@ -748,9 +749,10 @@ export default class Ptolemy {
     s.guide = [-3.2, EYE + 1.4, -5.5];
     await D.say('ch7_05');
     s.phase = 'follow';
-    G.ui.showHint(G.mode === 'desktop' ? this.marsIt.deskHint : this.marsIt.hint, 8);
+    D.hint(G.mode === 'desktop' ? this.marsIt.deskHint : this.marsIt.hint, 8);
     this.followStart = G.t;
-    await D.until(() => s.mt >= T1);
+    // Kids mode: Mars traces its loop by itself while you watch
+    await D.auto(() => s.mt >= T1, (dt) => { s.mt = Math.min(T1, s.mt + dt * MARS_RATE * (fast ? 4 : 1)); }, { after: fast ? 0.2 : 1 });
     G.ui.showHint('');
     // Ptolemy's answer: the small circle on the big circle
     s.phase = 'epicycle'; s.epi = 1; s.et = T0;
@@ -785,8 +787,8 @@ export default class Ptolemy {
     // The last journal page of Era 1
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
-    G.ui.showHint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
-    await D.until(() => s.journal === 2);
+    D.hint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
+    await D.auto(() => s.journal === 2, () => this.act({ type: 'touchPage' }), { after: fast ? 0.5 : 4 });
     G.ui.showHint('');
     G.events.emit('sfx', { k: 'page' });
     await D.wait(1.2);

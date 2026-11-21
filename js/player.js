@@ -89,7 +89,7 @@ export class Player {
   nearest(h) {
     let best = null, bd = REACH;
     for (const it of this.G.interactables) {
-      if (!it.reach || it.disabled) continue;
+      if (!it.reach || it.disabled || this.G.kids) continue;   // Kids mode is hands-free
       const d = it.reach(h.pos, h);
       if (d < bd) { bd = d; best = it; }
     }
@@ -216,7 +216,7 @@ export class Player {
     const cam = this.G.camera; cam.getWorldPosition(_a); cam.getWorldDirection(_b);
     let best = null, bd = 4.5;
     for (const it of this.G.interactables) {
-      if (it.disabled) continue;
+      if (it.disabled || this.G.kids) continue;
       const d = it.aim ? it.aim(_a, _b) : Infinity;
       if (d < bd) { bd = d; best = it; }
     }

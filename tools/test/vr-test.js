@@ -37,7 +37,7 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   // The emulated Quest 3, installed before the game's own code runs
   await page.addInitScript({ path: require.resolve('iwer/build/iwer.min.js') });
   await page.addInitScript(() => { const d = new IWER.XRDevice(IWER.metaQuest3); d.installRuntime({ forceInstall: true }); window.__xr = d; });
-  await page.goto(`http://localhost:${port}/index.html?fast&chapter=2`);
+  await page.goto(`http://localhost:${port}/index.html?fast&rating=adults&chapter=2`);
   await page.waitForFunction(() => !document.getElementById('vrBtn').disabled, null, { timeout: 15000 });
   check(true, 'Enter VR button is enabled with a (virtual) headset');
   await page.click('#vrBtn');

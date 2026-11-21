@@ -543,10 +543,11 @@ export default class Stonehenge {
     await D.say('ch2_03');
     s.guide = null;
     // Walk into the circle (or after a while, a gentle fade takes you there)
-    s.phase = 'walk'; s.ring = 1;
-    G.ui.showHint('Walk to the glowing ring in the circle (left stick)', 8);
+    s.phase = 'walk'; s.ring = D.kids ? 0 : 1;
+    D.hint('Walk to the glowing ring in the circle (left stick)', 8);
     const there = () => G.players.every((p) => { p.headPos?.(_a) ?? _a.copy(p.view?.head || this.ringSpot); return _a.distanceTo(this.ringSpot) < 2.2 || Math.hypot(_a.x, _a.z) < 12; });
-    if (!(await D.until(there, fast ? 3 : 35))) {
+    if (D.kids) { await D.wait(fast ? 0.2 : 1); await D.goTo(this.ringSpot, this.faceToward(this.ringSpot, at(SLOT, 20))); }
+    else if (!(await D.until(there, fast ? 3 : 35))) {
       await G.ui.fadeOut(0.8); placeAll(this.ringSpot, this.faceToward(this.ringSpot, at(SLOT, 20))); await G.ui.fadeIn(1);
     }
     s.ring = 0; G.ui.showHint('');
@@ -557,12 +558,13 @@ export default class Stonehenge {
     await D.say('ch2_05');
     s.path = 0;
     // Haul the stone in
-    s.point = 0; s.phase = 'pull'; s.ring = 1; this.ringSpot.copy(this.pullSpot());
+    s.point = 0; s.phase = 'pull'; s.ring = D.kids ? 0 : 1; this.ringSpot.copy(this.pullSpot());
     s.guide = at(SLOT, 5.5, 1.8).toArray();
     await D.say('ch2_06');
-    G.ui.showHint(G.mode === 'desktop' ? this.ropeIt.deskHint : this.ropeIt.hint, 7);
+    D.hint(G.mode === 'desktop' ? this.ropeIt.deskHint : this.ropeIt.hint, 7);
     this.pullStart = G.t;
-    await D.until(() => s.pulled >= PULL_NEEDED);
+    // Kids mode: the builders haul it in by themselves while you watch
+    await D.auto(() => s.pulled >= PULL_NEEDED, (dt) => { s.pulled = Math.min(PULL_NEEDED, s.pulled + dt * (fast ? 3 : 0.6)); }, { after: fast ? 0.2 : 1.5 });
     s.ring = 0; s.guide = null; G.ui.showHint('');
     // Up it goes
     s.phase = 'raise';
@@ -593,8 +595,8 @@ export default class Stonehenge {
     // The journal page
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
-    G.ui.showHint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
-    await D.until(() => s.journal === 2);
+    D.hint(G.mode === 'desktop' ? this.pageIt.deskHint : this.pageIt.hint, 8);
+    await D.auto(() => s.journal === 2, () => this.act({ type: 'touchPage' }), { after: fast ? 0.5 : 4 });
     G.ui.showHint('');
     G.events.emit('sfx', { k: 'page' });
     await D.wait(1.2);
