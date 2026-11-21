@@ -13,6 +13,7 @@ import { makeWorld } from './world.js';
 import { Net } from './net/net.js';
 import { Music } from './music.js';
 import { Stargazing } from './stargazing.js';
+import { Soundscape } from './soundscape.js';
 import { VERSION } from './version.js';
 
 const params = new URLSearchParams(location.search);
@@ -51,6 +52,7 @@ G.director = new Director(G);
 G.net = new Net(G);
 G.music = new Music(G);
 G.stargazing = new Stargazing(G);
+G.soundscape = new Soundscape(G);
 G.player.setupVR(renderer);
 
 // ---------- Settings on the title screen (remembered on this headset) ----------
@@ -357,6 +359,7 @@ function tick() {
   if (!G.paused) G.director.update(dt);
   G.narration.update(dt);
   G.music.update(dt);
+  G.soundscape.update(dt);
   G.guide.update(dt);
   G.net.update(dt);
   G.ui.update(dt);
