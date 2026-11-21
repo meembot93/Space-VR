@@ -21,6 +21,7 @@ import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeCard } from '../ui.js';
 import { rng, noise2 } from '../shapes.js';
+import { buildAthens } from './athens.js';
 
 const D2R = Math.PI / 180;
 const MOON_AZ = 160, MOON_EL = 24;           // the eclipsed Moon, over the sea to the south
@@ -450,7 +451,7 @@ export default class Greece {
     { const tc = makeTorch(); holdProp(this.thinkers[2], tc, 'Left', [0, 0.04, 0.03]); this.torches.push(tc); }
     // Syene: a villager drawing water at the well, donkeys and goats, kites circling high in the heat
     const Sy = this.sets.syene, W = this.wellPos;
-    this.drawer = extra(Sy, 'eratosthenes', new THREE.Vector3(W.x - 1.3, 0, W.z - 0.5), W, [0.85, 0.75, 0.6]);
+    this.drawer = extra(Sy, 'eratosthenes', new THREE.Vector3(W.x - 1.6, 0, W.z - 0.15), W, [0.85, 0.75, 0.6]);
     this.sLife = new Life(Sy.g);
     this.sLife.add(makeHerd('donkey', { n: 2, area: { x: W.x - 8, z: W.z - 6, r: 4 }, height: Sy.height, seed: 51 }));
     this.sLife.add(makeHerd('goat', { n: 5, area: { x: W.x + 7, z: W.z - 9, r: 5 }, height: Sy.height, seed: 52 }));
@@ -497,8 +498,11 @@ export default class Greece {
     const TC = this.templeAt = new THREE.Vector3(-40, 0, -21), TL = 31.8, TW = 13.7, TERR = 0.9;
     const H0 = (x, z) => {
       let h = (N1(x / 40, z / 40) - 0.5) * 1.5 * clamp((Math.hypot(x, z) - 12) / 30, 0, 1);
-      if (z > 22) h -= Math.min(30, (z - 22) * 0.16 + Math.pow(Math.max(0, z - 60) / 60, 2) * 4);   // down to the sea in the south
-      if (z < -30) h += (-z - 30) * 0.06 * (0.6 + N2(x / 60, z / 60));                              // hills to the north
+      // down to the sea in the south; the city climbs gently away from us to the north and west,
+      // so its roofs rise in tiers toward the Acropolis
+      if (z > 22) h -= Math.min(30, (z - 22) * 0.16 + Math.pow(Math.max(0, z - 60) / 60, 2) * 4);
+      h += clamp((20 - z) / 40, 0, 1) * Math.max(0, Math.hypot(x, z) - 45) * 0.06;
+      if (z < -230) h += (-z - 230) * 0.08 * (0.6 + N2(x / 60, z / 60));                            // hills to the north
       return h;
     };
     const H = (x, z) => {
@@ -530,9 +534,10 @@ export default class Greece {
 
     // Olive trees all around (but not in the way of the sea view or the lamp table)
     const trunks = new Kit(), leaves = new Kit(), r = rng(5);
-    for (let i = 0; i < 70; i++) {
-      const a = r() * 360, d = 7 + r() * 48, p = at(a, d);
+    for (let i = 0; i < 90; i++) {
+      const a = r() * 360, d = 7 + r() * 36, p = at(a, d);
       if ((a > 120 && a < 210 && d < 40) || Math.hypot(p.x, p.z + 4) < 6) continue;
+      if ((a > 235 || a < 40) && d > 16) continue;   // keep the view over the city open
       if (Math.abs(p.x - TC.x) < TL / 2 + 9 && Math.abs(p.z - TC.z) < TW / 2 + 8) continue;
       if (p.x > TC.x && p.x < 2 && Math.abs(p.z - TC.z * (1 - (p.x - TC.x) / -TC.x)) < 5) continue;
       olive(trunks, leaves, p.x, H(p.x, p.z), p.z, 0.85 + r() * 0.4, 100 + i);
@@ -561,12 +566,6 @@ export default class Greece {
     // a low dry-stone terrace wall and a few big jars
     for (let i = 0; i < 26; i++) { const x = -14 + i * 1.1; k.box(1.1, 0.5 + r() * 0.2, 0.6, 0x8a8068, [x, 0.25 + H(x, 9) * 0.9, 9 + Math.sin(i) * 0.3], [0, r() * 0.2, 0]); }
     for (const [x, z] of [[-1.6, -4.6], [-2.2, -4.4]]) k.cyl(0.25, 0.18, 0.8, 10, 0xa86a40, [x, 0.4, z]), k.ball(0.3, 1, 0xa86a40, [x, 0.75, z], 0, [1, 0.8, 1]);
-    // Athens far off on its hill: the Acropolis rock, with the Parthenon on top, and the town below
-    const ac = at(326, 540), ay = H(ac.x, ac.z);
-    k.cyl(70, 95, 46, 14, 0x6a6050, [ac.x, ay + 18, ac.z]);
-    const par = doricTemple({ L: 69.5, W: 30.9, nL: 17, nW: 8, colH: 10.4, colD: 1.9, seg: 12, figures: false });
-    par.geo.rotateY(0.4); par.geo.translate(ac.x, ay + 40.5, ac.z); g.add(new THREE.Mesh(par.geo, FLAT));
-    for (let i = 0; i < 40; i++) { const a = r() * 6.28, d = 95 + r() * 90; house(k, ac.x + Math.cos(a) * d, ac.z + Math.sin(a) * d, 6 + r() * 6, 6 + r() * 5, 4 + r() * 2, a, 0xb8ac90, H(ac.x + Math.cos(a) * d, ac.z + Math.sin(a) * d) - 1); }
     // ---- The temple ----
     const T = doricTemple();
     T.geo.translate(TC.x, TERR - 0.05, TC.z);
@@ -614,15 +613,11 @@ export default class Greece {
     this.fireSprites = this.fires.map((f, i) => { const sp = new THREE.Sprite(fm); sp.position.copy(f); sp.scale.setScalar(i === 2 ? 1.8 : 1.3); g.add(sp); return sp; });
     // a soft warm glow inside the open door (lamps burning by the statue of the god)
     const dg = new THREE.Sprite(glowMat('rgba(255,180,90,1)', 0.7)); dg.position.set(TC.x + T.cella.door - 1.5, TERR + T.base + 2.5, TC.z); dg.scale.set(4, 5, 1); g.add(dg);
-    // little lights in the town and on the temple
-    this.townLights = [];
-    const tm = glowMat('rgba(255,170,80,1)');
-    for (let i = 0; i < 26; i++) {
-      const a = r() * 6.28, d = i < 5 ? 30 : 100 + r() * 80, s = new THREE.Sprite(tm);
-      s.position.set(ac.x + Math.cos(a) * d, (i < 5 ? ay + 44 : H(ac.x + Math.cos(a) * d, ac.z + Math.sin(a) * d) + 2), ac.z + Math.sin(a) * d);
-      s.scale.setScalar(i < 5 ? 9 : 6); g.add(s);
-    }
-    this.acropolis = new THREE.Vector3(ac.x, ay + 50, ac.z);
+    // The city itself: walls and gate, the Long Wall to the sea, houses, the Agora, the Acropolis
+    const city = buildAthens({ H, temple: doricTemple, colonnade, avoid: (x, z) => Math.abs(x - TC.x) < TL / 2 + 12 && Math.abs(z - TC.z) < TW / 2 + 12 });
+    g.add(city.group); S.blockers.push(...city.blockers);
+    this.cityLights = city.torches; this.windowLights = city.windows;
+    this.acropolis = city.acropolis;
     g.add(tufts(4500, 9, (r2, p) => { at(r2() * 360, 2 + Math.pow(r2(), 1.4) * 50, 0, p); p.y = H(p.x, p.z); }, 0x5a6034, 0x9a8a58));
 
     // The lamp's light: a warm point light, the flame, and its glow on the wall
@@ -693,23 +688,14 @@ export default class Greece {
     S.g.add(buildGround(1200, 150, H, (x, y, z, c) => {
       c.copy(sand).lerp(sand2, N2(x / 14, z / 14));
       if (x > 26 && x < 78) c.lerp(green, clamp(1 - Math.abs(x - 52) / 26, 0, 1) * 0.85);  // fields along the river
-    }, (x, z) => Math.hypot(x - W.x, z - W.z) < 0.78));
+    }, (x, z) => Math.hypot(x - W.x, z - W.z) < 0.8));
     // The Nile
     const river = new THREE.Mesh(new THREE.PlaneGeometry(26, 2400), new THREE.MeshLambertMaterial({ color: 0x3a6a8a })); river.rotation.x = -Math.PI / 2; river.position.set(52, -0.9, 0); S.g.add(river);
     const k = new Kit(), r = rng(17);
-    // The well: a ring of stone around a deep shaft, water at the bottom
-    const prof = [[0.74, -8.2], [0.74, 0.55], [0.8, 0.62], [1.08, 0.62], [1.12, 0.5], [1.12, -0.05]].map(([x, y]) => new THREE.Vector2(x, y));
-    k.add(new THREE.LatheGeometry(prof, 24), 0xb09070, [W.x, 0, W.z]);
-    const shaft = new THREE.CylinderGeometry(0.75, 0.75, 8.2, 24, 8, true), sp = shaft.attributes.position, sc = new Float32Array(sp.count * 3);
-    for (let i = 0; i < sp.count; i++) { const t = (sp.getY(i) + 4.1) / 8.2; _col.setHex(0x9a7a5a).multiplyScalar(0.25 + 0.75 * t); sc.set([_col.r, _col.g, _col.b], i * 3); }
-    shaft.setAttribute('color', new THREE.BufferAttribute(sc, 3));
-    const sm = new THREE.Mesh(shaft, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })); sm.position.set(W.x, -4.1 + 0.02, W.z); S.g.add(sm);
-    const water = new THREE.Mesh(new THREE.CircleGeometry(0.75, 24), new THREE.MeshBasicMaterial({ color: 0x1a3040 })); water.rotation.x = -Math.PI / 2; water.position.set(W.x, -7.9, W.z); S.g.add(water);
-    this.glintSpr = new THREE.Sprite(glowMat('rgba(255,250,225,1)')); this.glintSpr.position.set(W.x, -7.85, W.z); this.glintSpr.scale.setScalar(1.1); S.g.add(this.glintSpr);
-    // a little wooden frame and bucket over the well
-    k.box(0.1, 1.8, 0.1, 0x6a4a2a, [W.x - 1.0, 0.9, W.z]); k.box(0.1, 1.8, 0.1, 0x6a4a2a, [W.x + 1.0, 0.9, W.z]); k.cyl(0.05, 0.05, 2.2, 6, 0x6a4a2a, [W.x, 1.75, W.z], [0, 0, Math.PI / 2]);
-    k.cyl(0.14, 0.11, 0.25, 8, 0x8a6a40, [W.x + 1.35, 0.13, W.z + 0.3]);
-    S.blockers.push({ x: W.x, z: W.z, r: 1.15 });
+    // The well: a waist-high round wall of dressed sandstone blocks in staggered courses, a
+    // capstone rim, a stone-lined shaft going down to the water, and a stone frame with a pulley
+    this.buildWell(S.g, k, W);
+    S.blockers.push({ x: W.x, z: W.z, r: 1.3 }, { x: W.x - 1.9, z: W.z + 1.5, r: 0.7 });
     // Mud-brick houses, palms along the river, rocks
     for (let i = 0; i < 16; i++) {
       const x = 12 + r() * 16, z = -40 + i * 5 + r() * 2;
@@ -725,6 +711,71 @@ export default class Greece {
     this.stickS = this.makeStick(S.g); this.stickS.userData.home = [W.x + 1.6, 0.04, W.z + 1.4, ...new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0.4)).toArray()];
     this.ringS = [W.x + 1.5, W.z - 0.2];
     S.start = { pos: new THREE.Vector3(1.6, 0, 1.3), look: W };
+  }
+
+  buildWell(g, k, W) {
+    const RI = 0.77, RO = 1.08, CH = 0.17, NC = 5, NB = 14, SAND = [0xc8a878, 0xb89868, 0xd2b286, 0xae8e60, 0xc0a070];
+    const r = rng(29);
+    // the mortar behind the blocks (a solid ring, so there are never any gaps to see through)
+    k.add(new THREE.CylinderGeometry(RO - 0.03, RO - 0.03, NC * CH, 28, 1, true), 0x7a6448, [W.x, NC * CH / 2, W.z]);
+    // the blocks: curved slabs, each a little different
+    for (let c = 0; c < NC; c++) for (let b = 0; b < NB; b++) {
+      const a0 = ((b + (c % 2) * 0.5) / NB) * Math.PI * 2 + 0.012, a1 = a0 + (Math.PI * 2) / NB - 0.024;
+      const ro = RO + (r() - 0.5) * 0.02, sh = new THREE.Shape();
+      sh.absarc(0, 0, ro, a0, a1, false); sh.absarc(0, 0, RI, a1, a0, true);
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: CH - 0.018, curveSegments: 3, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1 });
+      geo.rotateX(-Math.PI / 2);
+      k.add(geo, SAND[(r() * SAND.length) | 0], [W.x, c * CH + 0.02, W.z], 0, 1, 0.9 + r() * 0.15);
+    }
+    // the capstone rim, rounded on top, slightly overhanging both sides
+    const top = NC * CH;
+    const prof = [[RI - 0.05, top], [RI - 0.06, top + 0.06], [RI - 0.02, top + 0.11], [RO + 0.02, top + 0.11], [RO + 0.07, top + 0.06], [RO + 0.06, top]].map(([x, y]) => new THREE.Vector2(x, y));
+    prof.push(prof[0].clone());
+    k.add(new THREE.LatheGeometry(prof, 32), 0xdcc092, [W.x, 0, W.z]);
+    // a low stone step all round the foot of the well
+    const step = [[RO - 0.05, -0.05], [RO + 0.26, -0.05], [RO + 0.26, 0.09], [RO + 0.22, 0.13], [RO - 0.05, 0.13]].map(([x, y]) => new THREE.Vector2(x, y));
+    step.push(step[0].clone());
+    k.add(new THREE.LatheGeometry(step, 32), 0x9a8060, [W.x, 0, W.z]);
+    this.wellTop = top + 0.11;
+    // two square stone pillars on the rim carry a wooden beam with a pulley wheel
+    const PT = top + 0.11, PH = 1.55;
+    for (const sx of [-1, 1]) {
+      const x = W.x + sx * (RI + RO) / 2;
+      k.box(0.26, PH, 0.26, 0xc8a878, [x, PT + PH / 2, W.z]);
+      k.box(0.34, 0.1, 0.34, 0xdcc092, [x, PT + PH + 0.05, W.z]);
+    }
+    const BY = PT + PH + 0.17;
+    k.cyl(0.075, 0.075, 2.3, 8, 0x6a4a2a, [W.x, BY, W.z], [0, 0, Math.PI / 2]);
+    k.box(0.05, 0.22, 0.05, 0x5a3a22, [W.x - 0.06, BY - 0.13, W.z]); k.box(0.05, 0.22, 0.05, 0x5a3a22, [W.x + 0.06, BY - 0.13, W.z]);
+    k.cyl(0.17, 0.17, 0.07, 14, 0x7a5432, [W.x, BY - 0.27, W.z], [0, 0, Math.PI / 2]);
+    k.cyl(0.03, 0.03, 0.16, 6, 0x4a3020, [W.x, BY - 0.27, W.z], [0, 0, Math.PI / 2]);
+    // the rope runs over the wheel to a bucket resting on the rim, nearest us
+    const bucket = new THREE.Vector3(W.x + 0.3, PT, W.z + (RI + RO) / 2 - 0.02);
+    k.tube([[W.x, BY - 0.27, W.z + 0.17], [W.x + 0.1, BY - 0.9, W.z + 0.5], [bucket.x, PT + 0.5, bucket.z]], 0.012, 0xb8a070, 4);
+    k.cyl(0.15, 0.12, 0.26, 10, 0x7a5432, [bucket.x, PT + 0.13, bucket.z]);
+    k.cyl(0.155, 0.155, 0.03, 10, 0x4a3020, [bucket.x, PT + 0.22, bucket.z]); k.cyl(0.13, 0.13, 0.03, 10, 0x4a3020, [bucket.x, PT + 0.05, bucket.z]);
+    k.add(new THREE.TorusGeometry(0.13, 0.008, 4, 10, Math.PI), 0x4a3020, [bucket.x, PT + 0.26, bucket.z]);
+    // a stone water trough and two tall water jars beside the well
+    k.box(1.3, 0.5, 0.6, 0xb09070, [W.x - 1.9, 0.25, W.z + 1.5], [0, 0.5, 0]);
+    k.box(1.12, 0.04, 0.44, 0x2a4a5a, [W.x - 1.9, 0.48, W.z + 1.5], [0, 0.5, 0]);
+    for (const [dx, dz] of [[-1.55, -1.3], [-1.85, -0.95]]) {
+      k.cyl(0.2, 0.14, 0.6, 10, 0xa86a40, [W.x + dx, 0.3, W.z + dz]); k.ball(0.24, 1, 0xa86a40, [W.x + dx, 0.62, W.z + dz], 0, [1, 0.85, 1]);
+      k.cyl(0.09, 0.11, 0.16, 8, 0xa86a40, [W.x + dx, 0.86, W.z + dz]);
+    }
+    // inside: the shaft, lined with stone courses, getting darker the deeper you look
+    const sh = new THREE.CylinderGeometry(RI + 0.005, RI + 0.005, 8.2, 18, 36, true).toNonIndexed(), sp = sh.attributes.position, sc = new Float32Array(sp.count * 3);
+    for (let i = 0; i < sp.count; i += 3) {
+      let cy = 0, ca = 0;
+      for (let j = 0; j < 3; j++) { cy += sp.getY(i + j) / 3; ca += Math.atan2(sp.getZ(i + j), sp.getX(i + j)) / 3; }
+      const row = Math.floor((cy + 4.1) / 0.228), col = Math.floor(((ca + Math.PI) / (Math.PI * 2)) * 9 + (row % 2) * 0.5);
+      const t = (cy + 4.1) / 8.2, hsh = Math.abs(Math.sin(row * 12.9898 + col * 78.233) * 43758.5) % 1;
+      _col.setHex(SAND[(hsh * SAND.length) | 0]).multiplyScalar((0.12 + 0.88 * t * t) * 0.75);
+      for (let j = 0; j < 3; j++) sc.set([_col.r, _col.g, _col.b], (i + j) * 3);
+    }
+    sh.setAttribute('color', new THREE.BufferAttribute(sc, 3));
+    const sm = new THREE.Mesh(sh, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })); sm.position.set(W.x, -4.1 + 0.02, W.z); g.add(sm);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(RI, 24), new THREE.MeshBasicMaterial({ color: 0x1a3040 })); water.rotation.x = -Math.PI / 2; water.position.set(W.x, -7.9, W.z); g.add(water);
+    this.glintSpr = new THREE.Sprite(glowMat('rgba(255,250,225,1)')); this.glintSpr.position.set(W.x, -7.85, W.z); this.glintSpr.scale.setScalar(1.1); g.add(this.glintSpr);
   }
 
   makeStick(parent) {
@@ -1271,6 +1322,7 @@ export default class Greece {
     const ff = 1 + Math.sin(t * 9.1) * 0.08 + Math.sin(t * 5.3 + 1) * 0.07;
     this.templeLight.intensity = 30 * ff;
     this.fireSprites.forEach((sp, i) => sp.scale.setScalar((i === 2 ? 1.8 : 1.3) * (1 + Math.sin(t * 11 + i * 2) * 0.1)));
+    this.cityLights.material.size = 7 * (1 + Math.sin(t * 6.1) * 0.06 + Math.sin(t * 10.7) * 0.04);   // torches on the walls
     if (G.audio.ctx) {
       this.crackleT = (this.crackleT || 0) - dt;
       if (this.crackleT <= 0) { this.crackleT = 0.15 + Math.random() * 0.5; G.audio.noise(G.audio.out(this.fires[(Math.random() * 3) | 0], 0.25, 3), { type: 'highpass', f: 1500 + Math.random() * 2000, peak: 0.3, a: 0.002, d: 0.04 }); }
