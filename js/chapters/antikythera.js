@@ -63,7 +63,7 @@ export function seabedHeight(x, z) {
 
 // ---------- Shaders added to plain three.js materials ----------
 // Dancing light on the seafloor (caustics), on any lit material. The pattern sits in the world.
-function addCaustics(mat, uTime, strength = 1) {
+function addCaustics(mat, uTime, strength = 0.5) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
     sh.vertexShader = 'varying vec3 vCW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
@@ -77,7 +77,7 @@ function addCaustics(mat, uTime, strength = 1) {
         vec2 p = vCW.xz * 0.9; float t = uTime;
         float a = p.x * 1.6 + sin(p.y * 1.1 + t * 0.7) * 1.4 + sin(p.y * 0.43 - t * 0.4);
         float b = p.y * 1.6 + sin(p.x * 1.3 - t * 0.6) * 1.4 + sin(p.x * 0.51 + t * 0.3);
-        float c = pow(1.0 - abs(sin(a)), 7.0) + pow(1.0 - abs(sin(b)), 7.0);
+        float c = pow(1.0 - abs(sin(a)), 9.0) + pow(1.0 - abs(sin(b)), 9.0);
         vec3 upV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
         float facing = clamp(dot(normal, upV), 0.0, 1.0);
         outgoingLight += diffuseColor.rgb * vec3(0.55, 0.85, 0.9) * c * facing * ${strength.toFixed(2)};
@@ -284,7 +284,7 @@ function drawFront(g, w, h) {
   g.globalCompositeOperation = 'source-over';
 }
 function drawSpiral(g, cx, cy, rOf, aOf, months, ink) {
-  g.strokeStyle = ink; g.lineWidth = 3;
+  g.strokeStyle = ink; g.lineWidth = 5;
   for (const off of [-0.5, 0.5]) {
     g.beginPath();
     for (let m = 0; m <= months; m += 0.5) { const a = aOf(m), rr = (rOf(m) + off * 0.012) * PX; const x = cx + Math.sin(a) * rr, y = cy - Math.cos(a) * rr; if (m === 0) g.moveTo(x, y); else g.lineTo(x, y); }
@@ -300,10 +300,10 @@ function drawBack(g, w, h) {
   drawSpiral(g, toX(MET_C.x), toY(MET_C.y), metonicR, metonicA, METONIC, ink);
   drawSpiral(g, toX(SAR_C.x), toY(SAR_C.y), sarosR, sarosA, SAROS, ink);
   // eclipse signs on the lower spiral: Σ (Moon) and Η (Sun), in little boxes
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 15px Georgia, serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 19px Georgia, serif';
   ECLIPSES.forEach((m, i) => {
     const a = sarosA(m), rr = sarosR(m) * PX, x = toX(SAR_C.x) + Math.sin(a) * rr, y = toY(SAR_C.y) - Math.cos(a) * rr;
-    g.fillStyle = '#e8c070'; g.beginPath(); g.roundRect(x - 10, y - 10, 20, 20, 4); g.fill();
+    g.fillStyle = '#f2cf80'; g.beginPath(); g.roundRect(x - 12, y - 12, 24, 24, 5); g.fill();
     g.strokeStyle = ink; g.lineWidth = 2; g.stroke(); g.fillStyle = ink; g.fillText(i % 3 === 1 ? 'Η' : 'Σ', x, y + 1);
   });
   g.font = 'bold 30px Georgia, serif'; g.fillStyle = ink;
@@ -368,6 +368,9 @@ export default class Antikythera {
     this.clock = 0; this.phaseT = 0; this.lastPhase = '';
     this.sceneNow = null;
     this.waterFog = new THREE.FogExp2(0x0e4a5e, 0.034);
+    // The real sky over Antikythera (36° N) in spring 1901 (a daytime sky on the boat)
+    G.sky.setPlace?.({ lat: 35.9, year: 1901, sunLon: 30 });
+    G.sky.hideMoon?.();
     this.topBlk = [{ x: 0, z: -2.2, r: 0.12 }];
     this.seaBlk = [];
 
@@ -548,7 +551,7 @@ export default class Antikythera {
     // the flat rock (a slab of stone), top at waist height so you can pick the lump up without bending
     const gy = seabedHeight(ROCK.x, ROCK.z);
     this.rockTop = gy + 0.95;
-    const slab = lumpy(new THREE.CylinderGeometry(0.52, 0.7, 0.95, 10, 3), 444, 0.18, 2);
+    const slab = lumpy(new THREE.CylinderGeometry(0.52, 0.72, 0.95, 11, 4), 444, 0.32, 3);
     const sp = slab.attributes.position;
     for (let i = 0; i < sp.count; i++) if (sp.getY(i) > 0.4) sp.setY(i, 0.475);
     slab.computeVertexNormals();
@@ -778,7 +781,10 @@ export default class Antikythera {
     this.lumpGear = new THREE.Mesh(gearGeo(0.058, 56, 0.008), this.lumpGearMat);
     this.lumpGear.position.set(0.012, 0.005, 0.026);
     // crust half covering the wheel
-    const crust = new THREE.Mesh(lumpy(new THREE.SphereGeometry(0.05, 8, 6), 33, 0.6, 20), this.lumpMat);
+    const cg = lumpy(new THREE.SphereGeometry(0.05, 8, 6), 33, 0.6, 20), cc2 = new Float32Array(cg.attributes.position.count * 3);
+    for (let i = 0; i < cc2.length / 3; i++) { c.setHex(0x55806a).lerp(new THREE.Color(0x9ab08a), n(i * 0.7, i * 0.3) * 0.7); cc2.set([c.r, c.g, c.b], i * 3); }
+    cg.setAttribute('color', new THREE.BufferAttribute(cc2, 3));
+    const crust = new THREE.Mesh(cg, this.lumpMat);
     crust.scale.set(1.2, 0.8, 0.35); crust.position.set(-0.045, -0.035, 0.03);
     this.lump.add(this.lumpBody, this.lumpGear, crust);
     this.lumpRest = new THREE.Vector3(ROCK.x - 0.05, this.rockTop + 0.03, ROCK.z + 0.18);
@@ -827,7 +833,7 @@ export default class Antikythera {
     const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(0.15, PLATE_H), this.glassMat); glassPane.rotation.y = -Math.PI / 2; glassPane.position.x = -PLATE_W / 2 - 0.005; this.box.add(glassPane);
     // front and back plates with their dials
     const ftex = canvasTex(1024, Math.round(1024 * PLATE_H / PLATE_W), drawFront), btex = canvasTex(1024, Math.round(1024 * PLATE_H / PLATE_W), drawBack);
-    this.plateMats = [ftex, btex].map((map) => new THREE.MeshLambertMaterial({ map, transparent: true, opacity: 0, alphaTest: 0.02, emissive: 0x1a1206 }));
+    this.plateMats = [ftex, btex].map((map) => new THREE.MeshLambertMaterial({ map, transparent: true, opacity: 0, alphaTest: 0.02, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.4 }));
     const front = new THREE.Mesh(new THREE.PlaneGeometry(PLATE_W, PLATE_H), this.plateMats[0]); front.position.z = 0.078;
     const back = new THREE.Mesh(new THREE.PlaneGeometry(PLATE_W, PLATE_H), this.plateMats[1]); back.position.z = -0.078; back.rotation.y = Math.PI;
     this.box.add(front, back);
@@ -917,8 +923,8 @@ export default class Antikythera {
       onGrab(h) { h.crankA = self.handAngle(h.pos); self.cranking = h; },
       onHold(h) {
         const a = self.handAngle(h.pos), da = angleWrap(a - h.crankA);
-        if (Math.abs(da) > 0.004 && Math.abs(da) < 1.5) { G.act({ type: 'crank', amount: da / TAU }); h.crankA = a; }
-        else if (Math.abs(da) >= 1.5) h.crankA = a;
+        if (Math.abs(da) > 0.004 && Math.abs(da) < 2.5) { G.act({ type: 'crank', amount: da / TAU }); h.crankA = a; }
+        else if (Math.abs(da) >= 2.5) h.crankA = a;
       },
       onRelease(h) { if (self.cranking === h) self.cranking = null; },
       onMouse(h, dx, dy) { const amt = (dx + dy) * 0.0025; if (amt) G.act({ type: 'crank', amount: clamp(amt, -0.2, 0.2) }); },
@@ -986,7 +992,7 @@ export default class Antikythera {
     s.guide = [ROCK.x - 0.55, this.rockTop + 0.55, ROCK.z - 0.1];
     await D.say('ch6_04');
     hint(this.lumpIt, 8);
-    const got = await D.until(() => s.lump >= 1, fast ? 3 : 40);
+    const got = await D.until(() => s.lump >= 1, fast ? 15 : 40);
     if (!got) {
       // Nobody picked it up: bring everyone to the rock and lift it for them
       if (!near(STAND, 1.6)) { await G.ui.fadeOut(0.8); placeAll(STAND, 0); await G.ui.fadeIn(1); }
@@ -1042,7 +1048,7 @@ export default class Antikythera {
       G.world.height = seabedHeight; G.world.bounds = 22; G.world.blockers = this.seaBlk;
       G.audio.amb = 0;
       // Blue-green light from above; the sky's own lights are re-set by the next chapter
-      G.sky.hemi.color.setHex(0x8fdcf0); G.sky.hemi.groundColor.setHex(0x1a3a46); G.sky.hemi.intensity = 1.15;
+      G.sky.hemi.color.setHex(0x8fdcf0); G.sky.hemi.groundColor.setHex(0x1a3a46); G.sky.hemi.intensity = 0.95;
       G.sky.sunLight.color.setHex(0xc8f0ff); G.sky.sunLight.intensity = 1.5; G.sky.sunLight.position.set(6, 40, 8);
     } else {
       if (this.savedFog) { G.scene.fog = this.savedFog; this.savedFog = null; }
@@ -1230,14 +1236,14 @@ export default class Antikythera {
     this.knobGlow.material.opacity = this.knobV * (0.45 + 0.3 * Math.sin(t * 3.5));
     this.knobGlow.visible = this.knobV > 0.01;
     // The eclipse you found: its sign lights up, and above the machine the Moon covers the Sun
-    this.eclV = damp(this.eclV || 0, s.eclipse && s.phase !== 'journal' && s.phase !== 'done' ? 1 : 0, 1.5, dt);
+    this.eclV = damp(this.eclV || 0, s.eclipse && s.phase === 'eclipse' ? 1 : 0, 1.5, dt);
     if (s.eclM >= 0) { const a = sarosA(s.eclM), rr = sarosR(s.eclM); this.eclGlow.position.set(SAR_C.x - Math.sin(a) * rr, SAR_C.y + Math.cos(a) * rr, -0.09); }
     this.eclGlow.material.opacity = this.eclV * (0.7 + 0.3 * Math.sin(t * 5));
     this.eclGlow.visible = this.eclV > 0.01;
     this.eclipseFx.visible = this.eclV > 0.01;
     if (this.eclipseFx.visible) {
       G.camera.getWorldPosition(_a); this.eclipseFx.lookAt(_a);
-      this.eclSlide = s.eclipse ? Math.min(1, (this.eclSlide || 0) + dt / 3) : 0;
+      this.eclSlide = s.eclipse ? Math.min(1, (this.eclSlide || 0) + dt / 2) : 0;
       this.eclMoon.position.x = (1 - ease(this.eclSlide)) * 0.24;
       this.eclSun.material.opacity = this.eclV; this.eclMoon.material.opacity = this.eclV;
       this.corona.material.opacity = this.eclV * (0.25 + 0.75 * ease((this.eclSlide - 0.7) / 0.3));
