@@ -75,7 +75,7 @@ export default class Ch7Extras {
     this.space.sunDir.copy(this.right).multiplyScalar(-1).add(_a.set(0, 0.4, 0)).addScaledVector(this.fwd, -0.3).normalize();
     this.space.enter(this.ch.root);
     this.space.moon.visible = true; this.sputnik.visible = true; this.title.visible = true;
-    this.place(0);
+    this.finT = 0; this.place(0);
     rumble(G, 9, 0.7); whoosh(G, 7, 0.4);
     await G.ui.fadeIn(1.5);
     this.tl.after(4, () => awe(G, 22, 0.1, 82));
