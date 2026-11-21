@@ -14,6 +14,7 @@ import { Net } from './net/net.js';
 import { Music } from './music.js';
 import { Stargazing } from './stargazing.js';
 import { Soundscape } from './soundscape.js';
+import { Flight } from './flight.js';
 import { VERSION } from './version.js';
 
 const params = new URLSearchParams(location.search);
@@ -53,6 +54,7 @@ G.net = new Net(G);
 G.music = new Music(G);
 G.stargazing = new Stargazing(G);
 G.soundscape = new Soundscape(G);
+G.flight = new Flight(G);
 G.player.setupVR(renderer);
 
 // ---------- Settings on the title screen (remembered on this headset) ----------
@@ -222,12 +224,16 @@ function chapterEnded() {
     setTimeout(async () => {
       await G.ui.fadeOut(1.5);
       G.ui.subtitle('');
+      // build the next chapter while the screen is dark, then fly to it through the stars (js/flight.js)
+      if (G.isHost) {
+        chapterPick = next.n;
+        for (const b of chapList.children) b.classList.toggle('on', b.textContent.startsWith(next.n + '.'));
+        await G.director.load(next.n);
+      }
+      await G.flight.play(n, next.n);
       if (!G.isHost) return;          // friends follow the host into the next chapter
-      chapterPick = next.n;
-      for (const b of chapList.children) b.classList.toggle('on', b.textContent.startsWith(next.n + '.'));
-      await G.director.load(next.n);
       G.director.play();
-    }, 4500);
+    }, 3500);
     return;
   }
   if (n === 7) G.ui.subtitle('The end of Era 1: Watchers of the Sky. Thank you for watching the sky!', 'Era 2 is on the way.');
@@ -369,6 +375,7 @@ function tick() {
   if (G.mode) G.stargazing.update(dt);
   camera.getWorldDirection(_b); _c.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(_q));
   G.audio.setListener(_a, _b, _c, G.t);
-  renderer.render(scene, camera);
+  G.flight.update(dt);
+  renderer.render(G.flight.active ? G.flight.scene : scene, camera);
 }
 renderer.setAnimationLoop(tick);
