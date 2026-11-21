@@ -37,6 +37,7 @@ export class Director {
     G.interactables.length = 0;
     const mod = await info.load();
     this.chapter = new mod.default(G);
+    G.guide.follow(); G.guide.place();
     this.n = n; this.info = info;
     G.narration.preload(`ch${n}_`);
     return this.chapter;

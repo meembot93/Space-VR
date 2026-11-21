@@ -11,6 +11,7 @@ import { Director, CHAPTERS } from './chapters.js';
 import { makeWorld } from './world.js';
 import { Net } from './net/net.js';
 import { Music } from './music.js';
+import { Stargazing } from './stargazing.js';
 import { VERSION } from './version.js';
 
 const params = new URLSearchParams(location.search);
@@ -48,6 +49,7 @@ G.guide = new Guide(G);
 G.director = new Director(G);
 G.net = new Net(G);
 G.music = new Music(G);
+G.stargazing = new Stargazing(G);
 G.player.setupVR(renderer);
 
 // ---------- Settings on the title screen (remembered on this headset) ----------
@@ -76,7 +78,7 @@ choice('turning', 'turn', 'snap', (v) => { G.player.smoothTurn = v === 'smooth';
 choice('subs', 'subs', 'on', (v) => { G.ui.subsOn = v === 'on'; G.ui.subtitle(G.ui.subText || ''); });
 
 // Chapter list: only chapters that are built can be picked
-let chapterPick = Number(params.get('chapter')) || 2;
+let chapterPick = Number(params.get('chapter')) || CHAPTERS.find((c) => c.ready).n;
 const chapList = document.getElementById('chapters');
 for (const c of CHAPTERS) {
   const b = document.createElement('button');
@@ -150,7 +152,7 @@ G.events.on('placePlayers', (d) => placeMe(d));
 G.events.on('sfx', (d) => sfx(d.k));
 function sfx(k) {
   const A = G.audio;
-  if (k === 'boom') A.boom(null); else if (k === 'cheer') A.cheer(new THREE.Vector3(0, 1, -30)); else if (k === 'swell') A.swell(16); else if (k === 'page') A.page();
+  if (k === 'boom') A.boom(null); else if (k === 'cheer') A.cheer(new THREE.Vector3(0, 1, -30)); else if (k === 'swell') A.swell(16); else if (k === 'page') A.page(); else if (k === 'carve') A.carve(); else if (k === 'bell') A.bell(null, 1.2);
 }
 
 // ---------- Title screen, VR and desktop ----------
@@ -208,9 +210,22 @@ deskBtn.addEventListener('click', () => {
 });
 if (params.has('autostart')) deskBtn.click(); // testing
 
-// End of a chapter: a card in the headset (and on the page), then back to the title
+// End of a chapter: straight on to the next one if it's built, otherwise a card and back to the title
 function chapterEnded() {
-  const n = G.director.n;
+  const n = G.director.n, next = CHAPTERS.find((c) => c.n === n + 1 && c.ready);
+  if (next) {
+    G.ui.subtitle(`End of Chapter ${n}`, `Next: Chapter ${next.n}, ${next.title}`);
+    setTimeout(async () => {
+      await G.ui.fadeOut(1.5);
+      G.ui.subtitle('');
+      if (!G.isHost) return;          // friends follow the host into the next chapter
+      chapterPick = next.n;
+      for (const b of chapList.children) b.classList.toggle('on', b.textContent.startsWith(next.n + '.'));
+      await G.director.load(next.n);
+      G.director.play();
+    }, 4500);
+    return;
+  }
   G.ui.subtitle(`End of Chapter ${n}. Thank you for watching the sky!`, 'More chapters are on the way.');
   setTimeout(async () => {
     await G.ui.fadeOut(1.5);
@@ -328,7 +343,8 @@ function tick() {
   G.net.update(dt);
   G.ui.update(dt);
   camera.getWorldPosition(_a);
-  G.sky.update(dt, _a);
+  G.sky.update(dt, _a, G.t);
+  if (G.mode) G.stargazing.update(dt);
   camera.getWorldDirection(_b); _c.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(_q));
   G.audio.setListener(_a, _b, _c, G.t);
   renderer.render(scene, camera);

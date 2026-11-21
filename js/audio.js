@@ -118,6 +118,34 @@ export class Sound {
     this.noise(o, { type: 'highpass', f: 1800, f2: 4000, peak: 0.4, a: 0.03, d: 0.25 });
     this.noise(o, { type: 'bandpass', f: 900, peak: 0.25, a: 0.05, d: 0.2, t0: 0.12 });
   }
+  // Campfire: a single crackle or pop
+  crackle(pos) {
+    if (!this.ctx) return; const o = this.out(pos, 0.35, 2);
+    this.noise(o, { type: 'highpass', f: 1500 + Math.random() * 3000, peak: 0.2 + Math.random() * 0.5, a: 0.001, d: 0.02 + Math.random() * 0.05 });
+    if (Math.random() < 0.3) this.noise(o, { type: 'bandpass', f: 300, q: 1, peak: 0.25, a: 0.005, d: 0.25 });
+  }
+  // Flint scraping a groove into bone
+  carve() {
+    if (!this.ctx) return; const o = this.out(null, 0.5);
+    for (let i = 0; i < 3; i++) this.noise(o, { type: 'bandpass', f: 2600 + i * 400, f2: 1800, q: 4, peak: 0.35, a: 0.01, d: 0.12, t0: i * 0.13 });
+  }
+  // A wolf far away (a long sliding howl)
+  howl(pos) {
+    if (!this.ctx) return; const o = this.out(pos, 0.35, 40, 0.4);
+    this.tone(o, { type: 'triangle', f: 420, f2: 610, peak: 0.12, a: 0.6, d: 0.9 });
+    this.tone(o, { type: 'triangle', f: 610, f2: 380, peak: 0.12, a: 0.05, d: 2.2, t0: 1.4 });
+  }
+  // A bronze bell or gong being struck
+  bell(pos, vol = 1) {
+    if (!this.ctx) return; const o = this.out(pos, vol, 6);
+    [[220, 0.5, 4], [440 * 1.19, 0.25, 3], [660 * 1.07, 0.15, 2.2], [1010, 0.1, 1.4], [1480, 0.06, 0.9]].forEach(([f, p, d]) => this.tone(o, { f, peak: p, a: 0.002, d }));
+    this.noise(o, { type: 'bandpass', f: 2500, q: 2, peak: 0.2, a: 0.001, d: 0.08 });
+  }
+  // Water lapping on a river bank
+  lap(pos) {
+    if (!this.ctx) return; const o = this.out(pos, 0.25, 4);
+    this.noise(o, { type: 'lowpass', f: 600, f2: 300, peak: 0.3, a: 0.15, d: 0.6 });
+  }
   // A swelling warm pad for the sunrise moment (synth, no voice)
   swell(dur = 12) {
     if (!this.ctx) return; const c = this.ctx, t = c.currentTime, o = this.out(null, 0.12);

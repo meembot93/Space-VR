@@ -41,6 +41,60 @@ const DRAW = {
     g.fillText('Midsummer sunrise, through the gap', 40, h - 40);
     g.font = 'bold 28px Georgia, serif'; g.fillText('N ↑', w - 90, 70);
   },
+  // Chapter 1: the tally bone with 29 marks, and the Moon's phases above it
+  campfire(g, w, h) {
+    parchment(g, w, h);
+    const ink = '#3a2a18';
+    g.fillStyle = ink; g.font = 'italic bold 44px Georgia, serif'; g.textAlign = 'left';
+    g.fillText('The first calendar, 30,000 years ago', 40, 70);
+    // phases: new, crescent, half, gibbous, full, and back
+    const ph = [0.04, 0.12, 0.25, 0.37, 0.5, 0.63, 0.75, 0.88, 0.96];
+    ph.forEach((p, i) => {
+      const x = 120 + i * 98, y = 210, r = 34, waxing = p < 0.5, k = Math.cos(p * 2 * Math.PI), side = waxing ? 1 : -1;
+      g.strokeStyle = ink; g.lineWidth = 2; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
+      g.fillStyle = '#e8c860'; g.beginPath();
+      for (let j = 0; j <= 24; j++) { const a = -Math.PI / 2 + Math.PI * j / 24; g.lineTo(x + side * Math.cos(a) * r, y + Math.sin(a) * r); }
+      for (let j = 24; j >= 0; j--) { const a = -Math.PI / 2 + Math.PI * j / 24; g.lineTo(x + side * k * Math.cos(a) * r, y + Math.sin(a) * r); }
+      g.fill();
+    });
+    // the bone
+    g.fillStyle = '#efe4c8'; g.strokeStyle = ink; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(90, 400); g.quadraticCurveTo(w / 2, 340, w - 90, 400); g.lineTo(w - 90, 450); g.quadraticCurveTo(w / 2, 390, 90, 450); g.closePath(); g.fill(); g.stroke();
+    for (let i = 0; i < 29; i++) {
+      const t = 0.06 + i / 28 * 0.88, x = 90 + t * (w - 180), y = 425 - Math.sin(t * Math.PI) * 30;
+      g.beginPath(); g.moveTo(x, y - 18); g.lineTo(x + 2, y + 16); g.stroke();
+    }
+    g.font = 'italic 32px Georgia, serif'; g.fillText('29 marks: one round of the Moon', 40, h - 100);
+    g.fillText('New, growing, full, shrinking... and new again', 40, h - 50);
+  },
+  // Chapter 3: Sirius rising before the Sun, the flooding Nile, and the three seasons
+  nile(g, w, h) {
+    parchment(g, w, h);
+    const ink = '#3a2a18';
+    g.fillStyle = ink; g.font = 'italic bold 44px Georgia, serif'; g.textAlign = 'left';
+    g.fillText('Egypt, about 2500 BC: a new year', 40, 70);
+    // horizon, the Sun's glow, Sirius just above it
+    g.strokeStyle = ink; g.lineWidth = 3; g.beginPath(); g.moveTo(60, 330); g.lineTo(w - 60, 330); g.stroke();
+    const gr = g.createRadialGradient(640, 330, 0, 640, 330, 130); gr.addColorStop(0, 'rgba(230,150,60,0.8)'); gr.addColorStop(1, 'rgba(230,150,60,0)');
+    g.fillStyle = gr; g.fillRect(500, 200, 280, 130);
+    g.fillStyle = '#3a4a8a'; g.save(); g.translate(560, 250);
+    for (let i = 0; i < 4; i++) { g.rotate(Math.PI / 4); g.fillRect(-3, -22, 6, 44); }
+    g.restore();
+    g.fillStyle = ink; g.font = 'italic 28px Georgia, serif'; g.fillText('Sirius (Sopdet) returns', 600, 250);
+    // pyramids on the left, the river with waves
+    g.fillStyle = '#b89a60'; for (const [x, s] of [[120, 70], [210, 55], [280, 40]]) { g.beginPath(); g.moveTo(x - s, 330); g.lineTo(x, 330 - s * 1.2); g.lineTo(x + s, 330); g.fill(); }
+    g.strokeStyle = '#3a6a9a'; g.lineWidth = 3;
+    for (let row = 0; row < 3; row++) { g.beginPath(); for (let x = 60; x < w - 60; x += 10) g.lineTo(x, 370 + row * 18 + Math.sin(x / 18 + row) * 5); g.stroke(); }
+    // three seasons
+    const names = ['Flood', 'Growing', 'Harvest'], cols = ['#3a6a9a', '#4a7a3a', '#c09a40'];
+    names.forEach((n, i) => {
+      const x = 120 + i * 290;
+      g.fillStyle = cols[i]; g.fillRect(x, 470, 230, 70);
+      g.fillStyle = '#f4ead2'; g.font = 'bold 34px Georgia, serif'; g.textAlign = 'center'; g.fillText(n, x + 115, 516);
+    });
+    g.textAlign = 'left'; g.fillStyle = ink; g.font = 'italic 32px Georgia, serif';
+    g.fillText('365 days, three seasons of four months', 40, h - 50);
+  },
 };
 
 export function makeJournalPage(kind) {
