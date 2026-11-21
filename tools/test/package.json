@@ -3,12 +3,13 @@
   "private": true,
   "description": "Headset emulator tests: run each built chapter in Chromium with Meta's IWER WebXR emulator (a virtual Quest 3).",
   "scripts": {
-    "test": "node vr-test.js && node ch1-test.js && node ch3-test.js && node ch4-test.js && node ch7-test.js && node ch6-test.js && node kids-test.js",
+    "test": "node vr-test.js && node ch1-test.js && node ch3-test.js && node ch4-test.js && node ch7-test.js && node ch6-test.js && node ch5-test.js && node kids-test.js",
     "test:kids": "node kids-test.js",
     "test:ch3": "node ch3-test.js",
     "test:ch4": "node ch4-test.js",
     "test:ch7": "node ch7-test.js",
-    "test:ch6": "node ch6-test.js"
+    "test:ch6": "node ch6-test.js",
+    "test:ch5": "node ch5-test.js"
   },
   "devDependencies": {
     "iwer": "2.8.0"
