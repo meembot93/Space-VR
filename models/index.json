@@ -48,5 +48,30 @@
   "file": "chinese_astronomer.glb",
   "height": 1.7,
   "turn": 0
+ },
+ "architect": {
+  "file": "egyptian_architect.glb",
+  "height": 1.7,
+  "turn": 0
+ },
+ "instrument_maker": {
+  "file": "instrument_maker.glb",
+  "height": 1.72,
+  "turn": 0
+ },
+ "villager": {
+  "file": "egyptian_villager.glb",
+  "height": 1.7,
+  "turn": 0
+ },
+ "sailor": {
+  "file": "sponge_crew.glb",
+  "height": 1.76,
+  "turn": 0
+ },
+ "builder_far": {
+  "file": "stonehenge_builder_far.glb",
+  "height": 1.75,
+  "turn": 0
  }
 }

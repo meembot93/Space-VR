@@ -426,7 +426,7 @@ export default class Stonehenge {
     for (let i = 0; i < 7; i++) {
       // standing either side of the sunrise line, so nobody blocks the view through the gap
       const p = at(AXIS + (i < 4 ? -16 - i * 5 : 16 + (i - 4) * 5) + (r() - 0.5) * 2, 30 + r() * 6);
-      add(p, Math.atan2(-p.x, -p.z), { tunic: 0x8a7a64 }, 'crowd');
+      add(p, Math.atan2(-p.x, -p.z), { tunic: 0x8a7a64, model: 'builder_far' }, 'crowd');   // ~30 m away: the light model
     }
     // each person is a small round obstacle that moves with them (updated every frame)
     for (const P of this.people) { P.blk = { x: 0, z: 0, r: 0.3 }; G.world.blockers.push(P.blk); }
@@ -506,7 +506,8 @@ export default class Stonehenge {
     // families with torches, coming out from the village to the stones before dawn
     const route = [along(130, 4), along(95, 2), along(60, -2), along(25, -16), at(AXIS - 34, 40), at(AXIS - 30, 33)];
     for (let i = 0; i < 6; i++) {
-      const P = makePerson({ model: 'builder', seed: 320 + i * 9, tunic: [0x8a7a64, 0x7a6a50, 0x9a8466][i % 3], height: i === 4 ? 1.3 : 1.7 + (i % 2) * 0.08 });
+      const P = makePerson({ model: 'builder_far', seed: 320 + i * 9,   // seen from far off, so the light model
+        tunic: [0x8a7a64, 0x7a6a50, 0x9a8466][i % 3], height: i === 4 ? 1.3 : 1.7 + (i % 2) * 0.08 });
       const k = 1 + Math.floor(i / 2), p = route[k];
       const off = (i % 2 ? 1 : -1) * 0.7, back = (i % 2) * 1.4;
       P.g.position.set(p.x + off, groundHeight(p.x, p.z), p.z + back); this.root.add(P.g);

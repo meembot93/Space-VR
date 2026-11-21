@@ -1,0 +1,13 @@
+{
+  "name": "starward-model-tools",
+  "private": true,
+  "description": "Makes first-pass character models by reworking Meem's Tripo models (node derive.mjs).",
+  "type": "module",
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5"
+  }
+}
