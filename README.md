@@ -87,6 +87,19 @@ the same place, hears Aristarchus, and touches the last journal page.
 `node shot.js <chapter> <line id> <secs> <az> <el> out.png` saves a screenshot of a moment (SLOW=1 lets
 lines play at real speed after that line; LOOK='js' points the view at something). `node trace.js <chapter>`
 prints each narration line as the chapter plays itself.
+`node audit-shots.js <chapter> <dir>` plays a chapter in Kids mode and saves two screenshots per narration
+line, to check that what's on screen matches what Astra is saying.
+
+## Scenes that act out the story
+
+- `D.cue('a word')` in a chapter's `run()` waits until the current line reaches that word, so the
+  scene changes right as Astra says it (`const l = D.sayAsync('ch1_08'); await D.cue('walk by'); ...; await l;`).
+- `js/people.js` poses: idle, pull, point, cheer, walk, talk, gasp, wave, work, carry, hold, write, beckon.
+  `P.look` turns a head toward a point, `P.glance` makes someone look at you now and then,
+  `walkToward` / `runRoutine` walk people around, `holdProp` puts a prop in a hand.
+  `tools/lineup.html?model=builder&look&animals` previews them all.
+- `js/life.js`: herds (reindeer, horses, goats, sheep, cows, donkeys, dogs, ibis), bird flocks,
+  dolphins, fish, smoke, cloth, torches. Each is one or two draw calls.
 
 ## Version number (please keep it up to date)
 
