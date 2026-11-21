@@ -54,11 +54,14 @@ export class Space {
     this.hidden = hide || null; if (hide) { this.wasVisible = hide.visible; hide.visible = false; }
     this.group.visible = true; this.on = true;
     this.G.sky.mist = 0;
+    this.G.soundscape?.setLevel(0);   // no crickets or waves out in space
   }
   exit() {
+    if (!this.on) return;
     if (this.hidden) this.hidden.visible = this.wasVisible ?? true;
     this.hidden = null; this.group.visible = false; this.on = false;
     this.G.sky.uni.milky.value = 1;
+    this.G.soundscape?.setLevel(1);
   }
 
   // Every frame while it's showing (after the chapter's own update, so the night sky wins)

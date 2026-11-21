@@ -65,7 +65,7 @@ export default class Ch7Extras {
   extra(d) { if (d.k === 'finale') this.finale(); }
 
   async finale() {
-    const G = this.G; this.finT = 0; this.fin = true;
+    const G = this.G; this.finT = 0; this.fin = true; this.cam = null;
     await G.ui.fadeOut(1.2);
     G.skyFigures.stopAll();
     // you're just above the Earth: it fills the view below you, the Moon far ahead
@@ -86,6 +86,7 @@ export default class Ch7Extras {
 
   // Where everything is, T seconds into the flight (you stay still; the worlds move past you)
   place(T) {
+    if (!this.cam) return;
     const c = this.cam, f = this.fwd, r = this.right;
     // the Earth drops away below and a little ahead, shrinking to a ball
     const up = ease(T / 18) * 0.85 + (T / 40) * 0.15;
