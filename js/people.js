@@ -85,19 +85,42 @@ function aimBone(bone, child, want, k) {
   _bq.premultiply(_pq);
   bone.quaternion.slerp(_bq, k);
 }
-const _arm = new THREE.Vector3();
+const _arm = new THREE.Vector3(), _fore = new THREE.Vector3(), _hp = new THREE.Vector3(), _fq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _ax = new THREE.Vector3();
+// Arm directions for each pose, in the figure's own space (x its right, y up, z forward):
+// [left upper arm, right upper arm] and optionally [left forearm, right forearm] (else straight).
+// w = the walk cycle, t = time, ph = this person's own phase.
+function armDirs(pose, t, ph, w) {
+  const sw = Math.sin(w), b = Math.sin(t * 2.6);
+  switch (pose) {
+    case 'pull': return [[[0.12, -0.3 - 0.15 * b, 1], [-0.12, -0.35 - 0.15 * b, 1]]];
+    case 'cheer': return [[[-0.5, 1, 0.15], [0.5, 1, 0.15]]];
+    case 'point': return [[[-0.18, -1, 0.05], null]];
+    case 'walk': return [[[-0.15, -1, 0.35 * sw], [0.15, -1, -0.35 * sw]], [[-0.1, -1, 0.35 * sw + 0.25], [0.1, -1, -0.35 * sw + 0.25]]];
+    case 'talk': { // explaining: hands open in front, moving with the words
+      const a = Math.sin(ph * 2.3 + t * 2.1), c = Math.sin(ph + t * 1.6);
+      return [[[-0.3, -0.75, 0.45 + 0.15 * c], [0.3, -0.7 + 0.1 * a, 0.5]], [[-0.35, -0.1 + 0.15 * c, 1], [0.3, 0.05 + 0.2 * a, 1]]];
+    }
+    case 'gasp': return [[[-0.3, -0.45, 0.9], [0.3, -0.45, 0.9]], [[0.35, 1, 0.35], [-0.35, 1, 0.35]]];   // hands up to the face
+    case 'wave': return [[[-0.18, -1, 0.05], [0.75, 0.35, 0.25]], [null, [0.25 + 0.45 * Math.sin(t * 7 + ph), 1, 0.25]]];
+    case 'work': { // hoeing, digging, scrubbing: both arms down in front, swinging together
+      const k = Math.sin(t * 2.2 + ph);
+      return [[[0.08, -0.55 + 0.35 * k, 1], [-0.08, -0.6 + 0.35 * k, 1]], [[0.15, -0.9 + 0.3 * k, 0.6], [-0.15, -0.9 + 0.3 * k, 0.6]]];
+    }
+    case 'carry': return [[[-0.6, 0.55, 0.1], [0.6, 0.55, 0.1]], [[0.3, 1, 0], [-0.3, 1, 0]]];   // a jar or a bundle on the head
+    case 'hold': return [[[-0.2, -0.75, 0.6], [0.2, -0.75, 0.6]], [[0.35, -0.05, 1], [-0.35, -0.05, 1]]];   // holding something up in front
+    case 'write': { const k = Math.sin(t * 5 + ph) * 0.08; return [[[-0.2, -0.75, 0.55], [0.25, -0.8, 0.5]], [[0.35, -0.2, 1], [-0.25 + k, -0.45, 1]]]; }
+    case 'beckon': return [[[-0.18, -1, 0.05], [0.35, -0.4, 0.9]], [null, [0.1, 0.35 + 0.5 * Math.max(0, Math.sin(t * 5 + ph)), 1]]];
+    default: return [[[-0.18, -1, 0.05], [0.18, -1, 0.05]]];
+  }
+}
 function poseRig(P, t, dt) {
-  const { bones: B, rest } = P.rig, ph = P.phase + t, k = Math.min(1, dt * 6);
-  for (const [b, q] of rest) if (b === B.Spine || b === B.Hips) b.quaternion.copy(q);
-  // A gentle lean (hauling leans back)
-  if (B.Spine) B.Spine.rotateX(P.pose === 'pull' ? -0.25 - 0.1 * Math.sin(t * 2.6) : Math.sin(ph * 0.7) * 0.02);
+  const { bones: B, rest } = P.rig, ph = P.phase + t;
+  for (const [b, q] of rest) if (b === B.Spine || b === B.Hips || b === B.Neck || b === B.Head) b.quaternion.copy(q);
+  // A gentle lean (hauling leans back, working bends forward, gasping rocks back)
+  if (B.Spine) B.Spine.rotateX(P.pose === 'pull' ? -0.25 - 0.1 * Math.sin(t * 2.6) : P.pose === 'work' ? 0.3 + 0.08 * Math.sin(t * 2.2 + P.phase) : P.pose === 'gasp' ? -0.12 : Math.sin(ph * 0.7) * 0.02);
   P.inner.updateWorldMatrix(true, false);
-  const dirs = { // [left, right] in the figure's own space
-    idle: [[-0.18, -1, 0.05], [0.18, -1, 0.05]],
-    pull: [[0.12, -0.3 - 0.15 * Math.sin(t * 2.6), 1], [-0.12, -0.35 - 0.15 * Math.sin(t * 2.6), 1]],
-    cheer: [[-0.5, 1, 0.15], [0.5, 1, 0.15]],
-    point: [[-0.18, -1, 0.05], null],
-  }[P.pose] || [[-0.18, -1, 0.05], [0.18, -1, 0.05]];
+  const w = P.stride || 0;
+  const [dirs, fores] = armDirs(P.pose, t, P.phase, w);
   ['Left', 'Right'].forEach((side, i) => {
     const up = B[side + 'Arm'], fore = B[side + 'ForeArm'], hand = B[side + 'Hand'];
     if (!up || !fore) return;
@@ -107,10 +130,94 @@ function poseRig(P, t, dt) {
     else { up.getWorldPosition(_w0); _arm.subVectors(P.pointAt, _w0).normalize(); }
     if (P.pose === 'cheer') _arm.applyAxisAngle(_w0.set(0, 0, 1).transformDirection(P.inner.matrixWorld), Math.sin(ph * 7 + i) * 0.2 * (i ? 1 : -1));
     aimBone(up, fore, _arm, 1);
-    if (hand) aimBone(fore, hand, _arm, 1);
+    const f = fores?.[i];
+    if (f) _fore.set(-f[0], f[1], f[2]).normalize().transformDirection(P.inner.matrixWorld); else _fore.copy(_arm);
+    if (hand) aimBone(fore, hand, _fore, 1);
   });
-  // the "bob" for cheering
-  P.inner.position.y = P.pose === 'cheer' ? Math.max(0, Math.sin(ph * 5)) * 0.12 : 0;
+  // Legs: a walking stride (rest otherwise)
+  ['Left', 'Right'].forEach((side, i) => {
+    const up = B[side + 'UpLeg'], low = B[side + 'Leg'], foot = B[side + 'Foot'];
+    if (!up || !low) return;
+    up.quaternion.copy(rest.get(up)); low.quaternion.copy(rest.get(low));
+    if (P.pose !== 'walk' || !foot) return;
+    const s = Math.sin(w + i * Math.PI), lift = Math.max(0, Math.cos(w + i * Math.PI));
+    _arm.set(0, -1, 0.42 * s).normalize().transformDirection(P.inner.matrixWorld);
+    aimBone(up, low, _arm, 1);
+    _fore.set(0, -1, 0.42 * s - 0.55 * lift).normalize().transformDirection(P.inner.matrixWorld);
+    aimBone(low, foot, _fore, 1);
+  });
+  // Head: turn toward whatever they're looking at (P.look), within what a neck can do
+  lookHead(P, dt);
+  // the "bob" for cheering and walking
+  P.inner.position.y = P.pose === 'cheer' ? Math.max(0, Math.sin(ph * 5)) * 0.12 : P.pose === 'walk' ? Math.abs(Math.sin(w)) * 0.035 : 0;
+}
+
+// Where a person looks: P.look (a world point), or, if P.glance is on, now and then at you
+// when you're close (people glance at the visitor). Turns the neck smoothly.
+export const VIEW = { cam: null };
+function lookHead(P, dt) {
+  const B = P.rig.bones, neck = B.Neck || B.Head;
+  if (!neck) return;
+  let tgt = P.look;
+  if (!tgt && P.glance && VIEW.cam) {
+    P.watchT = (P.watchT ?? P.phase * 2) - dt;
+    if (P.watchT < 0) P.watchT += 9 + (P.phase % 5);
+    VIEW.cam.getWorldPosition(_hp);
+    if (P.watchT < 4 && P.g.position.distanceTo(_hp) < 10) tgt = _hp;
+  }
+  let yaw = 0, pitch = 0;
+  if (tgt) {
+    neck.getWorldPosition(_w0);
+    _d.subVectors(tgt, _w0).transformDirection(_m4.copy(P.inner.matrixWorld).invert());
+    yaw = Math.max(-1.1, Math.min(1.1, Math.atan2(_d.x, _d.z)));
+    pitch = Math.max(-0.5, Math.min(0.75, Math.atan2(_d.y, Math.hypot(_d.x, _d.z))));
+    if (Math.abs(Math.atan2(_d.x, _d.z)) > 2.2) yaw = pitch = 0;   // right behind them: don't twist
+  }
+  const k = 1 - Math.exp(-dt * 4);
+  P.hYaw = (P.hYaw || 0) + (yaw - (P.hYaw || 0)) * k;
+  P.hPitch = (P.hPitch || 0) + (pitch - (P.hPitch || 0)) * k;
+  if (Math.abs(P.hYaw) + Math.abs(P.hPitch) < 1e-3) return;
+  // rotate the neck in the world about the figure's own up and right axes
+  P.inner.getWorldQuaternion(_fq);
+  _rq.setFromAxisAngle(_ax.set(0, 1, 0), P.hYaw).multiply(_q.setFromAxisAngle(_ax.set(1, 0, 0), -P.hPitch));
+  _rq.premultiply(_fq).multiply(_q.copy(_fq).invert());
+  neck.getWorldQuaternion(_bq); _bq.premultiply(_rq);
+  neck.parent.getWorldQuaternion(_pq).invert();
+  neck.quaternion.copy(_bq.premultiply(_pq));
+}
+const _m4 = new THREE.Matrix4();
+
+// Walk a person toward (x, z) for this frame: turns to face the way they go, strides, and stands
+// on the ground (height(x, z), optional). Returns true once they've arrived.
+export function walkToward(P, x, z, dt, { speed = 1.1, height = null, stop = 0.15 } = {}) {
+  const g = P.g.position, dx = x - g.x, dz = z - g.z, d = Math.hypot(dx, dz);
+  if (d < stop) { if (P.pose === 'walk') P.pose = 'idle'; return true; }
+  const want = Math.atan2(dx, dz);
+  let dy = want - P.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  P.g.rotation.y += dy * Math.min(1, dt * 5);
+  const step = Math.min(d, speed * dt * (Math.abs(dy) > 1.2 ? 0.3 : 1));
+  g.x += dx / d * step; g.z += dz / d * step;
+  if (height) g.y = height(g.x, g.z);
+  P.pose = 'walk'; P.stride = (P.stride || 0) + step / (0.62 * (P.H || 1)) * Math.PI;
+  if (P.blk) { P.blk.x = g.x; P.blk.z = g.z; }
+  return false;
+}
+
+// A daily round for a background person: walk from stop to stop and do something at each one.
+// P.routine = [{ x, z, pose: 'work', secs: 6, face: yaw (optional), look: Vector3 (optional) }, ...]
+// Call every frame. (Chapters can override P.pose afterwards for story moments.)
+export function runRoutine(P, dt, opts) {
+  const R = P.routine; if (!R?.length) return;
+  P.ri ??= 0; P.rt ??= 0;
+  const st = R[P.ri % R.length];
+  if (P.rt <= 0) {
+    if (walkToward(P, st.x, st.z, dt, { speed: st.speed || 1.0, ...opts })) { P.rt = st.secs ?? 4; }
+    P.look = null;
+    return;
+  }
+  P.rt -= dt; P.pose = st.pose || 'idle'; P.look = st.look || null;
+  if (st.face != null) { let dy = st.face - P.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); P.g.rotation.y += dy * Math.min(1, dt * 3); }
+  if (P.rt <= 0) { P.ri++; P.rt = 0; }
 }
 
 // Move a figure for this frame: t = game time
@@ -134,6 +241,17 @@ export function animatePerson(P, t, dt) {
       set(L, -1.25 - 0.25 * beat, 0.12); set(R, -1.15 - 0.25 * beat, -0.12);
       break;
     }
+    case 'walk': {
+      const sw = Math.sin(P.stride || 0);
+      P.inner.position.y = Math.abs(sw) * 0.035;
+      set(L, 0.4 * sw, -0.08); set(R, -0.4 * sw, 0.08);
+      break;
+    }
+    case 'talk': case 'hold': case 'write': case 'beckon': set(L, -0.9 + 0.15 * Math.sin(ph * 2.1), -0.15); set(R, -1.0 + 0.2 * Math.sin(ph * 2.7), 0.15); break;
+    case 'work': { const k = Math.sin(t * 2.2 + P.phase); P.inner.rotation.x = 0.3; set(L, -0.8 + 0.4 * k, 0.1); set(R, -0.8 + 0.4 * k, -0.1); break; }
+    case 'gasp': P.inner.rotation.x = -0.1; set(L, -2.4, -0.3); set(R, -2.4, 0.3); break;
+    case 'carry': set(L, -0.3, -2.7); set(R, -0.3, 2.7); break;
+    case 'wave': set(L, 0, -0.08); set(R, -0.2, 2.4 + Math.sin(t * 7) * 0.4); break;
     case 'cheer': {
       const j = Math.max(0, Math.sin(ph * 5));
       P.inner.position.y = j * 0.12;
@@ -146,3 +264,28 @@ export function animatePerson(P, t, dt) {
     }
   }
 }
+
+// Put a prop (a bone, a reed, a jar, a torch) in someone's hand. It follows the hand as they move.
+// side: 'Right' or 'Left'. Works on Meem's rigged models and on the stand-ins (end of the arm).
+// The prop's own +y points out along the fingers; offset nudges it in the hand's space (metres).
+export function holdProp(P, obj, side = 'Right', offset = [0, 0.08, 0.03]) {
+  P.props ||= {};
+  P.props[side] = { obj, side, offset };
+  const put = () => {
+    const hand = P.rig?.bones[side + 'Hand'];
+    if (hand) {
+      // bones are scaled with the model: undo that so the prop keeps its real size
+      hand.add(obj); hand.updateWorldMatrix(true, false);
+      const ws = new THREE.Vector3(); hand.getWorldScale(ws); const gs = new THREE.Vector3(); P.g.getWorldScale(gs);
+      obj.scale.setScalar(gs.x / ws.x); obj.position.set(...offset).multiplyScalar(gs.x / ws.x);
+    } else {
+      const arm = P.arms[side === 'Right' ? 1 : 0]; arm.add(obj); obj.position.set(0, -0.66, 0.03); obj.scale.setScalar(1 / P.H);
+      obj.rotation.set(Math.PI, 0, 0);
+    }
+  };
+  put();
+  // when Meem's model finishes loading, move the prop over to its hand
+  if (!P.rig) { const iv = setInterval(() => { if (P.rig) { clearInterval(iv); put(); } else if (!P.g.parent) clearInterval(iv); }, 300); }
+  return obj;
+}
+export function dropProp(P, side = 'Right') { const p = P.props?.[side]; if (p) { p.obj.parent?.remove(p.obj); delete P.props[side]; } }

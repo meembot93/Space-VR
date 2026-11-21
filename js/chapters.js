@@ -31,6 +31,9 @@ export const CHAPTERS = [
   { n: 7, title: 'Ptolemy’s spinning sky', ready: true, load: () => import('./chapters/ptolemy.js') },
 ];
 
+import { VIEW } from './people.js';
+import { LINES } from './script.js';
+
 class Stop extends Error {}
 
 export class Director {
@@ -40,7 +43,7 @@ export class Director {
   async load(n) {
     const G = this.G, info = CHAPTERS.find((c) => c.n === n);
     if (!info?.ready) throw new Error('Chapter ' + n + ' is not built yet');
-    this.stop();
+    this.stop(); VIEW.cam = G.camera;
     G.extras?.dispose();
     if (this.chapter) { this.chapter.dispose(); this.chapter = null; }
     G.interactables.length = 0;
@@ -81,6 +84,14 @@ export class Director {
       }).then((r) => { check(); return r; }),
       // say a line while something else happens: returns the promise without waiting
       sayAsync: (id) => D.say(id).catch(() => {}),
+      // Time something to the words of the line being said: waits until the narration reaches
+      // `at`, either a fraction (0.5 = halfway) or a word or phrase from the line ('full Moon').
+      // Use with sayAsync:  const l = D.sayAsync('ch1_08'); await D.cue('walk by'); s.x = 1; await l;
+      cue: (at) => {
+        const c = G.narration.cur; let f = at;
+        if (typeof at === 'string') { const txt = LINES[c?.id] || ''; const i = txt.indexOf(at); f = i < 0 ? 0 : i / Math.max(1, txt.length); }
+        return D.until(() => !G.narration.cur || G.narration.cur !== c || G.narration.progress() >= f);
+      },
       // Kids mode: hands-free (see the top of this file)
       get kids() { return !!G.kids; },
       hint: (text, secs) => { if (!G.kids || !text) G.ui.showHint(G.kids ? '' : text, secs); },

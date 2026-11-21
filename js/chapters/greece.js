@@ -15,7 +15,8 @@
 // World axes as everywhere: -Z is north, +X is east, +Y is up.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
-import { makePerson, animatePerson } from '../people.js';
+import { makePerson, animatePerson, walkToward, runRoutine, holdProp } from '../people.js';
+import { makeHerd, makeFlock, makeTorch, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeCard } from '../ui.js';
@@ -402,6 +403,7 @@ export default class Greece {
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 32), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.ring.rotation.x = -Math.PI / 2; this.root.add(this.ring);
     this.registerInteractables();
+    this.buildLife();
     this.cur = null; this.useSet('grove');
     this.cricketT = 0; this.waveT = 2; this.windT = 1;
   }
@@ -423,6 +425,63 @@ export default class Greece {
     G.sky.hideMoon();
     for (const [k, v] of Object.entries(this.local)) if (v) { this.local[k] = null; }
   }
+  // ---------- Life in each place: citizens of Athens, villagers at the well in Syene, people and
+  // gulls in Alexandria, a court scribe in China ----------
+  buildLife() {
+    this.torches = [];
+    const extra = (S, model, pos, faceTo, tint, look = {}) => {
+      const P = this.person(S, model, pos, faceTo, look); P.tint = tint; P.extra = true; P.glance = true; return P;
+    };
+    const TINTS = [[0.95, 0.85, 0.75], [0.8, 0.9, 1.05], [1.05, 0.95, 0.8], [0.85, 0.8, 0.95], [1, 1, 1], [0.9, 1, 0.85]];
+    // Athens: citizens gathered by the temple: voting with raised hands, and thinkers arguing in pairs
+    const A = this.sets.grove;
+    const spk = new THREE.Vector3(-13, 0, -12.5);
+    this.orator = extra(A, 'eratosthenes', spk, new THREE.Vector3(-6, 0, -6), TINTS[4]);
+    this.voters = [];
+    for (let i = 0; i < 6; i++) {
+      const a = -0.9 + i * 0.36, p = new THREE.Vector3(spk.x + Math.sin(a) * 3.2 + 2.2, 0, spk.z + Math.cos(a) * 3.2 + 1.2);
+      const P = extra(A, i % 2 ? 'aristotle' : 'eratosthenes', p, spk, TINTS[i % 6]); P.voter = true; this.voters.push(P);
+      if (i % 3 === 0) { const tc = makeTorch(); holdProp(P, tc, 'Left', [0, 0.04, 0.03]); this.torches.push(tc); }
+    }
+    this.thinkers = [[-6.5, -7.2], [-7.6, -6.4], [4.5, -9], [5.6, -8.2]].map(([x, z], i) => {
+      const other = i % 2 ? [[-6.5, -7.2], [-7.6, -6.4], [4.5, -9], [5.6, -8.2]][i - 1] : [[-6.5, -7.2], [-7.6, -6.4], [4.5, -9], [5.6, -8.2]][i + 1];
+      const P = extra(A, i % 2 ? 'aristotle' : 'eratosthenes', new THREE.Vector3(x, 0, z), new THREE.Vector3(other[0], 0, other[1]), TINTS[(i + 2) % 6]); P.thinker = true; return P;
+    });
+    { const tc = makeTorch(); holdProp(this.thinkers[2], tc, 'Left', [0, 0.04, 0.03]); this.torches.push(tc); }
+    // Syene: a villager drawing water at the well, donkeys and goats, kites circling high in the heat
+    const Sy = this.sets.syene, W = this.wellPos;
+    this.drawer = extra(Sy, 'eratosthenes', new THREE.Vector3(W.x - 1.3, 0, W.z - 0.5), W, [0.85, 0.75, 0.6]);
+    this.sLife = new Life(Sy.g);
+    this.sLife.add(makeHerd('donkey', { n: 2, area: { x: W.x - 8, z: W.z - 6, r: 4 }, height: Sy.height, seed: 51 }));
+    this.sLife.add(makeHerd('goat', { n: 5, area: { x: W.x + 7, z: W.z - 9, r: 5 }, height: Sy.height, seed: 52 }));
+    this.sLife.add(makeFlock({ n: 5, center: new THREE.Vector3(W.x, 45, W.z - 20), r: 30, height: 10, color: 0x4a3a2a, size: 1.8, speed: 5, seed: 53 }));
+    // Alexandria: people crossing the square, gulls overhead
+    const Al = this.sets.alex;
+    this.strollers = [[-8, -10], [7, -12], [-5, 6], [9, 4]].map(([x, z], i) => {
+      const P = extra(Al, i % 2 ? 'aristotle' : 'eratosthenes', new THREE.Vector3(x, 0, z), new THREE.Vector3(0, 0, 0), TINTS[(i + 1) % 6]);
+      P.routine = [{ x, z, pose: i % 2 ? 'talk' : 'idle', secs: 3 + i }, { x: -x * 0.9, z: z + (i % 2 ? 5 : -5), pose: 'idle', secs: 2 + i }]; P.ri = i % 2;
+      return P;
+    });
+    this.aLife = new Life(Al.g);
+    this.aLife.add(makeFlock({ n: 10, center: new THREE.Vector3(0, 22, -15), r: 22, height: 6, color: 0xeeeeee, size: 1.1, speed: 6, seed: 54 }));
+    // China: a scribe beside the astronomer, writing down the comet
+    const Ch = this.sets.china;
+    this.scribe = extra(Ch, 'chinese_astronomer', new THREE.Vector3(1.2, 0, -1.9), new THREE.Vector3(0, 0, -1.3), [0.75, 0.85, 1.0]);
+  }
+
+  // What the background people are doing right now
+  lifePose(P, dt, t) {
+    const s = this.s, S = this.sets[this.cur];
+    if (P.voter) P.pose = s.vote ? (P.phase % 5 < 3.6 ? 'wave' : 'idle') : 'idle';
+    else if (P === this.orator) P.pose = s.vote || s.phase === 'arrive' ? 'talk' : 'idle';
+    else if (P.thinker) P.pose = s.think || P.phase % 2 < 1 ? 'talk' : 'idle';
+    else if (P === this.drawer) P.pose = 'work';
+    else if (P === this.scribe) P.pose = 'write';
+    else if (P.routine) runRoutine(P, dt, { height: S.height, speed: 0.9 });
+    if (s.cheer && !P.routine) P.pose = 'cheer';
+    if (s.phase === 'eclipse' && this.cur === 'grove') { P.pose = P.phase % 3 < 1 ? 'point' : 'idle'; dirFromAzEl(MOON_AZ, MOON_EL, P.pointAt).multiplyScalar(50).add(P.g.position); P.look = P.pointAt.clone(); }
+  }
+
   person(S, model, pos, faceTo, look = {}) {
     const P = makePerson({ model, seed: 70 + S.people.length * 9, ...look });
     P.g.position.copy(pos); P.g.position.y = S.height(pos.x, pos.z);
@@ -994,7 +1053,11 @@ export default class Greece {
     placeAll(S.start.pos, S.start.look);
     await G.ui.fadeIn(2.5);
     s.guide = _a.copy(this.templeFront).add(_b.set(7, 9.5, 5)).toArray();   // over the temple's front, beside its pediment
-    await D.say('ch5_01');
+    const l1 = D.sayAsync('ch5_01');
+    await D.cue('voting'); s.vote = 1;                 // hands go up: voting on their own laws
+    await D.cue('And a group'); s.vote = 0; s.think = 1; // ...and the thinkers argue, hands waving
+    await l1;
+    s.think = 0;
     s.phase = 'ship';
     s.guide = at(185, 14, 2.5).toArray();
     await D.say('ch5_02');
@@ -1051,7 +1114,8 @@ export default class Greece {
     await go('alex');
     s.phase = 'plantA'; s.ring = D.kids ? null : this.ringA; s.point = 3;
     hint('Grab the stick (GRIP) and stand it in the glowing ring', 'Click the stick to stand it up');
-    await D.auto(() => s.plantA, () => this.act({ type: 'plant', o: 'stickA' }), { after: soon, timeout: T(30) });
+    // (Kids mode: Eratosthenes walks over and plants it himself)
+    await D.auto(() => s.plantA, (dt) => { s.eraGo = 1; if (this.eratosthenes.pose === 'work' && (this.eraT = (this.eraT || 0) + dt) > 0.8) this.act({ type: 'plant', o: 'stickA' }); }, { after: soon, timeout: T(30) });
     s.plantA = 1; s.ring = null; G.ui.showHint('');
     s.guide = new THREE.Vector3(this.ringA[0] - 0.3, 2.4, this.ringA[1] - 1.2).toArray();
     await D.say('ch5_09');
@@ -1150,12 +1214,22 @@ export default class Greece {
       if (P === this.eratosthenes && s.point === 3) { P.pose = 'point'; P.pointAt.set(this.ringA[0], 0, this.ringA[1] + 0.1); }
       if (P === this.eratosthenes && s.globe) { P.pose = 'point'; P.pointAt.copy(this.globe.position); }
       if (P === this.astronomer && s.comet > 0 && s.paint !== 2) { P.pose = 'point'; P.pointAt.copy(this.comet.position); }
+      // Aristotle watches the shadow on the wall while the plate and ball turn; Eratosthenes walks to
+      // the ring and plants his stick himself, then holds up the measure
+      if (P === this.aristotle) P.look = s.phase === 'shadows' ? _c.set(0, 1.3, this.wallZ).clone() : s.point === 1 ? dirFromAzEl(MOON_AZ, MOON_EL, _c).multiplyScalar(50).add(P.g.position).clone() : null;
+      if (P === this.aristotle && s.phase === 'shadows' && s.demo > 0 && s.demo < 1) P.pose = 'hold';
+      if (P === this.eratosthenes && s.eraGo && !s.plantA) { if (walkToward(P, this.ringA[0] - 0.55, this.ringA[1] + 0.25, dt, { height: S.height, speed: 1 })) P.pose = 'work'; }
+      if (P === this.eratosthenes && s.prot === 2 && s.measure < 1) P.pose = 'hold';
+      if (P.extra) this.lifePose(P, dt, t);
       if (P.tint && P.model && !P.tinted) {
         P.tinted = true;
         P.model.scene.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color?.setRGB(...P.tint); } });
       }
       animatePerson(P, t, dt);
     }
+    for (const tc of this.torches) tc.userData.flicker(t);
+    if (this.cur === 'syene') this.sLife.update(dt, t);
+    if (this.cur === 'alex') this.aLife.update(dt, t);
     // Guide
     if (s.guide) { _a.fromArray(s.guide); if (!this.guideAt || !this.guideAt.equals(_a)) { this.guideAt = _a.clone(); G.guide.flyTo(this.guideAt); G.guide.chime(); } }
     else if (this.guideAt && s.journal !== 1) { this.guideAt = null; G.guide.follow(); }

@@ -61,7 +61,7 @@ export class Narration {
       } else {
         // No recording yet: read time at about 2.6 words a second, plus a breath
         const words = text.split(/\s+/).length;
-        token.fake = true; token.left = (Math.max(2.2, words / 2.6) + 0.4) / this.speed;
+        token.fake = true; token.left = token.total = (Math.max(2.2, words / 2.6) + 0.4) / this.speed;
       }
     });
     if (this.cur === token) { this.cur = null; this.G.ui.subtitle(''); this.level = 0; this.G.events.emit('narrating', { id, on: false }); }
@@ -93,6 +93,16 @@ export class Narration {
     try { c.src?.stop(); } catch (e) { /* already stopped */ }
     this.G.ui.subtitle(''); this.level = 0;
     c.done?.();
+  }
+
+  // How far through the current line we are, 0..1 (1 when nothing is being said). Chapters use
+  // it to time what happens on screen to the words (see D.cue in chapters.js).
+  progress() {
+    const c = this.cur; if (!c || !c.done) return c ? 0 : 1;
+    if (c.fake) return c.total ? 1 - c.left / c.total : 0;
+    if (!c.buf) return 0;
+    const el = c.offset + (c.paused || !c.src ? 0 : this.G.audio.ctx.currentTime - c.startT);
+    return Math.min(1, el / c.buf.duration);
   }
 
   // Testing: skip the line being said (N key on desktop with ?debug)

@@ -6,7 +6,8 @@
 // Moon grows from a sliver to full and back again: about 29 marks, the first calendar.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
-import { makePerson, animatePerson } from '../people.js';
+import { makePerson, animatePerson, runRoutine, holdProp, dropProp } from '../people.js';
+import { makeHerd, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
 import { rng, noise2, roughStone } from '../shapes.js';
@@ -52,6 +53,7 @@ export default class Campfire {
       guide: null,
       journal: 0,
       glowMarks: 0,     // counting: how many marks light up
+      moonlit: 0, echo: 0, future: 0,   // ch1_08 moonlight, ch1_11 the other bones and the telescope and rocket
       tell: 0,          // the storyteller holding up the bone
     };
     G.world.height = groundHeight;
@@ -66,6 +68,8 @@ export default class Campfire {
     this.buildTrees();
     this.buildPeople();
     this.buildBone();
+    this.buildLife();
+    this.buildEchoes();
     this.journal = makeJournalPage('campfire');
     this.journal.visible = false; this.root.add(this.journal);
     this.registerInteractables();
@@ -198,6 +202,66 @@ export default class Campfire {
     add(new THREE.Vector3(-1.9, 0, 2.9), { height: 1.25 }, 'listen');
   }
 
+  // Life out on the frozen plain: reindeer crossing the valley, wild horses, and two hunters coming
+  // and going across the snow with their spears (ch1_02: "following herds of reindeer and wild horses")
+  buildLife() {
+    this.life = new Life(this.root);
+    const c = at(192, 24), h = at(148, 30);
+    this.reindeer = this.life.add(makeHerd('reindeer', { n: 18, area: { x: c.x, z: c.z, r: 16 }, height: groundHeight, mode: 'migrate', dir: [1, 0.08], seed: 11 }));
+    this.horses = this.life.add(makeHerd('horse', { n: 8, area: { x: h.x, z: h.z, r: 7 }, height: groundHeight, seed: 12 }));
+    this.hunters = [];
+    const spear = () => { const k = new Kit(); k.cyl(0.015, 0.018, 2.1, 5, 0x6a5038, [0, 0, 0]); k.add(roughStone(0.04, 0.14, 0.015, 9, [1, 2, 1]), 0x4a4440, [0, 1.1, 0]); return k.mesh(); };
+    [[160, 46, 0], [166, 50, 1]].forEach(([az, d, i]) => {
+      const P = makePerson({ model: 'storyteller', seed: 90 + i * 13, tunic: 0x6a503a, hair: 0x2a1c12, beard: !i });
+      const p = at(az, d); P.g.position.set(p.x, groundHeight(p.x, p.z), p.z); this.root.add(P.g);
+      holdProp(P, spear(), 'Right', [0, 0.05, 0.02]);
+      // out to look over the herd, then home to the edge of the camp, and out again
+      const far = at(200 + i * 8, 30 + i * 4), near = at(150 + i * 8, 9.5 + i), herd = at(192, 24);
+      P.routine = [
+        { x: near.x, z: near.z, pose: 'talk', secs: 7 + i * 2, look: new THREE.Vector3(0, 1.2, 0) },
+        { x: far.x, z: far.z, pose: 'point', secs: 6, look: herd },
+      ];
+      P.pointAt.copy(herd).setY(1);
+      P.ri = i; this.hunters.push(P);
+    });
+  }
+
+  // ch1_11: other bones like this one (real finds), and a glimpse of what comes after: a telescope
+  // and a rocket drawn in starlight
+  buildEchoes() {
+    this.echoes = new THREE.Group(); this.echoes.visible = false; this.root.add(this.echoes);
+    const finds = [['Border Cave, South Africa', -0.75, 0.05], ['Ishango, Congo', 0, 0.38], ['Abri Blanchard, France', 0.75, 0.05]];
+    this.echoMats = [];
+    for (const [name, x, y] of finds) {
+      const k = new Kit(), curve = [];
+      for (let i = 0; i <= 6; i++) { const t = i / 6; curve.push([(t - 0.5) * 0.3, Math.sin(t * Math.PI) * 0.02, 0]); }
+      k.tube(curve, 0.018, 0xfff0c8, 8);
+      for (let i = 0; i < 14; i++) k.box(0.004, 0.026, 0.004, 0x6a4a20, [(-0.12 + i * 0.018), 0.012 + Math.sin((0.1 + i / 16) * Math.PI) * 0.02, 0.017]);
+      const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, fog: false });
+      const b = k.mesh(m); this.echoMats.push(m);
+      const tex = canvasTex(512, 72, (g, w, h) => { g.font = 'bold 34px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(255,236,200,1)'; g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 8; g.fillText(name, w / 2, h / 2); });
+      const lm = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false }); this.echoMats.push(lm);
+      const lab = new THREE.Sprite(lm); lab.scale.set(0.5, 0.07, 1); lab.position.set(0, 0.09, 0);
+      const g = new THREE.Group(); g.add(b, lab); g.position.set(x, y, 0); g.userData.base = g.position.clone(); this.echoes.add(g);
+    }
+    // the future, drawn like a constellation over the valley (south, where you're facing)
+    const lines = (segs, cx, cy, s) => {
+      const pos = [];
+      for (const [a, b] of segs) { pos.push(cx + a[0] * s, cy + a[1] * s, 0, cx + b[0] * s, cy + b[1] * s, 0); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      const m = new THREE.LineBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+      return new THREE.LineSegments(g, m);
+    };
+    // a telescope on its tripod, and a rocket lifting off
+    const scope = lines([[[-1, 0.2], [1.1, 1.3]], [[-0.9, -0.05], [1.2, 1.05]], [[-1, 0.2], [-0.9, -0.05]], [[1.1, 1.3], [1.2, 1.05]], [[1.1, 1.3], [1.35, 1.45]], [[1.2, 1.05], [1.45, 1.2]], [[1.35, 1.45], [1.45, 1.2]],
+      [[0, 0.6], [-0.6, -1.4]], [[0, 0.6], [0.6, -1.4]], [[0, 0.6], [0, -1.4]]], 0, 0, 1);
+    const rocket = lines([[[0, 2], [-0.35, 1.3]], [[0, 2], [0.35, 1.3]], [[-0.35, 1.3], [-0.35, -0.6]], [[0.35, 1.3], [0.35, -0.6]], [[-0.35, -0.6], [0.35, -0.6]],
+      [[-0.35, -0.1], [-0.75, -0.8]], [[-0.75, -0.8], [-0.35, -0.6]], [[0.35, -0.1], [0.75, -0.8]], [[0.75, -0.8], [0.35, -0.6]], [[-0.2, -0.6], [0, -1.5]], [[0.2, -0.6], [0, -1.5]], [[0, -1.5], [0, -2.1]]], 0, 0, 1);
+    this.future = [scope, rocket];
+    const place = (o, az, el, size) => { const d = 120; o.position.set(Math.sin(az * D2R) * Math.cos(el * D2R) * d, Math.sin(el * D2R) * d, -Math.cos(az * D2R) * Math.cos(el * D2R) * d); o.scale.setScalar(size); o.lookAt(0, 1.5, 0); o.rotateY(Math.PI); o.visible = false; this.root.add(o); };
+    place(scope, 162, 26, 9); place(rocket, 200, 30, 9);
+  }
+
   // The tally bone: a long, slightly curved piece of bone. Marks are carved along it.
   buildBone() {
     const g = new THREE.Group();
@@ -208,7 +272,7 @@ export default class Campfire {
     k.ball(0.032, 1, 0xdcd0b2, curve[0], 0, [1, 0.8, 0.8]); k.ball(0.03, 1, 0xdcd0b2, curve[8], 0, [1, 0.8, 0.8]);
     g.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 })));
     // the flint, resting beside it
-    const fk = new Kit(); fk.add(roughStone(0.05, 0.09, 0.025, 77, [2, 2, 1]), 0x5a5048); const flint = fk.mesh(); flint.position.set(0.24, -0.06, 0.02); flint.rotation.z = 0.6; g.add(flint);
+    const fk = new Kit(); fk.add(roughStone(0.05, 0.09, 0.025, 77, [2, 2, 1]), 0x5a5048); const flint = fk.mesh(); fk.add(roughStone(0.05, 0.09, 0.025, 77, [2, 2, 1]), 0x5a5048); flint.position.set(0.24, -0.06, 0.02); flint.rotation.z = 0.6; g.add(flint);
     // marks: small dark notches, made visible one at a time (they can glow when counted)
     this.notches = [];
     const nm = new THREE.MeshBasicMaterial({ color: 0x3a2a1a });
@@ -223,6 +287,10 @@ export default class Campfire {
     this.boneGlow.scale.set(0.6, 0.2, 1); g.add(this.boneGlow);
     g.visible = false;
     this.bone = g; this.root.add(g);
+    // the storyteller's own bone and flint, to hold up while ch1_05 is told
+    const tk = new Kit(); tk.tube(curve, 0.022, 0xe6dcc2, 8); const tb = tk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 }));
+    tb.rotation.z = Math.PI / 2; tb.scale.setScalar(1.5); this.tellerBone = new THREE.Group(); this.tellerBone.add(tb);
+    this.tellerFlint = new THREE.Group(); const ff = fk.mesh(); ff.rotation.z = 0.4; this.tellerFlint.add(ff);
   }
 
   registerInteractables() {
@@ -276,14 +344,18 @@ export default class Campfire {
     s.guide = at(170, 30, 6).toArray();          // out over the frozen valley
     await D.say('ch1_02');
     s.guide = at(185, 9, 4.5).toArray();
-    await D.say('ch1_03');
+    const l3 = D.sayAsync('ch1_03');
+    await D.cue('Look up'); s.up = 1;          // everyone tips their head back
+    await l3;
     s.phase = 'sky';
     D.hint(G.mode === 'vr' ? 'Point a controller at a star to see its name' : 'Look at a star to see its name', 7);
     await D.say('ch1_04');
     await D.wait(fast ? 1 : 12);                // time to look around the sky
     // The storyteller holds up a bone; then it floats over to you, with a flint
-    s.guide = null; s.tell = 1;
-    await D.say('ch1_05');
+    s.up = 0; s.guide = null; s.tell = 1;       // ...holding up a bone, then scratching at it with a flint
+    const l5 = D.sayAsync('ch1_05');
+    await D.cue('And they started'); s.tell = 2;
+    await l5;
     s.tell = 0; s.bone = 1;
     s.phase = 'carve'; s.night = 1.2;
     G.events.emit('sfx', { k: 'page' });
@@ -298,7 +370,9 @@ export default class Campfire {
     await D.say('ch1_07');
     await D.until(() => s.marks >= 15);
     s.phase = 'full';
-    await D.say('ch1_08');
+    const l8 = D.sayAsync('ch1_08');
+    await D.cue('walk by'); s.moonlit = 1;      // the whole valley lights up silver: you could walk, or hunt, by it
+    await l8;
     s.phase = 'wane'; this.autoTo = MARKS;
     await D.say('ch1_09');
     await D.until(() => s.marks >= MARKS);
@@ -308,7 +382,13 @@ export default class Campfire {
     s.phase = 'count';
     await D.say('ch1_10');
     s.phase = 'closing';
-    await D.say('ch1_11');
+    const l11 = D.sayAsync('ch1_11');
+    s.echo = 1;                                 // bones like this one, found in caves in Africa and France
+    await D.cue('We can'); s.echo = 0.6;
+    await D.cue('every telescope'); s.future = 1;   // ...and a glimpse of everything that comes after
+    await D.cue('every rocket'); s.future = 2;
+    await l11;
+    s.echo = 0; s.future = 0;
     s.bone = 0;
     s.journal = 1; s.phase = 'journal';
     G.events.emit('sfx', { k: 'page' });
@@ -362,12 +442,37 @@ export default class Campfire {
     this.wolfT -= dt;
     if (this.wolfT <= 0) { this.wolfT = 35 + Math.random() * 40; G.audio.howl?.(at(120 + Math.random() * 120, 200, 10)); }
 
-    // People
+    // People: they look up at the sky with you, the storyteller holds up a bone and carves it, and
+    // everyone points at the full Moon. Now and then they glance over at you.
+    const lookUp = !!s.up;
     for (const P of this.people) {
-      P.pose = P.role === 'teller' ? (s.tell ? 'cheer' : s.phase === 'carve' || s.phase === 'wane' ? 'point' : 'idle') : (s.phase === 'full' ? 'point' : 'idle');
+      P.pose = P.role === 'teller' ? (s.tell === 2 ? 'write' : s.tell ? 'hold' : s.phase === 'sky' ? 'point' : s.phase === 'carve' || s.phase === 'wane' ? 'point' : 'idle') : (s.phase === 'full' ? 'point' : s.phase === 'count' ? 'cheer' : 'idle');
+      if (P.pose === 'cheer' && P.H > 0.8) P.pose = 'idle';   // (only the child jumps up and down at the count)
       if (P.pose === 'point') { const mm = moonFor(this.nightV); _c.set(Math.sin(mm.az * D2R) * Math.cos(mm.el * D2R), Math.sin(mm.el * D2R), -Math.cos(mm.az * D2R) * Math.cos(mm.el * D2R)); P.pointAt.copy(P.g.position).addScaledVector(_c, 50); }
+      if (P.role === 'teller' && s.phase === 'sky') P.pointAt.set(P.g.position.x - 10, 40, P.g.position.z - 30);   // the Milky Way, overhead
+      P.glance = true;
+      P.look = lookUp ? _c.set(Math.sin(P.g.rotation.y) * 12, 22, Math.cos(P.g.rotation.y) * 12).add(P.g.position).clone() : s.tell && P.role !== 'teller' ? this.teller.g.position.clone().setY(1.5) : null;
       animatePerson(P, t, dt);
     }
+    // the storyteller's bone and flint, in hand while ch1_05 is told
+    if (s.tell && !this.tellerBone.parent) { holdProp(this.teller, this.tellerBone, 'Right', [0, 0.06, 0.03]); holdProp(this.teller, this.tellerFlint, 'Left', [0, 0.05, 0.03]); }
+    if (!s.tell && this.tellerBone.parent) { dropProp(this.teller, 'Right'); dropProp(this.teller, 'Left'); }
+    // Hunters and herds out on the plain
+    for (const P of this.hunters) { runRoutine(P, dt, { height: groundHeight, speed: 1.1 }); animatePerson(P, t, dt); }
+    this.life.update(dt, t);
+    // Moonlight: the valley glows silver around the full Moon
+    this.moonlitV = damp(this.moonlitV || 0, s.moonlit && ['full', 'wane'].includes(s.phase) ? 1 : 0, 0.8, dt);
+    if (!this.moonLight) { this.moonLight = new THREE.DirectionalLight(0xb8c8ff, 0); this.root.add(this.moonLight, this.moonLight.target); }
+    this.moonLight.intensity = this.moonlitV * 1.1; this.moonLight.position.set(Math.sin(m.az * D2R) * 60, 40, -Math.cos(m.az * D2R) * 60);
+    // ch1_11: the other bones, and the telescope and rocket drawn in starlight
+    this.echoV = damp(this.echoV || 0, s.echo || 0, 1.5, dt);
+    this.echoes.visible = this.echoV > 0.01;
+    if (this.echoes.visible) {
+      if (!this.echoSet) { this.echoSet = true; this.echoes.position.copy(this.bone.position).add(_a.set(0, 0.35, 0)); this.echoes.quaternion.copy(this.bone.quaternion); }
+      for (const mtl of this.echoMats) mtl.opacity = this.echoV * (mtl.isSpriteMaterial ? 1 : 0.9);
+      this.echoes.children.forEach((g, i) => { g.position.copy(g.userData.base); g.position.y += Math.sin(t * 1.2 + i * 2) * 0.02 + (1 - Math.min(1, this.echoV)) * -0.2; g.rotation.y = Math.sin(t * 0.5 + i) * 0.4; });
+    }
+    this.future.forEach((o, i) => { const want = (s.future || 0) > i ? 1 : 0; o.material.opacity = damp(o.material.opacity, want * (0.75 + 0.25 * Math.sin(t * 2 + i)), 1.2, dt); o.visible = o.material.opacity > 0.01; });
 
     // Guide
     if (s.guide) { _a.fromArray(s.guide); if (!this.guideAt || !this.guideAt.equals(_a)) { this.guideAt = _a.clone(); G.guide.flyTo(this.guideAt); G.guide.chime(); } }

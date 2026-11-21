@@ -20,7 +20,7 @@
 // south end. The cosmos is centred on the same spot, shown instead of the hall.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
-import { makePerson, animatePerson } from '../people.js';
+import { makePerson, animatePerson, runRoutine } from '../people.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 
 const D2R = Math.PI / 180;
@@ -474,6 +474,11 @@ export default class Ptolemy {
       P.g.position.y = 0; // (they stand at their desks to read, as people often did)
     });
     const w = add(new THREE.Vector3(ARMILLARY.x + 2.1, 0, ARMILLARY.z + 0.8), Math.atan2(-2.1, -0.8), looks[1], 'gaze'); w.pointAt.copy(ARMILLARY).setY(2.9);
+    // Two scholars arguing as they walk up and down the hall (ch7_01: "reading, writing and arguing")
+    [[1.6, 6.5], [2.3, 7.1]].forEach(([x, z], i) => {
+      const P = add(new THREE.Vector3(x, 0, z), Math.PI, looks[(i + 1) % 3], 'argue');
+      P.routine = [{ x, z: z - 4, pose: 'talk', secs: 5, face: i ? -2.2 : 0.9 }, { x, z, pose: 'talk', secs: 4, face: i ? -2.2 : 0.9 }]; P.ri = 0;
+    });
     // Aristarchus: in the dark cosmos, standing in the shadows on the curve of the little Earth
     const ap = new THREE.Vector3(-0.9, 0, -1.9), apr = Math.hypot(ap.x, ap.z);
     ap.y = Math.sqrt(GLOBE_R * GLOBE_R - apr * apr) - GLOBE_R;
@@ -633,6 +638,28 @@ export default class Ptolemy {
     this.journal = new THREE.Group(); this.journal.add(page); this.journal.visible = false; this.root.add(this.journal);
   }
 
+  // ch7_02: everything learned so far, as little glowing pictures along the hall (Moon phases, the Sun
+  // on the horizon, a star by the river, a red eclipsed Moon, the round Earth and its size)
+  buildRecap() {
+    const draw = (k) => canvasTex(256, 256, (g, w) => {
+      const c = w / 2; g.strokeStyle = '#ffe2a8'; g.fillStyle = '#ffe2a8'; g.lineWidth = 8; g.lineCap = 'round';
+      g.beginPath(); g.arc(c, c, 118, 0, 6.283); g.globalAlpha = 0.25; g.fill(); g.globalAlpha = 1; g.stroke();
+      if (k === 0) { for (let i = 0; i < 5; i++) { const x = 40 + i * 44, ph = i / 4; g.beginPath(); g.arc(x, c, 17, 0, 6.283); g.fillStyle = '#334'; g.fill(); g.fillStyle = '#fff2c8'; g.beginPath(); g.arc(x, c, 17, -Math.PI / 2, Math.PI / 2); g.ellipse(x, c, Math.abs(Math.cos(ph * Math.PI)) * 17, 17, 0, Math.PI / 2, -Math.PI / 2, ph < 0.5); g.fill(); } }
+      if (k === 1) { g.beginPath(); g.moveTo(30, 170); g.lineTo(226, 170); g.stroke(); g.setLineDash([6, 12]); g.beginPath(); g.arc(c, 300, 175, -2.2, -0.94); g.stroke(); g.setLineDash([]); g.beginPath(); g.arc(c, 150, 30, Math.PI, 0); g.fill(); }
+      if (k === 2) { g.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283 - Math.PI / 2, r = i % 2 ? 22 : 56; g.lineTo(c + Math.cos(a) * r, 100 + Math.sin(a) * r); } g.fill(); g.strokeStyle = '#7ac0ff'; for (let j = 0; j < 2; j++) { g.beginPath(); for (let x = 40; x < 220; x += 6) g.lineTo(x, 185 + j * 22 + Math.sin(x / 14) * 6); g.stroke(); } }
+      if (k === 3) { g.fillStyle = '#b04a28'; g.beginPath(); g.arc(c, c, 62, 0, 6.283); g.fill(); g.fillStyle = 'rgba(20,10,10,0.6)'; g.beginPath(); g.arc(c - 60, c + 10, 70, 0, 6.283); g.fill(); }
+      if (k === 4) { g.strokeStyle = '#8ad0ff'; g.beginPath(); g.arc(c, c, 70, 0, 6.283); g.stroke(); g.beginPath(); g.ellipse(c, c, 70, 24, 0, 0, 6.283); g.stroke(); g.beginPath(); g.ellipse(c, c, 26, 70, 0, 0, 6.283); g.stroke(); g.fillStyle = '#ffe2a8'; g.font = 'bold 30px Georgia, serif'; g.textAlign = 'center'; g.fillText('40,000 km', c, 228); }
+    });
+    this.recap = [0, 1, 2, 3, 4].map((k) => {
+      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: draw(k), transparent: true, opacity: 0, depthWrite: false, fog: false }));
+      m.position.set(-2.4 + k * 1.2, 3.1 + (k % 2) * 0.25, 3.5); m.scale.setScalar(0.95); this.hall.add(m); return m;
+    });
+    // ch7_07: the Almagest, "The Greatest", glowing in the dark of the cosmos
+    const t = canvasTex(512, 160, (g, w, h) => { g.font = 'bold 72px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffe2a8'; g.shadowColor = 'rgba(255,190,90,0.9)'; g.shadowBlur = 18; g.fillText('ALMAGEST', w / 2, 62); g.font = 'italic 40px Georgia, serif'; g.fillText('"The Greatest"', w / 2, 128); });
+    this.almagest = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+    this.almagest.scale.set(2.6, 0.81, 1); this.almagest.position.set(0, EYE + 1.5, -4.5); this.cosmos.add(this.almagest);
+  }
+
   // Swap between the hall and the cosmos (sky, ground, where you can walk)
   useHall(on) {
     const G = this.G;
@@ -718,14 +745,17 @@ export default class Ptolemy {
     s.guide = [-5.5, 3.2, 4]; // ...along the scroll cabinets
     s.phase = 'walk'; s.ring = D.kids ? 0 : 1;
     D.hint('Walk up the hall to the glowing ring (left stick)', 8);
-    await D.say('ch7_02');
+    // each thing learned so far lights up along the hall as Astra names it
+    const l2 = D.sayAsync('ch7_02');
+    for (const [i, w] of ['The Moon has', 'The Sun walks', 'Stars can tell', 'Eclipses can', 'The Earth is a ball'].entries()) { await D.cue(w); s.recap = i + 1; }
+    await l2;
     s.guide = null;
     const there = () => G.players.every((p) => { p.headPos?.(_a) ?? _a.copy(p.view?.head || SPOT); return Math.hypot(_a.x - SPOT.x, _a.z - SPOT.z) < 1.8; });
     if (D.kids) await D.goTo(SPOT, 0);   // Kids mode: a quick fade takes you there
     else if (!(await D.until(there, fast ? 3 : 30))) {
       await G.ui.fadeOut(0.8); placeAll(SPOT, 0); await G.ui.fadeIn(1);
     }
-    s.ring = 0; G.ui.showHint('');
+    s.ring = 0; s.recap = 0; G.ui.showHint('');
     // The scroll unrolls
     s.phase = 'scroll'; s.point = 1; s.guide = [1.6, 2.1, TABLE.z - 0.2];
     await D.say('ch7_03');
@@ -762,7 +792,10 @@ export default class Ptolemy {
     // The whole universe runs like clockwork
     s.phase = 'clock'; s.epi = 0; s.focus = 0; s.trail = 0; s.spin = 1.6;
     s.guide = null;
-    await D.say('ch7_07');
+    const l7 = D.sayAsync('ch7_07');
+    await D.cue('Almagest'); s.almagest = 1;
+    await l7;
+    s.almagest = 0;
     // Aristarchus, from the shadows
     s.phase = 'aristarchus'; s.spin = 0.3; s.focus = 0.6;
     await D.say('ch7_08');
@@ -826,6 +859,8 @@ export default class Ptolemy {
 
   updateHall(dt, t) {
     const G = this.G, s = this.s;
+    if (!this.recap) this.buildRecap();
+    this.recap.forEach((m, i) => { m.material.opacity = damp(m.material.opacity, (s.recap || 0) > i ? 1 : 0, 2.5, dt); m.visible = m.material.opacity > 0.01; m.position.y = 3.1 + (i % 2) * 0.25 + Math.sin(t * 1.3 + i) * 0.05; });
     // Bright late morning outside (the high windows show the sky); soft light inside
     G.sky.sunSize = 1;
     G.sky.set(115, 52);
@@ -857,13 +892,18 @@ export default class Ptolemy {
     for (const P of this.people) {
       if (P.role === 'ptolemy') { P.pose = s.point ? 'point' : 'idle'; P.pointAt.copy(ARMILLARY).setY(2.9); }
       else if (P.role === 'gaze') P.pose = 'point';
+      else if (P.role === 'read') P.pose = (t * 0.12 + P.phase) % 2 < 1 ? 'hold' : 'write';   // reading a scroll, then writing notes
+      else if (P.role === 'argue') { runRoutine(P, dt, { speed: 0.6 }); if (P.blk) { P.blk.x = P.g.position.x; P.blk.z = P.g.position.z; } }
       else P.pose = 'idle';
+      P.glance = P.role !== 'ptolemy' || !s.point;
       animatePerson(P, t, dt);
     }
   }
 
   updateCosmos(dt, t) {
     const G = this.G, s = this.s;
+    if (!this.recap) this.buildRecap();
+    this.almagest.material.opacity = damp(this.almagest.material.opacity, s.almagest ? 1 : 0, 2, dt); this.almagest.visible = this.almagest.material.opacity > 0.01;
     // Deep night: the real stars are Ptolemy's outermost sphere
     G.sky.sunSize = 1; G.sky.set(115, -32);
     G.sky.mist = damp(G.sky.mist, 0, 1, dt);
