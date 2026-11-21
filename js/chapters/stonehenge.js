@@ -136,7 +136,7 @@ export default class Stonehenge {
 
   // ---------- Building the place ----------
   buildGround() {
-    const SIZE = 900, SEG = 175;
+    const SIZE = 900, SEG = 130;   // (5-7 m squares: thinned in v14 to spend triangles on the night sky)
     const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI / 2);
     const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color();
     const grass = new THREE.Color(0x5f7d3a), grass2 = new THREE.Color(0x7a8f44), chalk = new THREE.Color(0xd8d4c0), wheat = new THREE.Color(0xb59a52), dirt = new THREE.Color(0x7a6448);
@@ -175,10 +175,10 @@ export default class Stonehenge {
     }
     const blade = new THREE.BufferGeometry();
     blade.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); blade.computeVertexNormals();
-    const N = 6500, tufts = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), N);
+    const N = 4600, tufts = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), N);
     const r = rng(5), mm = new THREE.Matrix4(), cc = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
     for (let i = 0; i < N; i++) {
-      const az = r() * 360, rad = 4.5 + Math.pow(r(), 1.6) * 120, pos = at(az, rad);
+      const az = r() * 360, rad = 4.5 + Math.pow(r(), 1.6) * 85, pos = at(az, rad);   // (far grass is too small to see)
       pos.y = groundHeight(pos.x, pos.z);
       _q.setFromAxisAngle(up, r() * 6.28);
       const sc = 0.7 + r() * 0.8;
@@ -302,19 +302,20 @@ export default class Stonehenge {
     const village = at(150, 165);
     const tree = (x, z, s) => {
       const y = groundHeight(x, z) - 0.2, lean = (r() - 0.5) * 0.08, trunkH = 3.4 * s;
-      trunks.add(new THREE.CylinderGeometry(0.28 * s, 0.5 * s, trunkH, 9, 2), 0x4a3a2a, [x, y + trunkH / 2, z], [lean, r() * 6, lean]);
+      const far = Math.hypot(x, z) > 150;   // far trees get simpler shapes (you can't tell from here)
+      trunks.add(new THREE.CylinderGeometry(0.28 * s, 0.5 * s, trunkH, far ? 6 : 9, far ? 1 : 2, far), 0x4a3a2a, [x, y + trunkH / 2, z], [lean, r() * 6, lean]);
       // main boughs reaching up and out into the crown
-      const nb = 3 + (r() * 2 | 0);
+      const nb = far ? 3 : 3 + (r() * 2 | 0);
       for (let i = 0; i < nb; i++) {
         const a = i / nb * 6.28 + r(), out = 1.2 * s, len = 3.2 * s;
-        trunks.add(new THREE.CylinderGeometry(0.1 * s, 0.2 * s, len, 6), 0x4e3e2c,
+        trunks.add(new THREE.CylinderGeometry(0.1 * s, 0.2 * s, len, far ? 4 : 6, 1, far), 0x4e3e2c,
           [x + Math.cos(a) * out * 0.6, y + trunkH + len * 0.3, z + Math.sin(a) * out * 0.6], [Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7]);
       }
       // the crown: overlapping lumpy blobs, darker underneath, sunlit on top
-      const cy = y + trunkH + 3.4 * s, nBlob = 7 + (r() * 4 | 0);
+      const cy = y + trunkH + 3.4 * s, nBlob = far ? 6 + (r() * 2 | 0) : 7 + (r() * 4 | 0);
       for (let i = 0; i < nBlob; i++) {
         const a = r() * 6.28, d = (i === 0 ? 0 : 1.5 + r() * 1.6) * s, rad = (2.1 + r() * 1.2) * s;
-        const g = new THREE.IcosahedronGeometry(rad, 1), p = g.attributes.position;
+        const g = new THREE.IcosahedronGeometry(rad, far ? 0 : 1), p = g.attributes.position;
         const nz = noise2(400 + leaves.length);
         for (let j = 0; j < p.count; j++) { const vx = p.getX(j), vy = p.getY(j), vz = p.getZ(j), b = 0.82 + nz(vx * 0.9 + 5, vz * 0.9 + vy) * 0.36; p.setXYZ(j, vx * b, vy * b * 0.92, vz * b); }
         g.translate(x + Math.cos(a) * d, cy + (i === 0 ? 0.6 * s : (r() - 0.45) * 3.4 * s), z + Math.sin(a) * d);
@@ -339,7 +340,7 @@ export default class Stonehenge {
     for (let az = 172; az < 372; az += 2.6) {
       if (r() < 0.25) continue;
       const d = 400 + r() * 40, p = at(az, d), rad = 10 + r() * 9;
-      const g = new THREE.IcosahedronGeometry(rad, 1); g.scale(1.3, 0.55 + r() * 0.2, 1.3);
+      const g = new THREE.IcosahedronGeometry(rad, 0); g.scale(1.3, 0.55 + r() * 0.2, 1.3);
       g.translate(p.x, groundHeight(p.x, p.z) + rad * 0.35, p.z); leaves.push(g);
     }
     // colour the leaves vertex by vertex (shade and sun), then merge into one mesh

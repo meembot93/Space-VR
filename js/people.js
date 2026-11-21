@@ -39,7 +39,7 @@ export function makePerson(look = {}) {
   k.ball(0.135, 1, hair, [0, 1.65, -0.02], 0, [1.02, 0.9, 1.05]);
   if (look.beard) k.ball(0.1, 1, hair, [0, 1.52, 0.06], 0, [1, 0.8, 0.8]);
   k.box(0.03, 0.03, 0.02, 0x000000, [-0.045, 1.62, 0.12]); k.box(0.03, 0.03, 0.02, 0x000000, [0.045, 1.62, 0.12]);
-  const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
+  const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.userData.kind = 'characters';
   const body = k.mesh(CLAY); inner.add(body);
   const arms = [];
   for (const sx of [-1, 1]) {

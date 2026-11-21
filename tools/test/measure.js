@@ -11,7 +11,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applic
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
     await page.addInitScript({ path: require.resolve('iwer/build/iwer.min.js') });
     await page.addInitScript(() => { const d = new IWER.XRDevice(IWER.metaQuest3); d.installRuntime({ forceInstall: true }); window.__xr = d; });
-    await page.goto(`http://localhost:${srv.address().port}/index.html?fast&rating=kids&chapter=${n}`);
+    await page.goto(`http://localhost:${srv.address().port}/index.html?fast&fulldetail&rating=kids&chapter=${n}`);
     await page.waitForFunction(() => !document.getElementById('vrBtn').disabled, null, { timeout: 20000 });
     await page.click('#vrBtn');
     await page.waitForFunction(() => window.G?.mode === 'vr' && G.director.running, null, { timeout: 15000 });
