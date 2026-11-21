@@ -14,7 +14,7 @@
 //
 // In multiplayer only the host runs run(); friends get the state and the narration lines.
 export const CHAPTERS = [
-  { n: 1, title: 'Campfire, 30,000 years ago', ready: false },
+  { n: 1, title: 'Campfire, 30,000 years ago', ready: true, load: () => import('./chapters/campfire.js') },
   { n: 2, title: 'Stonehenge at dawn', ready: true, load: () => import('./chapters/stonehenge.js') },
   { n: 3, title: 'Sirius over the Nile', ready: false },
   { n: 4, title: 'Babylon predicts an eclipse', ready: false },

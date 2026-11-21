@@ -203,7 +203,7 @@ export class Sky {
         this.moon.material.map = this.moonDisc; this.moon.material.blending = THREE.NormalBlending; this.moon.material.needsUpdate = true;
       }
       if (this.moonPhase == null || Math.abs(this.moonPhase - phase) > 0.004) { this.moonPhase = phase; drawMoon(this.moonCanvas, phase); this.moonDisc.needsUpdate = true; }
-      this.moon.scale.setScalar(26 * size);
+      this.moon.scale.setScalar(64 * size); // about 4 degrees: bigger than life, so its shape is easy to see
     } else this.moon.scale.setScalar(70 * size);
   }
   hideMoon() { this.moon.visible = false; }
