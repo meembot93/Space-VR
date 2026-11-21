@@ -32,7 +32,13 @@ Address-bar options for testing: `?fast` (placeholder lines and timelines run qu
 ## Controls
 
 **Quest** (same as Broadside VR): left stick walk, right stick snap turn (45°) or smooth turn,
-grip = grab (the rope), trigger = touch (the journal page), B or Y = voice chat mic on/off.
+grip = grab (the rope), trigger = touch (the journal page), B or Y = voice chat mic on/off,
+hold either thumbstick pressed in for 1 second = reset your height.
+
+**Seated / Standing** (title screen, remembered on the headset): Seated (default) lifts your
+eyes to a grown-up's standing height (1.6 m) as VR starts, so sitting or being small doesn't put
+you near the ground; Standing uses your real height. Tall players are never pushed down.
+`?posture=standing` picks it from the address. `node tools/test/height-test.js` checks it.
 
 **Desktop test mode:** click to look around, WASD to walk, hold the mouse on the rope and drag
 down to pull (or tap E), click the journal page.
