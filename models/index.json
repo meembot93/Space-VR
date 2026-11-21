@@ -38,5 +38,15 @@
   "file": "sponge_diver.glb",
   "height": 1.8,
   "turn": 0
+ },
+ "eratosthenes": {
+  "file": "eratosthenes.glb",
+  "height": 1.75,
+  "turn": 0
+ },
+ "chinese_astronomer": {
+  "file": "chinese_astronomer.glb",
+  "height": 1.7,
+  "turn": 0
  }
 }
