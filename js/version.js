@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 3;
-export const CHANGES = ['soft background music', 'music easy to swap'];
+export const VERSION = 4;
+export const CHANGES = ['Chapter 2 narration voiced', 'Astra speaks aloud'];
