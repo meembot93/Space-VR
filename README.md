@@ -70,6 +70,9 @@ emulator (a virtual Quest 3): enters VR, walks, snap-turns, grips and hauls the 
 sunbeam, touches the journal page. Add `--shots` to save screenshots.
 `npm run test:ch4` plays Chapter 4 the same way: grips the reed and presses the six marks into
 the clay, grabs the four glowing tablets, looks up at the Moon and checks it turns red.
+`node ch7-test.js` (same folder) plays Chapter 7: walks up the hall, touches Ptolemy's scroll, grips
+and follows Mars around its backward loop, checks the small-circle-on-big-circle machine puts Mars in
+the same place, hears Aristarchus, and touches the last journal page.
 
 ## Version number (please keep it up to date)
 
