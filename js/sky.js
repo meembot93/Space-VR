@@ -186,7 +186,7 @@ export class Sky {
   }
 
   // Spend what's left of the triangle budget on the Milky Way's star dust: the chapter's own
-  // triangles (what's showing, re-checked every 2 s) plus the stars come to about BUDGET.
+  // triangles (what's showing, re-checked twice a second) plus the stars come to about BUDGET.
   budget(scene, BUDGET = 520000) {
     let tris = 0;
     scene.traverseVisible((o) => {
@@ -210,7 +210,7 @@ export class Sky {
     this.starField.update(this.sunAz, this.sunEl, t);
     this.updateMeteor(dt);
     // re-check the budget now and then (models finish loading, chapters swap scenes)
-    if ((this.budgetT = (this.budgetT || 0) - dt) <= 0) { this.budgetT = 2; this.budget(this.scene); }
+    if ((this.budgetT = (this.budgetT || 0) - dt) <= 0) { this.budgetT = 0.5; this.budget(this.scene); }
     const F = this.scene.fog;
     F.far = lerp(this.fogFar, 140, this.mist);
     F.near = lerp(40, 4, this.mist);
