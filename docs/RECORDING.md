@@ -8,7 +8,7 @@ number (`ch2_05.m4a`). Drop them in your project folder; Claude adds them to the
 Until a clip exists, its line shows as a subtitle instead, so nothing is blocked.
 The words live in `js/script.js` (copied from the Era 1 plan doc).
 
-## Chapter 2: Stonehenge at dawn
+## Chapter 2: Stonehenge at dawn (all 10 lines in, version 4)
 
 | # | Line |
 |---|---|
