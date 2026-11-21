@@ -24,10 +24,13 @@ const DROP = 1.25;  // how far below your eyes the ribbon runs
 function labelTex(lines, w = 1024, h = 256) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d'); g.textAlign = 'center'; g.textBaseline = 'middle';
+  const step = 1 / lines.length;
   lines.forEach(([text, size, color], i) => {
-    g.font = `${size}px Georgia, serif`; g.fillStyle = color;
-    g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 12;
-    g.fillText(text, w / 2, h * (lines.length === 1 ? 0.5 : 0.3 + i * 0.42));
+    // shrink the words until they fit, with a margin, so nothing is ever cut off at the sides
+    let fs = size; g.font = `${fs}px Georgia, serif`;
+    while (fs > 20 && g.measureText(text).width > w * 0.9) { fs -= 2; g.font = `${fs}px Georgia, serif`; }
+    g.fillStyle = color; g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 12;
+    g.fillText(text, w / 2, h * step * (i + 0.5));
   });
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return t;
@@ -83,14 +86,15 @@ export class Flight {
       const P = PLACES[ch.n] || { year: '', place: '' }, z = -GAP * (ch.n - 1);
       const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xffe2a8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
       m.position.set(0, -DROP + 0.05, z); m.scale.setScalar(1.2); this.track.add(m);
-      const lab = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.6), new THREE.MeshBasicMaterial({ map: labelTex([[P.year, 74, '#ffd98a'], [P.place, 62, '#e8f0ff']]), transparent: true, depthWrite: false }));
-      lab.position.set(ch.n % 2 ? -1.9 : 1.9, -DROP + 0.55, z); lab.rotation.y = ch.n % 2 ? 0.35 : -0.35; this.track.add(lab);
+      const lab = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.45), new THREE.MeshBasicMaterial({ map: labelTex([[P.year, 74, '#ffd98a'], [P.place, 62, '#e8f0ff']]), transparent: true, depthWrite: false }));
+      lab.position.set(ch.n % 2 ? -1.5 : 1.5, -DROP + 0.55, z); lab.rotation.y = ch.n % 2 ? 0.35 : -0.35; this.track.add(lab);
       this.marks.push({ n: ch.n, m, lab });
     }
 
-    // The arrival card, floating ahead: "Chapter 3: Sirius over the Nile / Egypt, about 2500 BC"
-    this.card = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.64), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0 }));
-    this.card.position.set(0, 0.55, -3.6); this.card.renderOrder = 5; this.rig.add(this.card);
+    // The arrival card, floating ahead: "Chapter 3 / Sirius over the Nile / The Nile, Egypt, about 2500 BC".
+    // About 35 degrees wide, so it sits well inside the headset's view.
+    this.card = new THREE.Mesh(new THREE.PlaneGeometry(2, 0.6), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0 }));
+    this.card.position.set(0, 0.45, -3); this.card.renderOrder = 5; this.rig.add(this.card);
 
     // Its own fade to black (the world's fader isn't in this scene)
     this.fader = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 8), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: 1, side: THREE.BackSide, depthTest: false, depthWrite: false }));
@@ -106,7 +110,7 @@ export class Flight {
     this.rig.position.copy(p); this.rig.rotation.set(0, Math.atan2(-d.x, -d.z), 0);
     this.from = from; this.to = to; this.t = 0; this.secs = secs;
     this.card.material.map?.dispose();
-    this.card.material.map = labelTex([[`Chapter ${to}: ${info?.title || ''}`, 70, '#fff3d6'], [`${P.place || ''}, ${P.year || ''}`, 60, '#ffd98a']], 1400, 300);
+    this.card.material.map = labelTex([[`Chapter ${to}`, 56, '#ffd98a'], [info?.title || '', 80, '#fff3d6'], [`${P.place || ''}, ${P.year || ''}`, 56, '#ffd98a']], 1400, 420);
     this.card.material.opacity = 0; this.card.material.needsUpdate = true;
     this.fade = 1; this.active = true; this.chimed = false;
     G.soundscape?.setLevel(0);
