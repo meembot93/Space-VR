@@ -230,7 +230,7 @@ export default class Campfire {
   // and a rocket drawn in starlight
   buildEchoes() {
     this.echoes = new THREE.Group(); this.echoes.visible = false; this.root.add(this.echoes);
-    const finds = [['Border Cave, South Africa', -0.75, 0.05], ['Ishango, Congo', 0, 0.38], ['Abri Blanchard, France', 0.75, 0.05]];
+    const finds = [['Border Cave, South Africa', -0.5, 0], ['Ishango, Congo', 0, 0.2], ['Abri Blanchard, France', 0.5, 0]];
     this.echoMats = [];
     for (const [name, x, y] of finds) {
       const k = new Kit(), curve = [];
@@ -468,7 +468,7 @@ export default class Campfire {
     this.echoV = damp(this.echoV || 0, s.echo || 0, 1.5, dt);
     this.echoes.visible = this.echoV > 0.01;
     if (this.echoes.visible) {
-      if (!this.echoSet) { this.echoSet = true; this.echoes.position.copy(this.bone.position).add(_a.set(0, 0.35, 0)); this.echoes.quaternion.copy(this.bone.quaternion); }
+      if (!this.echoSet) { this.echoSet = true; G.camera.getWorldDirection(_b); _b.y = 0; _b.normalize(); this.echoes.position.copy(this.bone.position).addScaledVector(_b, 0.9).add(_a.set(0, 0.45, 0)); this.echoes.quaternion.copy(this.bone.quaternion); }
       for (const mtl of this.echoMats) mtl.opacity = this.echoV * (mtl.isSpriteMaterial ? 1 : 0.9);
       this.echoes.children.forEach((g, i) => { g.position.copy(g.userData.base); g.position.y += Math.sin(t * 1.2 + i * 2) * 0.02 + (1 - Math.min(1, this.echoV)) * -0.2; g.rotation.y = Math.sin(t * 0.5 + i) * 0.4; });
     }
