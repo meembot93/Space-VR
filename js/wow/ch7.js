@@ -9,6 +9,7 @@
 //    drifts by (Sputnik, where the story is heading), and the words "Era 2 is on the way" glow ahead.
 import * as THREE from 'three';
 import { Space } from './space.js';
+import { CHAPTERS } from '../chapters.js';
 import { textSprite, glowSprite, shimmer, shatter, rumble, whoosh, awe, beeps, Timeline, clamp01, ease } from './fx.js';
 
 const SHARDS = 900;
@@ -27,7 +28,7 @@ export default class Ch7Extras {
     this.space = new Space(G, { earthR: 60 });
     this.sputnik = makeSputnik(); this.sputnik.visible = false; this.space.group.add(this.sputnik);
     this.title = new THREE.Group(); this.space.group.add(this.title);
-    this.t1 = textSprite('Era 2 is on the way', 1.4); this.t2 = textSprite('Starward', 2.6, { color: '#ffe7b0' });
+    this.t1 = textSprite(CHAPTERS.find((c) => c.n === 8)?.ready ? 'Next: Era 2, The Telescope and the Rocket' : 'Era 2 is on the way', 1.4); this.t2 = textSprite('Starward', 2.6, { color: '#ffe7b0' });
     this.t2.position.y = 2.2; this.title.add(this.t1, this.t2); this.title.visible = false;
     this.finT = -1;
   }

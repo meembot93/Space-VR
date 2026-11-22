@@ -73,5 +73,55 @@
   "file": "stonehenge_builder_far.glb",
   "height": 1.75,
   "turn": 0
+ },
+ "copernicus": {
+  "file": "copernicus.glb",
+  "height": 1.74,
+  "turn": 0
+ },
+ "galileo": {
+  "file": "galileo.glb",
+  "height": 1.7,
+  "turn": 0
+ },
+ "tycho": {
+  "file": "tycho.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "kepler": {
+  "file": "kepler.glb",
+  "height": 1.7,
+  "turn": 0
+ },
+ "canon": {
+  "file": "era2_canon.glb",
+  "height": 1.72,
+  "turn": 0
+ },
+ "rheticus": {
+  "file": "era2_rheticus.glb",
+  "height": 1.74,
+  "turn": 0
+ },
+ "townsman": {
+  "file": "era2_townsman.glb",
+  "height": 1.7,
+  "turn": 0
+ },
+ "goddard": {
+  "file": "goddard.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "tsiolkovsky": {
+  "file": "tsiolkovsky.glb",
+  "height": 1.72,
+  "turn": 0
+ },
+ "newton": {
+  "file": "newton.glb",
+  "height": 1.7,
+  "turn": 0
  }
 }

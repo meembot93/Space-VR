@@ -1,4 +1,4 @@
-// Every narration line in Era 1, numbered. Astra, the guide star, says them, in Meem's voice.
+// Every narration line in Era 1 and Era 2, numbered. Astra, the guide star, says them, in Meem's voice.
 //
 // Recording: each line is its own short clip named by its number, e.g. ch2_05.mp3, in
 // sounds/narration/ (see docs/RECORDING.md). Until a clip exists, the line shows as a subtitle
@@ -85,7 +85,88 @@ export const LINES = {
   ch7_10: "Almost nobody listened. It seemed ridiculous. After all, we can't feel the Earth moving... can we?",
   ch7_11: "Ptolemy's model was beautiful. It was useful. And it was wrong.",
   ch7_12: "The answer would take more than a thousand years, and sky watchers all over the world, to find. But that's the next part of our story.",
+
+  // ---------- Era 2: The Telescope and the Rocket (recording sheet: narration/ERA2_RECORDING_SHEET.md) ----------
+  // Era 2, Chapter 1: Copernicus moves the Sun
+  ch8_01: "Remember Aristarchus, and his strange question? What if the Sun is in the middle? For almost two thousand years, hardly anyone took it seriously. Then, on the cold coast of Poland, one man did.",
+  ch8_02: "This is Frombork, about five hundred years ago. That's Nicolaus Copernicus. By day he works for the cathedral. He's a doctor, a lawyer, and he looks after the money. But at night, up in his tower, he watches the planets.",
+  ch8_03: "Copernicus had studied Ptolemy's great book. He knew the spinning circles worked. But they were so complicated. Circles on circles on circles. Surely the sky should be simpler than that.",
+  ch8_04: "So he tried an experiment, in his head. Take the Sun... and put it in the middle.",
+  ch8_05: "Now the Earth is just another planet, going around the Sun. Mercury, Venus, Earth, Mars, Jupiter, Saturn, each in its own circle. The closer to the Sun, the faster it goes.",
+  ch8_06: "Now watch Mars from the Earth. We're on the inside lane, going faster. When we catch up and pass it... Mars seems to go backward. No little circles needed. It's like passing a slower car on the highway.",
+  ch8_07: "And why does the whole sky spin around us every night? Because the Earth itself is turning, once a day, like a spinning top.",
+  ch8_08: "It was a daring idea. It went against what almost everyone believed, and Copernicus worried people would laugh. So he waited. For about thirty years, he kept working, and showed it to only a few friends.",
+  ch8_09: "At last, in 1543, his book was printed. The story goes that the very first copy reached him on the day he died.",
+  ch8_10: "His book didn't change the world overnight. But it started a revolution. To prove it, though, someone would need to measure the sky better than anyone ever had.",
+  // Era 2, Chapter 2: Tycho's new star
+  ch9_01: "Denmark, November 1572. A young nobleman named Tycho Brahe is walking home after a day of experiments. He looks up at the stars he knows by heart... and stops.",
+  ch9_02: "What is that? A new star? Am I dreaming? Somebody tell me you can see it too!",
+  ch9_03: "There, in Cassiopeia, the queen on her throne. A star that wasn't there before. Brighter than every other star in the sky.",
+  ch9_04: "Everyone had been taught that the heavens never change. Tycho measured the new star night after night. It never moved against the other stars. It wasn't close, like the Moon. It was far out among the stars themselves. The heavens could change.",
+  ch9_05: "Today we know what he saw: a star exploding, so far away that its light had been travelling for thousands of years.",
+  ch9_06: "The King of Denmark was so impressed, he gave Tycho a whole island. And Tycho built a castle for the sky. He called it Uraniborg.",
+  ch9_07: "There were no telescopes yet. Just giant instruments of brass and wood, and very sharp eyes. This one is built right into the wall. Line up the star in the sights, and call out the time.",
+  ch9_08: "Tycho had a nose made of metal, after losing part of his own in a sword fight. He had a team of helpers, and even a pet elk that wandered around the castle.",
+  ch9_09: "Night after night, for more than twenty years, they measured the stars and planets more carefully than anyone ever had. And Tycho saw that comets fly far beyond the Moon, smashing through where the crystal spheres were supposed to be.",
+  ch9_10: "But Tycho never believed the Earth moves. He was wrong about that. What he left behind was even better than an idea: the best measurements in the world. Especially of Mars.",
+  // Era 2, Chapter 3: Kepler's ellipses
+  ch10_01: "Prague, the year 1600. Tycho has moved here to work for the Emperor, and he's hired a new helper: Johannes Kepler. Kepler is poor, and his eyesight is weak. But he's brilliant at math.",
+  ch10_02: "The two of them didn't always get along. Tycho guarded his measurements like treasure. Then, the very next year, Tycho fell ill and died. And Kepler got everything.",
+  ch10_03: "Kepler picked the hardest planet: Mars. He tried circle after circle. One came so close... but it still missed Tycho's measurements, by less than a third of the width of the full Moon.",
+  ch10_04: "Anyone else would have said, close enough. But Kepler trusted Tycho's eyes. If the circle didn't fit, the circle had to go.",
+  ch10_05: "After years of work, he found it. Mars doesn't move in a circle. It moves in an ellipse: a stretched circle, with the Sun not in the middle, but off to one side.",
+  ch10_06: "Want to draw one? Two pins, a loop of string, and a pencil. Keep the string tight, and go all the way around.",
+  ch10_07: "And there's more. When Mars swings close to the Sun, it speeds up. Far away, it slows down. Like a skateboarder in a bowl: fast at the bottom, slow at the top.",
+  ch10_08: "With ellipses, the predictions finally matched the sky. Kepler's tables were the most accurate ever made.",
+  ch10_09: "Kepler even wrote one of the first science fiction stories ever: a dream about a journey to the Moon.",
+  ch10_10: "But why do the planets move like this? What holds them on their paths? Nobody knew yet. And meanwhile, in Italy, someone had just pointed a brand new invention at the sky.",
+  // Era 2, Chapter 4: Galileo's telescope
+  ch11_01: "Italy, 1609. In Holland, spectacle makers have invented a tube with two glass lenses that makes faraway things look close. A professor named Galileo Galilei hears about it, and builds a better one himself.",
+  ch11_02: "Merchants used telescopes to spot ships coming into port hours early. But Galileo did something new. He pointed his up.",
+  ch11_03: "Let's look at the Moon.",
+  ch11_04: "It isn't a perfect, smooth ball at all. It has mountains, and craters, and long dark shadows. Galileo even worked out how tall the mountains were from their shadows. The Moon is a world, like ours.",
+  ch11_05: "Now the Milky Way. That river of light? Through the telescope it breaks apart into stars. Countless stars, too faint to see on their own.",
+  ch11_06: "Then, in January 1610, he looked at Jupiter. Beside it, three little stars in a row. The next night, they had moved. A few nights later, there were four.",
+  ch11_07: "They are not stars. They are going around Jupiter. Moons! Four moons!",
+  ch11_08: "Proof that not everything in the sky goes around the Earth. Later, he watched Venus change shape like the Moon, from a thin crescent to almost full. That only works if Venus goes around the Sun.",
+  ch11_09: "Galileo wrote it all in a little book called The Starry Messenger, and it made him famous. But saying the Earth moves got him into big trouble. He was put on trial, and spent his last years shut up in his house.",
+  ch11_10: "Hundreds of years later, the Church said he had been right. When we sent a spacecraft to Jupiter, we named it Galileo. And those four moons are still called the Galilean moons.",
+  // Era 2, Chapter 5: Newton's apple and cannon
+  ch12_01: "England, 1666. A terrible sickness, the plague, has closed the university. A young student named Isaac Newton has come home to his family's farm. He's twenty-three, and he's thinking about everything.",
+  ch12_02: "The story goes that one evening, he was sitting in the orchard, and he saw an apple fall.",
+  ch12_03: "Why does an apple always fall straight down? Never sideways, never up? Something must be pulling it toward the Earth.",
+  ch12_04: "Then Newton looked up at the Moon, and wondered. If the Earth pulls the apple, does it pull the Moon too? And if it does... why doesn't the Moon fall down?",
+  ch12_05: "Here's how he worked it out. Imagine a cannon on top of a very, very tall mountain. Fire it, and the ball curves down to the ground.",
+  ch12_06: "Fire it faster, and it flies farther before it lands.",
+  ch12_07: "Now fire it really fast. The ball falls... but the Earth curves away underneath it just as fast. It keeps falling, and keeps missing. All the way around.",
+  ch12_08: "That's an orbit. The Moon is falling too, and it has been falling around the Earth for billions of years. The same pull that drops the apple holds the Moon, and holds the planets around the Sun. Newton called it gravity.",
+  ch12_09: "His math even explained Kepler's ellipses. In 1687 he put it all into one of the most important books ever written, the Principia.",
+  ch12_10: "And hidden in that cannonball idea was something amazing. If you could ever throw something fast enough, about eight kilometers every second, it would never come down. You could make your own moon. It would take almost three hundred years to work out how.",
+  // Era 2, Chapter 6: The rocket dreamers
+  ch13_01: "Newton showed how something could stay up in space. But how do you get there? For a long time it was only a dream, in stories like Jules Verne's, where travellers are fired to the Moon from a giant cannon.",
+  ch13_02: "Russia, 1903. In the town of Kaluga lives a schoolteacher named Konstantin Tsiolkovsky. He lost most of his hearing as a boy, and taught himself science from library books.",
+  ch13_03: "Tsiolkovsky worked out that a cannon would never work. You need a rocket. A rocket pushes itself forward by blasting gas out of the back. Just like a balloon zooming around the room when you let it go.",
+  ch13_04: "He worked out the math for how much fuel it takes to reach space. And he wrote: The Earth is the cradle of humanity. But we cannot stay in the cradle forever.",
+  ch13_05: "America, March 1926. A snowy field on Aunt Effie's farm in Massachusetts. Robert Goddard has built something brand new: a rocket that burns liquid fuel, gasoline and liquid oxygen.",
+  ch13_06: "All right, Henry. Light it.",
+  ch13_07: "Two and a half seconds. Twelve meters high. It landed in a cabbage patch. That doesn't sound like much. But it was the first liquid-fuel rocket ever to fly, and every big rocket since works the same way.",
+  ch13_08: "Newspapers made fun of Goddard. They said a rocket could never work in empty space, with nothing to push against. They were wrong. Almost fifty years later, as astronauts flew to the Moon, one newspaper finally said sorry.",
+  ch13_09: "Then came a terrible war. In Germany, engineers built a giant rocket called the V-2. It was a weapon, and prisoners were forced to build it. But in 1944, one of them did something nothing made by people had ever done. It reached space.",
+  ch13_10: "After the war, the rocket builders and their rockets were taken to America, and to the Soviet Union. Two rival countries now held the key to space. And the race was about to begin.",
+  // Era 2, Chapter 7: Sputnik
+  ch14_01: "October the fourth, 1957. Night, in the desert of Kazakhstan, in the Soviet Union. Engineers have worked in secret for weeks. On the launch pad stands the most powerful rocket ever built.",
+  ch14_02: "Its chief designer, Sergei Korolev, had dreamed of space ever since he read Tsiolkovsky as a young man. His name was kept secret. The world only knew him as the Chief Designer.",
+  ch14_03: "On top, under the nose, is a shiny metal ball about the size of a beach ball, with four long antennas. Its name is Sputnik. It means travelling companion.",
+  ch14_04: "Five... four... three... two... one...",
+  ch14_05: "Liftoff!",
+  ch14_06: "Faster and faster. Eight kilometers every second. Just like Newton's cannonball, Sputnik is falling around the Earth, and missing. It's in orbit.",
+  ch14_07: "Listen! The signal! Beep, beep, beep. It's working! It's in orbit!",
+  ch14_08: "Once around the whole planet every hour and a half. And the whole way, it sends a simple radio signal. Beep. Beep. Beep.",
+  ch14_09: "All over the world, people tuned their radios to listen. At dusk and dawn they went outside and looked up. That moving light? That's the big rocket stage, following Sputnik around the world.",
+  ch14_10: "Remember the beep you heard at the very end of our first journey? Now you know what it was.",
+  ch14_11: "For thirty thousand years, people looked up at the sky. Now, for the first time, something made by people was up there, looking back down.",
+  ch14_12: "The Space Race had begun. In just twelve years, people would walk on the Moon. But that's the next part of our story.",
 };
 
 // Lines spoken by someone other than Astra (a different voice in the recording)
-export const SPEAKERS = { ch7_09: 'Aristarchus' };
+export const SPEAKERS = { ch7_09: 'Aristarchus', ch9_02: 'Tycho', ch11_07: 'Galileo', ch13_06: 'Goddard', ch14_07: 'Engineer' };
