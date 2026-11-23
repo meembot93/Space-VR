@@ -21,6 +21,7 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { glowPoints, textSprite, shatter, rumble, whoosh, awe, shimmer } from '../wow/fx.js';
 import { Echo } from '../wow/echo.js';
+import { grove, bareTree, orchardTree, bush } from '../trees.js';
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(91), N2 = noise2(93);
@@ -126,12 +127,15 @@ export default class Tycho {
     this.labSmoke = makeSmoke(new THREE.Vector3(31, 10, -8), { n: 7, rise: 8, size: 1.2, opacity: 0.18, color: 0x9a9aa8 }); A.add(this.labSmoke.group);
     // a fence along the lane, bare trees, haystacks
     for (let x = -12; x < 50; x += 2.4) { const z = 4 + Math.sin(x / 30) * 3 - 2.4; k.box(0.1, 1.1, 0.1, 0x4a3a2a, [x, fieldsHeight(x, z) + 0.55, z]); k.box(2.4, 0.08, 0.05, 0x5a4a3a, [x + 1.2, fieldsHeight(x, z) + 0.85, z]); }
+    // bare November trees: a few detailed ones near the lane, the rest a cheap grove
+    const near = [], far = [];
     for (let i = 0; i < 90; i++) {
       const a = r() * 6.28, d = 18 + r() * 300, x = Math.cos(a) * d, z = Math.sin(a) * d; if (x > 10 && x < 90 && z > -20 && z < 40) continue;
-      const y = fieldsHeight(x, z), s = 0.8 + r() * 0.7;
-      k.cyl(0.12 * s, 0.25 * s, 5 * s, 5, 0x2a221c, [x, y + 2.5 * s, z]);
-      for (let j = 0; j < 5; j++) { const b = r() * 6.28; k.cyl(0.03 * s, 0.08 * s, 3 * s, 4, 0x2a221c, [x + Math.cos(b) * 0.9 * s, y + (4.5 + r() * 1.5) * s, z + Math.sin(b) * 0.9 * s], [Math.sin(b) * 0.7, 0, -Math.cos(b) * 0.7]); }
+      if (Math.abs(z - 4 + Math.sin(x / 30) * 3) < 4) continue;   // not on the lane
+      (d < 60 ? near : far).push({ x, y: fieldsHeight(x, z) - 0.05, z, s: 0.8 + r() * 0.5 });
     }
+    A.add(grove(bareTree, near, { detail: 'mid', variants: 4, seed: 3, height: 9 }).group);
+    A.add(grove(bareTree, far, { detail: 'low', variants: 4, seed: 5, height: 9 }).group);
     for (let i = 0; i < 8; i++) { const x = -30 - r() * 60, z = -20 - r() * 60; k.cyl(0.4, 2.2, 3, 8, 0x8a7a4a, [x, fieldsHeight(x, z) + 1.5, z]); }
     A.add(k.mesh());
     A.add(windows(wins, { lit: 0.55, seed: 2 }));
@@ -265,7 +269,11 @@ export default class Tycho {
     // the servants' house (north corner) and the printing house (south corner), gable ends stepped
     for (const s of [-1, 1]) house(k, { x: X, y: 0, z: Z + s * (HD - 2.5), w: 7.5, d: 6, h: 4.6, yaw: s > 0 ? Math.PI : 0, wall: BRK[1], roofCol: 0x6a3426, gableFront: true, stepped: true }, wins);
     // garden trees (fruit trees in rows) and hedges
-    for (let i = 0; i < 64; i++) { const a = i / 64 * 6.28, d = i % 2 ? 30 : 18, x = X + Math.cos(a) * d, z = Z + Math.sin(a) * d; if (Math.abs(x - X) < 3 || Math.abs(z - Z) < 3 || Math.hypot(x, z) < 8) continue; k.cyl(0.08, 0.12, 1.6, 5, 0x3a2a1c, [x, 0.8, z]); k.ball(1.1, 1, i % 3 ? 0x4a6a2a : 0x5a6a30, [x, 2.2, z]); }
+    const orch = [], shrubs = [];
+    for (let i = 0; i < 64; i++) { const a = i / 64 * 6.28, d = i % 2 ? 30 : 18, x = X + Math.cos(a) * d, z = Z + Math.sin(a) * d; if (Math.abs(x - X) < 3 || Math.abs(z - Z) < 3 || Math.hypot(x, z) < 8) continue; orch.push({ x, y: -0.05, z, s: 0.85 + r() * 0.3 }); }
+    for (let i = 0; i < 40; i++) { const a = (i + 0.5) / 40 * 6.28, x = X + Math.cos(a) * 21.5, z = Z + Math.sin(a) * 21.5; if (Math.abs(x - X) < 3.5 || Math.abs(z - Z) < 3.5) continue; shrubs.push({ x, y: -0.03, z, s: 0.8 + r() * 0.4 }); }
+    Bg.add(grove(orchardTree, orch, { detail: 'mid', variants: 4, seed: 7, height: 4.2 }).group);
+    Bg.add(grove(bush, shrubs, { detail: 'low', variants: 3, seed: 2, height: 1.1 }).group);
     // Stjerneborg: the half-underground observatory nearby, its little domes just above the ground
     for (const [dx, dz] of [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]]) k.ball(dx || dz ? 1.8 : 2.4, 1, 0x7a5a3a, [70 + dx, -0.5, -80 + dz], 0, [1, 0.7, 1]);
     // fields, farms and the village of Tuna
