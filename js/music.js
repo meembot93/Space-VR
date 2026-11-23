@@ -25,7 +25,7 @@ const MOMENTS = {
   ch10: { line: 'ch10_05', at: 'he found it' },             // Kepler finds the ellipse
   ch11: { when: (ch) => ch.s?.phase === 'moon' && ch.s?.scope === 1 }, // the moment you look through the telescope at the Moon (Meem's model moment)
   ch12: { when: (ch) => ch.s?.phase === 'cannon' && ch.s?.mtn === 1 }, // Newton's cannon on the tall mountain appears (Meem's pick)
-  ch13: { when: (ch) => ch.s?.phase === 'launch' },         // Goddard's rocket lifts off
+  ch13: { line: 'ch13_01', at: 'how do you get there' },  // right at the start, dreaming of space (Meem's pick); none for Goddard or the V-2
   ch14: { line: 'ch14_11' },                                // "something made by people was up there, looking back down"
 };
 const SCORE_SECS = 50; // how long the generated score plays at a moment (when there's no music file)
