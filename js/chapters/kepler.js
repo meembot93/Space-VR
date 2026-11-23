@@ -526,7 +526,7 @@ export default class Kepler {
     this.G.world.blockers.push(this.tycBlk = { x: -0.55, z: -1.05, r: 0.3 });
     // in the street below, walking up to the square and back: each one a different person (two with lanterns)
     this.walkers = [];
-    const who = [['townsman', 1.7, -12], ['instrument_maker', 1.68, -60], ['copernicus', 1.72, -35], ['newton', 1.66, -82]];
+    const who = [['townsman', 1.7, -12], ['instrument_maker', 1.68, -60], ['sailor', 1.72, -35], [null, 1.66, -82]];
     who.forEach(([model, height, z0], i) => {
       const x = (i % 2 ? 1.6 : -1.6), P = add(model, new THREE.Vector3(x, groundHeight(x, z0), z0), { height, seed: 40 + i });
       P.routine = [{ x, z: -92, pose: 'idle', secs: 3 + i }, { x: SQ.x - 14 + i * 6, z: SQ.z + 14, pose: i % 2 ? 'talk' : 'idle', secs: 6 }, { x: -x, z: -24 - i * 6, pose: 'idle', secs: 4 }];

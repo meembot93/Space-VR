@@ -566,7 +566,7 @@ export default class Galileo {
     this.spyTube = tk.mesh(); this.spyglass = new THREE.Group(); this.spyglass.add(this.spyTube); this.spyLen = 0.55; this.spyTube.scale.set(1, this.spyLen, 1);
     holdProp(this.galA, this.spyglass, 'Right', [0, 0.05, 0.03]);
     // (every senator a different person: one model each, none of them Galileo's own face)
-    const SEN = ['canon', 'ptolemy', 'instrument_maker', 'aristotle'];
+    const SEN = ['canon', 'ptolemy', 'instrument_maker', 'rheticus'];
     this.senators = [[3.3, 3.0, 2.3], [2.0, -2.3, 1.2], [4.1, -2.0, 1.4], [-2.6, 3.4, 2.4]].map(([x, z, yaw], i) => { const P = add(this.A, SEN[i], new THREE.Vector3(x, TOPA, z), { tunic: 0x8a1a1a, hair: 0x5a5a5a, height: 1.7 + i * 0.03 }); P.g.rotation.y = yaw; P.glance = true; return P; });
     // Padua: Galileo at his telescope; two craftsmen in the garden workshop; people in the street
     this.galB = add(this.B, 'galileo', new THREE.Vector3(1.35, TOPB, -0.55), { tunic: 0x1a1a1a, hair: 0x6a3a1a, beard: true, height: 1.7 });
