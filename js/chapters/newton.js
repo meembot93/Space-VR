@@ -297,7 +297,7 @@ export default class Newton {
     // Newton's little pile of books on the grass beside him, and an open notebook
     k.box(0.22, 0.05, 0.3, 0x5a2a1a, [SIT.x + SIDE.x * 0.55, groundHeight(SIT.x, SIT.z) + 0.025, SIT.z + SIDE.z * 0.55], [0, 0.4, 0]);
     k.box(0.2, 0.05, 0.28, 0x2a3a2a, [SIT.x + SIDE.x * 0.55, groundHeight(SIT.x, SIT.z) + 0.075, SIT.z + SIDE.z * 0.55], [0, 0.7, 0]);
-    k.box(0.36, 0.01, 0.26, 0xece0c0, [SIT.x - SIDE.x * 0.6 + TOWARD.x * 0.3, groundHeight(SIT.x, SIT.z) + 0.01, SIT.z - SIDE.z * 0.6 + TOWARD.z * 0.3], [0, 0.9, 0]);
+    k.box(0.36, 0.01, 0.26, 0xece0c0, [SIT.x + SIDE.x * 0.75 + TOWARD.x * 0.5, groundHeight(SIT.x, SIT.z) + 0.01, SIT.z + SIDE.z * 0.75 + TOWARD.z * 0.5], [0, 0.9, 0]);
     this.root.add(k.mesh());
     this.applesMesh = ak.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })); this.root.add(this.applesMesh);
   }
@@ -394,7 +394,7 @@ export default class Newton {
     this.arrows = [arrow(0.45, 0xffd890), arrow(0.45, 0xffd890), arrow(0.45, 0xffd890)];   // up, left, right
     this.down = arrow(0.6, 0xffe2a0);
     this.pullDots = glowPoints(90, { sizeScale: 300, depthTest: false }); this.pullDots.visible = false; this.root.add(this.pullDots);
-    this.centreLab = label("toward the middle of the Earth", 0.09); this.centreLab.material.opacity = 0; this.centreLab.material.depthTest = false; this.root.add(this.centreLab);
+    this.centreLab = label("toward the middle of the Earth", 0.13); this.centreLab.material.opacity = 0; this.centreLab.material.depthTest = false; this.root.add(this.centreLab);
   }
 
   // The Moon question, the ellipse and the satellite (all on the farm)
@@ -428,7 +428,7 @@ export default class Newton {
     this.bookSparks = glowPoints(70, { sizeScale: 260 }); this.bookSparks.visible = false; this.root.add(this.bookSparks);
     this.bs = Array.from({ length: 70 }, () => ({ a: Math.random() * 6.28, y: Math.random() * 3, r: 0.1 + Math.random() * 0.3, v: 0.4 + Math.random() * 0.8 }));
     // ch12_10: a satellite: a steady little star creeping across the sky (and its speed)
-    this.sat = glow(0xf4f8ff, 4, 0); this.root.add(this.sat);
+    this.sat = glow(0xf4f8ff, 9, 0); this.root.add(this.sat);
     this.satTrail = glowPoints(50, { sizeScale: 1800 }); this.satTrail.visible = false; this.root.add(this.satTrail);
     this.satLab = label('8 kilometres every second', 0.32); this.satLab.material.opacity = 0; this.root.add(this.satLab);
   }
@@ -470,12 +470,12 @@ export default class Newton {
     this.paths = SPEEDS.map((k) => simulate(k * VC));
     this.shotLabs = ['slow', 'faster', 'really fast'].map((t) => { const l = label(t, 0.42); l.material.opacity = 0; C.add(l); return l; });
     this.orbitLab = label('An orbit!', 0.4); this.orbitLab.material.opacity = 0; C.add(this.orbitLab);
-    this.gravLab = label('GRAVITY', 0.7, { bold: true, color: '#ffe8b0' }); this.gravLab.material.opacity = 0; C.add(this.gravLab);
+    this.gravLab = label('GRAVITY', 1.1, { bold: true, color: '#ffe8b0' }); this.gravLab.material.opacity = 0; C.add(this.gravLab);
     this.moonLab = label('the Moon, falling too', 0.3); this.moonLab.material.opacity = 0; C.add(this.moonLab);
     // far off: a little Sun with planets going round it
-    this.mini = new THREE.Group(); sp.group.add(this.mini);
+    this.mini = new THREE.Group(); this.mini.scale.setScalar(1.8); sp.group.add(this.mini);
     this.miniSun = glow(0xffc050, 2.2, 0); this.mini.add(this.miniSun);
-    this.miniPts = glowPoints(420, { sizeScale: 300 }); this.mini.add(this.miniPts);
+    this.miniPts = glowPoints(420, { sizeScale: 700 }); this.mini.add(this.miniPts);
     this.miniLab = label('...and the planets round the Sun', 0.32); this.miniLab.position.y = 2.2; this.miniLab.material.opacity = 0; this.mini.add(this.miniLab);
     // the brass lever by your hand (Adults pull it; in Kids mode Astra does)
     const lv = this.lever = new THREE.Group(); sp.group.add(lv);
@@ -486,7 +486,7 @@ export default class Newton {
     this.arm.add(ak.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.6, fog: false })));
     this.knobGlow = glow(0xffd890, 0.25, 0); this.knobGlow.position.y = 0.34; this.arm.add(this.knobGlow);
     this.thread = glowPoints(60, { sizeScale: 200 }); sp.group.add(this.thread);
-    this.shotN = 0; this.shotT = 0; this.orbA = 0; this.loops = 0; this.moonA = 2.3;
+    this.shotN = 0; this.shotT = 0; this.orbA = 0; this.loops = 0; this.moonA = -0.9;
   }
 
   registerInteractables() {
@@ -730,7 +730,7 @@ export default class Newton {
     this.pullDots.visible = k2 > 0.01;
     if (this.pullDots.visible) {
       const P = this.pullDots.userData;
-      for (let i = 0; i < 90; i++) { const f = ((i / 90) + t * 0.18) % 1, d = f * f * 7; P.pos.set([_a.x, _a.y - 0.1 - d, _a.z], i * 3); const b = k2 * (1 - f) * 0.9; P.col.set([b, b * 0.85, b * 0.55], i * 3); P.size[i] = 0.03 + f * 0.06; }
+      for (let i = 0; i < 90; i++) { const f = ((i / 90) + t * 0.18) % 1, d = f * f * 7; P.pos.set([_a.x, _a.y - 0.1 - d, _a.z], i * 3); const b = k2 * (1 - f) * 0.9; P.col.set([b, b * 0.85, b * 0.55], i * 3); P.size[i] = 0.05 + f * 0.1; }
       P.commit();
     }
     this.centreLab.material.opacity = k2; this.centreLab.position.copy(_a).add(_b.set(0, -0.55, 0)).addScaledVector(TOWARD, 0.35);
@@ -794,7 +794,7 @@ export default class Newton {
     this.sat.position.copy(_c).addScaledVector(dirFromAzEl(az, el, _a), 420);
     this.sat.material.opacity = (s.sat ? 1 : 0) * clamp01(this.satT) * (0.85 + 0.15 * Math.sin(t * 2)) * (f < 1 ? 1 : 0);
     this.satTrail.visible = this.sat.material.opacity > 0.01;
-    if (this.satTrail.visible) { const P = this.satTrail.userData; for (let i = 0; i < 50; i++) { const ff = Math.max(0, f - i * 0.0025), q = _b.copy(_c).addScaledVector(dirFromAzEl(215 + ff * 190, 18 + Math.sin(ff * Math.PI) * 58, _d), 420); P.pos.set([q.x, q.y, q.z], i * 3); const b = 0.5 * (1 - i / 50); P.col.set([b * 0.8, b * 0.9, b], i * 3); P.size[i] = 0.4; } P.commit(); }
+    if (this.satTrail.visible) { const P = this.satTrail.userData; for (let i = 0; i < 50; i++) { const ff = Math.max(0, f - i * 0.0012), q = _b.copy(_c).addScaledVector(dirFromAzEl(215 + ff * 190, 18 + Math.sin(ff * Math.PI) * 58, _d), 420); P.pos.set([q.x, q.y, q.z], i * 3); const b = i ? 0.45 * (1 - i / 50) : 1.6; P.col.set([b * 0.85, b * 0.92, b], i * 3); P.size[i] = i ? 0.9 : 4.5; } P.commit(); }
     this.satLab.material.opacity = damp(this.satLab.material.opacity, s.sat >= 2 && s.phase === 'satellite' ? 1 : 0, 2, dt);
     this.satLab.position.copy(_c).add(at(FACE, 9, 3.6));
     if (s.sat === 3 && !this.beeped) { this.beeped = true; const A = G.audio; if (A.ctx) { const o = A.out(null, 0.08); for (let i = 0; i < 5; i++) A.tone(o, { type: 'square', f: 1000, peak: 0.1, a: 0.005, d: 0.25, t0: i * 0.62 }); } }
@@ -830,7 +830,7 @@ export default class Newton {
     sp.earth.quaternion.copy(q).premultiply(new THREE.Quaternion().setFromAxisAngle(u, ang));
     sp.sunDir.copy(f).negate().multiplyScalar(0.7).addScaledVector(r, -0.55).add(_a.set(0, 0.5, 0)).normalize();
     sp.moon.scale.setScalar(0.62); sp.moon.visible = false;
-    this.mini.position.copy(cam).addScaledVector(f, 10).addScaledVector(r, -8).add(_a.set(0, 2.5, 0));
+    this.mini.position.copy(cam).addScaledVector(f, 10).addScaledVector(r, -11).add(_a.set(0, 4, 0));
     this.lever.position.copy(cam).addScaledVector(f, 0.42).addScaledVector(r, 0.4).add(_a.set(0, -0.72, 0));
     this.lever.rotation.y = Math.atan2(r.x, r.z);
     sp.enter(this.root);
@@ -924,8 +924,8 @@ export default class Newton {
       const P = this.miniPts.userData, k = this.miniK; let m = 0;
       [[0.55, 0.24, 0xd8c8b0], [0.9, 0.15, 0x9ac8ff], [1.3, 0.08, 0xff7a50], [1.8, 0.04, 0xf0d2a8]].forEach(([R, w, c], i) => {
         const col = new THREE.Color(c);
-        for (let j = 0; j < 90; j++) { const a = j / 90 * Math.PI * 2; P.pos.set([Math.cos(a) * R, 0, Math.sin(a) * R], m * 3); P.col.set([0.15 * k, 0.15 * k, 0.2 * k], m * 3); P.size[m] = 0.012; m++; }
-        const a = t * w * fast * 3 + i * 1.7; P.pos.set([Math.cos(a) * R, 0, Math.sin(a) * R], m * 3); P.col.set([col.r * k, col.g * k, col.b * k], m * 3); P.size[m] = 0.09; m++;
+        for (let j = 0; j < 90; j++) { const a = j / 90 * Math.PI * 2; P.pos.set([Math.cos(a) * R, 0, Math.sin(a) * R], m * 3); P.col.set([0.3 * k, 0.3 * k, 0.4 * k], m * 3); P.size[m] = 0.02; m++; }
+        const a = t * w * fast * 3 + i * 1.7; P.pos.set([Math.cos(a) * R, 0, Math.sin(a) * R], m * 3); P.col.set([col.r * k, col.g * k, col.b * k], m * 3); P.size[m] = 0.16; m++;
       });
       while (m < 420) { P.size[m] = 0; m++; }
       P.commit(); this.miniSun.material.opacity = k; this.miniLab.material.opacity = s.planets && !s.gravity ? k : damp(this.miniLab.material.opacity, 0, 2, dt);
