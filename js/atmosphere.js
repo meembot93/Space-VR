@@ -172,6 +172,12 @@ export class Atmosphere {
       this.root.add(m); this.mists.push({ m, amt: 0.8, on: (c) => c.cur === 'abbey' });
       this.fires = fireLights(ch, ['lampB', 'folkLight']);
     }
+    if (n === 14) {
+      // the cold steppe wind blowing grit and frost past the pad
+      this.specks = makeSpecks(260, 24, 0xdfe4ea, 0.04); this.root.add(this.specks);
+      R.wind = (c) => (c.cur === 'pad' || c.cur === 'view' ? 1 : c.cur === 'lift' ? 1.4 : c.cur === 'hill' ? 0.4 : 0);
+      R.windDir = new THREE.Vector3(1, 0, 0.4).normalize();
+    }
     if (n === 7) {
       // dust turning slowly in the sunbeams of the hall
       this.motes = makeSpecks(220, 14, 0xfff0c8, 0.03); this.motes.material.opacity = 0.45; this.root.add(this.motes);

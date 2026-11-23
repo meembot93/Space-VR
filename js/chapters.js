@@ -37,7 +37,7 @@ export const CHAPTERS = [
   { n: 11, era: 2, title: 'Galileo’s telescope', ready: false, load: () => import('./chapters/galileo.js') },
   { n: 12, era: 2, title: 'Newton’s apple and cannon', ready: false, load: () => import('./chapters/newton.js') },
   { n: 13, era: 2, title: 'The rocket dreamers', ready: false, load: () => import('./chapters/rockets.js') },
-  { n: 14, era: 2, title: 'Sputnik', ready: false, load: () => import('./chapters/sputnik.js') },
+  { n: 14, era: 2, title: 'Sputnik', ready: true, load: () => import('./chapters/sputnik.js') },
 ];
 for (const c of CHAPTERS) c.era ||= 1;
 
