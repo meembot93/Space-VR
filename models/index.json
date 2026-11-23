@@ -87,22 +87,26 @@
  "copernicus": {
   "file": "copernicus.glb",
   "height": 1.74,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/copernicus.glb"
  },
  "galileo": {
   "file": "galileo.glb",
   "height": 1.7,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/galileo.glb"
  },
  "tycho": {
   "file": "tycho.glb",
   "height": 1.78,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/tycho.glb"
  },
  "kepler": {
   "file": "kepler.glb",
   "height": 1.7,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/kepler.glb"
  },
  "canon": {
   "file": "era2_canon.glb",
@@ -122,21 +126,25 @@
  "goddard": {
   "file": "goddard.glb",
   "height": 1.78,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/goddard.glb"
  },
  "tsiolkovsky": {
   "file": "tsiolkovsky.glb",
   "height": 1.72,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/tsiolkovsky.glb"
  },
  "newton": {
   "file": "newton.glb",
   "height": 1.7,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/newton.glb"
  },
  "korolev": {
   "file": "korolev.glb",
   "height": 1.72,
-  "turn": 0
+  "turn": 0,
+  "hd": "hd/korolev.glb"
  }
 }
