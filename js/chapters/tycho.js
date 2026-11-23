@@ -250,6 +250,7 @@ export default class Tycho {
   // ---------- The new star (and what it really was) ----------
   buildNova() {
     this.novaS = glow(0xfff6e0, 1, 0); this.novaS.material.depthTest = true; this.root.add(this.novaS);
+    this.novaCore = glow(0xffffff, 0.35, 1); this.novaS.add(this.novaCore);
     this.novaRays = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(256, 256, (g) => { g.translate(128, 128); for (let i = 0; i < 4; i++) { g.rotate(Math.PI / 4); const gr = g.createLinearGradient(-128, 0, 128, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(-128, -2, 256, 4); } }), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.root.add(this.novaRays);
     this.casLab = textSprite('Cassiopeia', 30); this.casLab.material.opacity = 0; this.root.add(this.casLab);
@@ -342,7 +343,7 @@ export default class Tycho {
     await D.cue('Somebody'); s.folk = 1;
     await l2;
     s.phase = 'cas'; s.cas = 1;
-    s.guide = this.novaDir(_a).multiplyScalar(14).add(_b.set(0, 1.6, 0)).toArray();
+    s.guide = this.novaDir(_a).multiplyScalar(9).add(_b.set(2.5, -2, 2.5)).toArray();
     await D.say('ch9_03');
     s.guide = null; s.cas = 0;
     s.phase = 'measure'; s.parallax = 1;
@@ -450,8 +451,8 @@ export default class Tycho {
     this.novaV = damp(this.novaV || 0, s.nova ? 1 : 0, s.nova ? 0.8 : 3, dt);
     const fl = 0.85 + 0.15 * Math.sin(t * 11) * Math.sin(t * 4.3);
     const vis = this.novaV * (1 - clamp01((this.boomT || 0) / 2.5) * (this.boomT >= 0 ? 1 : 0));
-    this.novaS.position.copy(_a).addScaledVector(_b, 800); this.novaS.scale.setScalar((14 + 6 * fl) * (1 + (s.cas ? 0.3 : 0))); this.novaS.material.opacity = vis;
-    this.novaRays.position.copy(this.novaS.position); this.novaRays.scale.setScalar(70 * fl); this.novaRays.material.opacity = vis * 0.8;
+    this.novaS.position.copy(_a).addScaledVector(_b, 800); this.novaS.scale.setScalar((40 + 10 * fl) * (1 + (s.cas ? 0.3 : 0))); this.novaS.material.opacity = vis; this.novaCore.material.opacity = vis;
+    this.novaRays.position.copy(this.novaS.position); this.novaRays.scale.setScalar(150 * fl); this.novaRays.material.opacity = vis * 0.8;
     this.novaS.visible = this.novaRays.visible = this.A.visible;
     // Cassiopeia's W, and its name
     this.casV = damp(this.casV || 0, s.cas ? 1 : 0, 2, dt);
@@ -472,7 +473,7 @@ export default class Tycho {
       });
       S.commit();
       if (!s.boom && fade <= 0) this.boomT = -1;
-      if (k < 0.6) { this.novaS.scale.setScalar(60 * (1 - k)); this.novaS.material.opacity = 1; }
+      if (k < 0.6) { this.novaS.scale.setScalar(160 * (1 - k)); this.novaS.material.opacity = 1; }
     }
   }
 
