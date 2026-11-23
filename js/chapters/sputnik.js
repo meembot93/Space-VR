@@ -1503,7 +1503,7 @@ export default class Sputnik {
     this.titleV = damp(this.titleV || 0, s.title ? 1 : 0, 1.2, dt);
     const camY = G.camera.getWorldPosition(_b).y;
     this.eraTitle.position.copy(at(100, 26, camY + 15)); this.eraTitle.material.opacity = this.titleV;
-    this.eraSub.position.copy(at(100, 26, camY + 11.8)); this.eraSub.material.opacity = this.titleV * 0.8;
+    this.eraSub.position.copy(at(100, 26, camY + 18.2)); this.eraSub.material.opacity = this.titleV * 0.8;
     this.eraTitle.visible = this.titleV > 0.01; this.eraSub.visible = this.eraTitle.visible;
     if (s.title && !this.titleSound) { this.titleSound = true; if (G.audio.ctx) { shimmer(G, 5, 0.18); awe(G, 14, 0.1, 82); } }
   }
