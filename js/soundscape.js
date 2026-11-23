@@ -121,6 +121,12 @@ const LOOPS = {
     for (let i = 0; i < n; i++) x[i] *= Math.pow(w[i], 2) * (0.7 + 0.3 * w2[i]);
     return seamless(normalize(lowpass(x, 6000), 0.4), 1);
   },
+  // Gas venting from a cold rocket: a steady hiss that sighs louder now and then
+  vent(r) {
+    const n = SR * 6, x = highpass(noise(n, r), 2200), w = wobble(n, r, 0.7);
+    for (let i = 0; i < n; i++) x[i] *= 0.45 + 0.55 * w[i] * w[i];
+    return seamless(normalize(lowpass(x, 7000), 0.35), 0.8);
+  },
   // The hush of a big stone room: a very low, soft air sound
   room(r) {
     const n = SR * 6, x = lowpass(noise(n, r), 220);
@@ -279,5 +285,12 @@ const RECIPES = {
     { kind: 'crowd', at: V(50, 2, 20), vol: 0.04, ref: 20, on: (ch) => ch.cur === 'abbey' },
     { kind: 'surf', follow: (ch, L) => L.clone().setLength(270).setY(-26), vol: 0.22, ref: 120, wide: true, on: (ch) => ch.cur === 'hven' },
     { kind: 'crowd', at: V(0, 2, -20), vol: 0.05, ref: 15, on: (ch) => ch.cur === 'hven' },
+  ],
+  // Era 2, Ch7 (Sputnik): oxygen hissing off the rocket, engineers by the bunker; a town at dusk; grass on the hill
+  14: () => [
+    { kind: 'vent', follow: (ch) => ch.W(0, 15, 0), vol: 0.3, ref: 10, on: (ch) => (ch.cur === 'pad' || ch.cur === 'lift') && ch.launchT < 0 },
+    { kind: 'crowd', follow: (ch) => ch.W(-14, 1.5, 18), vol: 0.06, ref: 8, on: (ch) => ch.cur === 'pad' },
+    { kind: 'crowd', at: V(0, 4, -60), vol: 0.1, ref: 40, on: (ch) => ch.cur === 'roofs' },
+    { kind: 'leaves', at: V(30, 2, -20), vol: 0.06, ref: 30, wide: true, on: (ch) => ch.cur === 'hill' },
   ],
 };

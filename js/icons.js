@@ -49,6 +49,11 @@ export const CHAPTER_ICONS = {
   12: badge(`<circle cx="32" cy="34" r="20" opacity="0.6" stroke-dasharray="3 3"/><circle cx="32" cy="34" r="12" fill="#3f7fd0" stroke="#9cc8ff"/>
     <path d="M29 23 L32 16 L35 23" fill="#8a7a60" stroke="#c8b898" stroke-width="1.6"/><circle cx="50" cy="26" r="2.4" fill="${GOLD}" stroke="none"/>
     <circle cx="16" cy="15" r="5" fill="#c8281c" stroke="#ff7a5a" stroke-width="1.4"/><path d="M16 10 L17 6" stroke="#6aa040" stroke-width="1.6"/>`),
+  // Sputnik: the shiny ball with its four antennas, and the rocket's trail curving up
+  14: badge(`<path d="M12 52 C20 50 26 44 30 36" stroke="#ff9a40" stroke-width="2.6" opacity="0.9"/>
+    <circle cx="38" cy="26" r="8" fill="#e8ecf2" stroke="#ffffff"/><circle cx="35.5" cy="23.5" r="2.4" fill="#ffffff" stroke="none"/>
+    <path d="M33 31 L16 44 M35 33 L22 50 M31 29 L12 38 M37 34 L28 52" stroke="#c8d0dc" stroke-width="1.4"/>
+    <path d="M48 12 l1 3 3 1 -3 1 -1 3 -1 -3 -3 -1 3 -1z" fill="${GOLD}" stroke="none"/>`),
   // Tycho: the W of Cassiopeia with the bright new star above it
   9: badge(`<path d="M14 40 L22 32 L30 42 L38 33 L48 40" stroke-width="2" opacity="0.8"/>
     <path d="M32 12 l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" fill="${GOLD}" stroke="none"/>`),

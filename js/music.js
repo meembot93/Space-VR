@@ -30,11 +30,13 @@ const MOODS = {
   ch9: { chords: [[-12, -5, 0, 4, 7], [-10, -3, 2, 5, 9], [-7, 0, 4, 7, 12], [-5, 2, 5, 9, 11]], tempo: 12, twinkle: [12, 16, 19, 23, 24, 28], drone: -24, lead: 'flute', scale: [0, 2, 4, 5, 7, 9, 11, 12] },
   ch8: { chords: [[-12, -5, 0, 3, 7], [-8, -1, 3, 8], [-10, -3, 2, 5], [-7, 0, 5, 10]], tempo: 11, twinkle: [12, 15, 19, 22, 24, 27], drone: -24, lead: 'reed', scale: [0, 2, 3, 5, 7, 8, 10, 12] },
   ch7: { chords: [[-12, -5, 0, 4, 7], [-7, 0, 4, 9], [-9, -2, 3, 7], [-5, 2, 7, 11]], tempo: 10, twinkle: [12, 16, 19, 23, 24, 28], drone: -24, lead: 'lyre', scale: [0, 4, 7, 9, 11, 12, 16] },
+  // Era 2, Ch7: Sputnik, a cold desert night at the launch pad, then space (Meem's track plays if it's listed)
+  ch14: { chords: [[-12, -5, 0, 3, 7], [-10, -3, 2, 5, 9], [-8, -1, 3, 7], [-5, 2, 7, 10, 14]], tempo: 10, twinkle: [12, 15, 19, 22, 24, 27], drone: -24, lead: 'flute', scale: [0, 3, 5, 7, 10, 12, 15] },
 };
 
 // The big moments: when Astra starts one of these lines, the music swells up under her
 // instead of dipping (and a bright chord blooms).
-const SWELLS = new Set(['ch1_04', 'ch2_08', 'ch3_06', 'ch4_09', 'ch5_06', 'ch5_12', 'ch6_05', 'ch7_04', 'ch7_12', 'ch8_04', 'ch8_10', 'ch9_02', 'ch9_05', 'ch9_09', 'ch10_05', 'ch10_09', 'ch12_07', 'ch12_10', 'br3_01']);
+const SWELLS = new Set(['ch1_04', 'ch2_08', 'ch3_06', 'ch4_09', 'ch5_06', 'ch5_12', 'ch6_05', 'ch7_04', 'ch7_12', 'ch8_04', 'ch8_10', 'ch9_02', 'ch9_05', 'ch9_09', 'ch10_05', 'ch10_09', 'ch12_07', 'ch12_10', 'ch14_08', 'ch14_11', 'ch14_12', 'br3_01']);
 
 export class Music {
   constructor(G) {
@@ -147,7 +149,35 @@ export class Music {
     if (c.lp) { const t = this.G.audio.ctx.currentTime; c.lp.frequency.setTargetAtTime(3200, t, 2); c.lp.frequency.setTargetAtTime(1400, t + secs * 0.7, 3); }
   }
 
+  // A one-off piece of music over the top (a launch, a fanfare): the loop fades right down, `file`
+  // (in sounds/music/) plays once at `vol`, then the loop comes back. Call preload(file) earlier so it
+  // starts exactly on time. Resolves when it starts playing (false if it couldn't).
+  async preload(file) {
+    const A = this.G.audio; if (!A.ctx) return null;
+    this.bufs ||= {};
+    this.bufs[file] ||= fetch(DIR + file).then((r) => r.arrayBuffer()).then((ab) => new Promise((ok, fail) => A.ctx.decodeAudioData(ab, ok, fail))).catch((e) => { console.warn('Music file failed', file, e); return null; });
+    return this.bufs[file];
+  }
+  async sting(file, vol = 0.8, { duck = 0.08, fade = 1.5 } = {}) {
+    const A = this.G.audio; if (!A.ctx) return false;
+    const buf = await this.preload(file); if (!buf) return false;
+    this.stopSting(0.3);
+    const ctx = A.ctx, out = ctx.createGain(), t = ctx.currentTime;
+    out.gain.setValueAtTime(vol, t); out.connect(A.master);
+    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(out); src.start(t);
+    const S = this.stingCur = { src, out, duck, fade, until: this.G.t + buf.duration };
+    src.onended = () => { if (this.stingCur === S) this.stingCur = null; out.disconnect(); };
+    return true;
+  }
+  stopSting(fade = 1.5) {
+    const S = this.stingCur; if (!S) return; this.stingCur = null;
+    const t = this.G.audio.ctx.currentTime;
+    S.out.gain.cancelScheduledValues(t); S.out.gain.setValueAtTime(Math.max(0.0001, S.out.gain.value), t); S.out.gain.exponentialRampToValueAtTime(0.0001, t + fade);
+    try { S.src.stop(t + fade + 0.05); } catch (e) { /* done */ }
+  }
+
   stop(fade = 2) {
+    if (this.stingCur) this.stopSting(fade);
     const c = this.cur; if (!c) return; this.cur = null;
     clearTimeout(c.timer);
     const ctx = this.G.audio.ctx, t = ctx.currentTime;
@@ -161,8 +191,8 @@ export class Music {
     const id = this.G.narration.cur?.id;
     if (id !== this.lastLine) { this.lastLine = id; if (SWELLS.has(id)) this.swell(16); }
     const swelling = this.G.t < (this.swellUntil || 0);
-    const talking = swelling ? 1.5 : this.G.narration.cur ? 0.45 : 1;
-    this.duck += (talking - this.duck) * Math.min(1, dt * (swelling ? 0.6 : 2));
+    const S = this.stingCur, talking = S ? S.duck : swelling ? 1.5 : this.G.narration.cur ? 0.45 : 1;
+    this.duck += (talking - this.duck) * Math.min(1, dt * (S ? 1.5 / S.fade : swelling ? 0.6 : 2));
     if (c.out.gain.value > 0.01 && this.G.t > (c.t0 ??= this.G.t + 4)) c.out.gain.setTargetAtTime(c.vol * this.duck * (this.G.paused ? 0.35 : 1), this.G.audio.ctx.currentTime, 0.3);
   }
 }
