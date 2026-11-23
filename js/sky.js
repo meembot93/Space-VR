@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { clamp, lerp } from './util.js';
 import { StarField, DUST_MAX } from './stars.js';
+import { moonSkyTextures, MOON_GLSL } from './moontex.js';
 
 const D2R = Math.PI / 180;
 // A direction from compass bearing (degrees clockwise from north) and height above the horizon
@@ -83,31 +84,25 @@ function glowTexture(inner = 'rgba(255,250,230,1)', mid = 'rgba(255,200,120,0.35
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-// Draw the Moon's face with the right part lit (northern-hemisphere view: waxing = lit on the right)
-function drawMoon(c, phase) {
-  const g = c.getContext('2d'), W = c.width, r = W * 0.36, cx = W / 2;
-  g.clearRect(0, 0, W, W);
-  // a faint halo
-  const hal = g.createRadialGradient(cx, cx, r, cx, cx, W / 2); hal.addColorStop(0, `rgba(200,215,255,${0.25 * Math.sin(Math.PI * phase)})`); hal.addColorStop(1, 'rgba(200,215,255,0)');
-  g.fillStyle = hal; g.fillRect(0, 0, W, W);
-  // the dark side, just visible (earthshine)
-  g.fillStyle = 'rgba(70,78,96,0.55)'; g.beginPath(); g.arc(cx, cx, r, 0, 7); g.fill();
-  // the lit part: half a disc plus/minus an ellipse for the terminator
-  const k = Math.cos(phase * 2 * Math.PI);           // 1 new .. -1 full
-  const waxing = phase < 0.5;
-  g.save(); g.beginPath(); g.arc(cx, cx, r, 0, 7); g.clip();
-  // lit between the bright limb and the terminator (an ellipse edge that sweeps across over the month)
-  g.fillStyle = '#f2f0e6'; g.beginPath();
-  const side = waxing ? 1 : -1, N = 48;
-  for (let i = 0; i <= N; i++) { const a = -Math.PI / 2 + Math.PI * i / N; g.lineTo(cx + side * Math.cos(a) * r, cx + Math.sin(a) * r); }
-  for (let i = N; i >= 0; i--) { const a = -Math.PI / 2 + Math.PI * i / N; g.lineTo(cx + side * k * Math.cos(a) * r, cx + Math.sin(a) * r); }
-  g.fill();
-  // seas: a few soft grey patches
-  g.globalCompositeOperation = 'source-atop';
-  g.fillStyle = 'rgba(120,120,128,0.35)';
-  for (const [x, y, s] of [[-0.25, -0.3, 0.22], [0.15, -0.15, 0.26], [0.25, 0.25, 0.18], [-0.1, 0.2, 0.14], [-0.35, 0.1, 0.12]]) { g.beginPath(); g.arc(cx + x * r, cx + y * r, s * r, 0, 7); g.fill(); }
-  g.restore();
-}
+// The Moon's disc: the real near side (js/moontex.js) lit for its phase. The square is 1/0.72 Moon
+// diameters wide: the disc, then a faint halo round it.
+const MOON_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const MOON_FS = `
+${MOON_GLSL}
+uniform float moonHalo, moonNight;
+varying vec2 vUv;
+void main() {
+  vec2 q = (vUv * 2.0 - 1.0) / 0.72; float r = length(q);
+  float edge = 1.0 - smoothstep(1.0 - 1.5 * fwidth(r), 1.0, r);
+  float lit = 0.0; vec3 col = vec3(0.0);
+  if (r < 1.0) col = moonShade(q * min(1.0, 0.9995 / r), lit);
+  // the dark part hides the stars behind it at night; by day it is just sky
+  float a = mix(0.82 * moonNight, 1.0, smoothstep(0.0, 0.12, lit)) * mix(0.8, 1.0, moonNight);
+  vec3 halo = vec3(0.6, 0.67, 0.85) * moonHalo * (1.0 - smoothstep(1.0, 1.39, r)) * (1.0 - smoothstep(1.0, 1.39, r));
+  gl_FragColor = vec4(mix(halo, col, edge), max(a * edge, length(halo) * 0.6));
+  #include <colorspace_fragment>
+}`;
+const _m4 = new THREE.Matrix4(), _o = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
 export class Sky {
   constructor(scene) {
@@ -130,6 +125,11 @@ export class Sky {
     this.sun.scale.setScalar(170); this.sun.renderOrder = -8;
     this.moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('rgba(240,244,255,1)', 'rgba(160,180,220,0.18)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.moon.scale.setScalar(70); this.moon.visible = false; this.moon.renderOrder = -8;
+    // the Moon with a face: built once at load (see js/moontex.js)
+    const mt = moonSkyTextures();
+    this.moonU = { moonFace: { value: mt.face }, moonCol: { value: mt.col }, moonL: { value: new THREE.Vector3(1, 0, 0) }, moonEarth: { value: 0 }, moonBump: { value: 1 }, moonDetail: { value: 0 }, moonHalo: { value: 0 }, moonNight: { value: 1 } };
+    this.moonDisc = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ uniforms: this.moonU, vertexShader: MOON_VS, fragmentShader: MOON_FS, transparent: true, depthWrite: false, fog: false }));
+    this.moonDisc.visible = false; this.moonDisc.renderOrder = -8; this.moonDisc.frustumCulled = false;
     // Shooting stars: now and then on a dark night, a quick bright streak
     const mc = document.createElement('canvas'); mc.width = 256; mc.height = 8;
     const mg = mc.getContext('2d'), mgr = mg.createLinearGradient(0, 0, 256, 0);
@@ -139,7 +139,7 @@ export class Sky {
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(mc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
     this.meteor.visible = false; this.meteor.renderOrder = -8; this.meteor.frustumCulled = false;
     this.meteorT = 4; this.meteorLife = 0;
-    this.group = new THREE.Group(); this.group.add(dome, this.starField.group, this.sun, this.moon, this.meteor);
+    this.group = new THREE.Group(); this.group.add(dome, this.starField.group, this.sun, this.moon, this.moonDisc, this.meteor);
     scene.add(this.group);
 
     // Lights: soft sky/ground fill plus the Sun
@@ -219,19 +219,23 @@ export class Sky {
   // The Moon at bearing az, height el. phase: 0 new, 0.25 first quarter (right half lit),
   // 0.5 full, 0.75 last quarter. Pass phase = null for just a soft glow.
   setMoon(az, el, size = 1, phase = null) {
-    this.moon.visible = el > -2 && (phase == null || Math.abs(phase - Math.round(phase)) > 0.02);
-    dirFromAzEl(az, el, this.moon.position).multiplyScalar(900);
-    if (phase != null) {
-      if (!this.moonDisc) {
-        const c = document.createElement('canvas'); c.width = c.height = 256;
-        this.moonCanvas = c; this.moonDisc = new THREE.CanvasTexture(c); this.moonDisc.colorSpace = THREE.SRGBColorSpace;
-        this.moon.material.map = this.moonDisc; this.moon.material.blending = THREE.NormalBlending; this.moon.material.needsUpdate = true;
-      }
-      if (this.moonPhase == null || Math.abs(this.moonPhase - phase) > 0.004) { this.moonPhase = phase; drawMoon(this.moonCanvas, phase); this.moonDisc.needsUpdate = true; }
-      this.moon.scale.setScalar(64 * size); // about 4 degrees: bigger than life, so its shape is easy to see
-    } else this.moon.scale.setScalar(70 * size);
+    const show = el > -2 && (phase == null || Math.abs(phase - Math.round(phase)) > 0.02);
+    const m = phase == null ? this.moon : this.moonDisc;
+    this.moon.visible = show && phase == null; this.moonDisc.visible = show && phase != null;
+    dirFromAzEl(az, el, m.position).multiplyScalar(900);
+    if (phase == null) { this.moon.scale.setScalar(70 * size); return; }
+    // face the viewer, north up: the right-hand side is lit while it waxes
+    m.quaternion.setFromRotationMatrix(_m4.lookAt(_o.set(0, 0, 0), m.position, _up));
+    m.scale.setScalar(64 * size); // the disc is about 4 degrees: bigger than life, so its shape is easy to see
+    const U = this.moonU, a = phase * 2 * Math.PI, lit = (1 - Math.cos(a)) / 2;
+    U.moonL.value.set(Math.sin(a), 0, -Math.cos(a));
+    U.moonEarth.value = 0.012 * (1 - lit) ** 2;      // faint, and strongest when the Moon is a thin crescent
+    U.moonHalo.value = 0.25 * Math.sin(Math.PI * phase);
+    U.moonNight.value = this.night || 0;
+    U.moonBump.value = 0.75;
+    U.moonDetail.value = Math.min(1, Math.max(0, (size - 3) / 10));   // Kepler's Dream: the Moon fills the sky
   }
-  hideMoon() { this.moon.visible = false; }
+  hideMoon() { this.moon.visible = false; this.moonDisc.visible = false; }
 
   updateMeteor(dt) {
     const m = this.meteor, night = this.starField.opacity * this.uni.milky.value;

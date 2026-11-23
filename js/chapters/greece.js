@@ -22,6 +22,7 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeCard } from '../ui.js';
 import { rng, noise2 } from '../shapes.js';
 import { buildAthens } from './athens.js';
+import { moonFaceTexture } from '../moontex.js';
 
 const D2R = Math.PI / 180;
 const MOON_AZ = 160, MOON_EL = 24;           // the eclipsed Moon, over the sea to the south
@@ -336,7 +337,7 @@ function journalPage() {
 // ---------- The eclipsed Moon: a big disc on the sky with Earth's round shadow sliding across ----------
 const MOON_VS = `varying vec2 vUv; void main(){ vUv = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const MOON_FS = `
-uniform vec2 shadowC; uniform float shadowR, guide, glow;
+uniform vec2 shadowC; uniform float shadowR, guide, glow; uniform sampler2D moonMap;
 varying vec2 vUv;
 float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
@@ -344,9 +345,8 @@ void main(){
   vec2 p = vUv * 3.0;                       // the plane is 3 Moon-radii wide each way
   float r = length(p);
   float disc = 1.0 - smoothstep(0.985, 1.0, r);
-  // Moon surface: pale with darker seas
-  float m = n(p * 2.2 + 3.0) * 0.6 + n(p * 5.0) * 0.3 + n(p * 11.0) * 0.1;
-  vec3 col = vec3(0.96, 0.94, 0.86) * (0.78 + 0.22 * smoothstep(0.35, 0.7, m));
+  // Moon surface: the real near side (js/moontex.js)
+  vec3 col = texture2D(moonMap, clamp(p * 0.5 + 0.5, 0.0, 1.0)).rgb;
   col *= 1.0 - 0.18 * pow(r, 4.0);
   // Earth's shadow: dark coppery red inside, soft edge (the penumbra)
   float d = length(p - shadowC);
@@ -659,7 +659,7 @@ export default class Greece {
 
     // The Moon (our own, so we can draw Earth's shadow on it)
     this.moonMat = new THREE.ShaderMaterial({
-      uniforms: { shadowC: { value: new THREE.Vector2(-3.8, 0.6) }, shadowR: { value: 2.6 }, guide: { value: 0 }, glow: { value: 1 } },
+      uniforms: { shadowC: { value: new THREE.Vector2(-3.8, 0.6) }, shadowR: { value: 2.6 }, guide: { value: 0 }, glow: { value: 1 }, moonMap: { value: moonFaceTexture() } },
       vertexShader: MOON_VS, fragmentShader: MOON_FS, transparent: true, depthWrite: false, fog: false,
     });
     this.moon = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.moonMat); this.moon.renderOrder = -5;
