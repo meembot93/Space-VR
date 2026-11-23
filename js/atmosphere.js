@@ -153,6 +153,53 @@ export class Atmosphere {
       R.wind = (c) => (c.sceneNow === 'sea' ? 0 : 1);
       R.windDir = new THREE.Vector3(1, 0, 0.2).normalize();
     }
+    if (n === 8) {
+      // mist lying on the Vistula Lagoon under the Moon; the candle and the brazier flicker
+      const m = makeMist(scatter(45, () => [(Math.random() - 0.5) * 900, -170 - Math.random() * 700], () => -19.4, [0.3, 1.6], [40, 90]), 0xb8c4dc);
+      this.root.add(m); this.mists.push({ m, amt: 0.7 });
+      this.fires = fireLights(ch, ['candle', 'brazierLight']);
+    }
+    if (n === 10) {
+      // river mist along the Vltava; dust in the candlelight of the study
+      const m = makeMist(scatter(30, () => [-330 + (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 1400], () => -3, [0.3, 1.4], [40, 80]), 0xb8c4dc);
+      this.root.add(m); this.mists.push({ m, amt: 0.7 });
+      this.motes = makeSpecks(120, 4, 0xfff0c8, 0.02); this.motes.material.opacity = 0.35; this.root.add(this.motes); R.motesOn = () => true;
+      this.fires = fireLights(ch, ['candle', 'stove']);
+    }
+    if (n === 12) {
+      // evening mist settling in the Witham valley; midges and pollen in the last light; the door lantern
+      const m = makeMist(scatter(45, () => [80 + Math.random() * 380, (Math.random() - 0.5) * 900], ground, [0.3, 1.6], [40, 90]), 0xc8d0dc);
+      this.root.add(m); this.mists.push({ m, amt: 0.7, on: (c) => !c.spaceOn });
+      this.specks = makeSpecks(160, 18, 0xfff0c8, 0.03); this.root.add(this.specks);
+      R.wind = (c) => (c.spaceOn ? 0 : 0.15); R.windDir = new THREE.Vector3(1, 0, 0.3).normalize();
+      this.fires = fireLights(ch, ['lantern']);
+    }
+    if (n === 11) {
+      // evening haze on the Venice lagoon; night mist on Padua's canal; the candle and the workshop glow
+      const m = makeMist(scatter(40, () => [(Math.random() - 0.5) * 1400, 150 + Math.random() * 900], () => 0.2, [0.3, 1.6], [50, 100]), 0xe0c8b0);
+      this.root.add(m); this.mists.push({ m, amt: 0.5, on: (c) => c.cur === 'venice' });
+      const m2 = makeMist(scatter(24, () => [(Math.random() - 0.5) * 600, -62 + (Math.random() - 0.5) * 10], () => 0, [0.3, 1.2], [20, 40]), 0xb8c4dc);
+      this.root.add(m2); this.mists.push({ m: m2, amt: 0.7, on: (c) => c.cur === 'padua' });
+      this.fires = fireLights(ch, ['candle', 'workLight']);
+    }
+    if (n === 9) {
+      // frost mist over Herrevad's fields; the lamp on Hven's terrace flickers
+      const m = makeMist(scatter(40, () => { const a = Math.random() * 6.28, r = 30 + Math.random() * 300; return [Math.cos(a) * r, Math.sin(a) * r]; }, ground, [0.2, 1.2], [30, 60]), 0xc8d0dc);
+      this.root.add(m); this.mists.push({ m, amt: 0.8, on: (c) => c.cur === 'abbey' });
+      this.fires = fireLights(ch, ['lampB', 'folkLight']);
+    }
+    if (n === 14) {
+      // the cold steppe wind blowing grit and frost past the pad
+      this.specks = makeSpecks(260, 24, 0xdfe4ea, 0.04); this.root.add(this.specks);
+      R.wind = (c) => (c.cur === 'pad' || c.cur === 'view' ? 1 : c.cur === 'lift' ? 1.4 : c.cur === 'hill' ? 0.4 : 0);
+      R.windDir = new THREE.Vector3(1, 0, 0.4).normalize();
+    }
+    if (n === 13) {
+      // fog lying in the pines at Peenemünde; the kerosene lamp and the stove in Tsiolkovsky's study
+      const m = makeMist(scatter(45, () => { const a = Math.random() * 6.28, r = 20 + Math.random() * 260; return [Math.cos(a) * r, -55 + Math.sin(a) * r]; }, () => 0, [0.3, 2.5], [35, 70]), 0xb8c0cc);
+      this.root.add(m); this.mists.push({ m, amt: 0.9, on: (c) => c.cur === 'baltic' && !c.space?.on });
+      this.fires = fireLights(ch, ['lamp', 'stoveLight']);
+    }
     if (n === 7) {
       // dust turning slowly in the sunbeams of the hall
       this.motes = makeSpecks(220, 14, 0xfff0c8, 0.03); this.motes.material.opacity = 0.45; this.root.add(this.motes);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Starward: Era 1, Watchers of the Sky</title>
+<title>Starward</title>
 <link rel="icon" href="data:,">
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#03060f;font-family:Georgia,'Times New Roman',serif;color:#f4ead2}
@@ -28,6 +28,7 @@
   #chapters .ico{width:72px;height:72px;flex:none;display:block}
   #chapters .ico svg{width:100%;height:100%;display:block}
   #chapters button:disabled{opacity:.35}
+  #chapters .eraHead{margin:14px 0 4px;font-size:18px;letter-spacing:2px;color:#cfd8ff}
   #note{margin-top:10px;font-size:15px;opacity:.75;min-height:20px}
   #mp{margin-top:16px}
   #mp input{font:inherit;font-size:18px;padding:8px 10px;border-radius:8px;border:2px solid #d8b66a;background:#0e1430;color:#f4ead2;width:130px}
@@ -58,8 +59,8 @@
   <canvas id="stars"></canvas>
   <div id="version">&nbsp;</div>
   <h1>STARWARD</h1>
-  <div class="era">Era 1 &middot; Watchers of the Sky</div>
-  <div class="sub">Thirty thousand years of people looking up.</div>
+  <div class="era" id="eraLine">Era 1 &middot; Watchers of the Sky</div>
+  <div class="sub" id="eraSub">Thirty thousand years of people looking up.</div>
   <div>
     <button id="vrBtn" disabled>Enter VR</button>
     <button id="deskBtn">Try on desktop</button>

@@ -136,6 +136,26 @@ const RECIPES = {
   // Ch2: the Stonehenge builder for people far away (the crowd, the families walking in):
   // about a third of the triangles and a smaller texture, looks the same from 20 m.
   builder_far: { from: 'stonehenge_builder.glb', file: 'stonehenge_builder_far.glb', tris: 5000, texture: 512 },
+  // ---------- Era 2 ----------
+  // Frombork's canons (Era 2, ch1), from Kepler: his black cassock-like coat and white collar fit a
+  // cathedral canon already; grey hair and beard, lighter, as they're seen from the tower.
+  canon: {
+    from: 'kepler.glb', file: 'era2_canon.glb', tris: 7000, texture: 512,
+    region(q) { if (q.y > 0.852 && Math.abs(q.x) < 0.085) return 'head'; },
+    paint: { head: (r, g, b) => { const L = lum(r, g, b); if (isSkin(r, g, b) || L < 0.04 || L > 0.5) return null; const v = 0.4 + L * 1.1; return [v, v * 0.98, v * 0.95]; } },
+  },
+  // Rheticus, Copernicus's young friend (Era 2, ch1), from Kepler: a dark blue scholar's coat.
+  rheticus: {
+    from: 'kepler.glb', file: 'era2_rheticus.glb',
+    region(q) { if (q.y > 0.22 && q.y < 0.84 && Math.abs(q.x) < 0.27) return 'coat'; },
+    paint: { coat: (r, g, b) => { const [, s, v] = hsv(r, g, b); if (isSkin(r, g, b) || (v > 0.6 && s < 0.25)) return null; return shade(hex(0x2c3a5c), 0.12, 0.7)(r, g, b); } },
+  },
+  // Townsfolk of the 1500s-1600s (Era 2), from Galileo: his robe dyed a working brown, lighter.
+  townsman: {
+    from: 'galileo.glb', file: 'era2_townsman.glb', tris: 6000, texture: 512,
+    region(q) { if (q.y > 0.12 && q.y < 0.84 && Math.abs(q.x) < 0.27) return 'robe'; },
+    paint: { robe: (r, g, b) => { const [, s, v] = hsv(r, g, b); if (isSkin(r, g, b) || (v > 0.6 && s < 0.25)) return null; return shade(hex(0x5e4630), 0.12, 0.7)(r, g, b); } },
+  },
 };
 
 // ---------- the work ----------

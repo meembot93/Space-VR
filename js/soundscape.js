@@ -121,6 +121,12 @@ const LOOPS = {
     for (let i = 0; i < n; i++) x[i] *= Math.pow(w[i], 2) * (0.7 + 0.3 * w2[i]);
     return seamless(normalize(lowpass(x, 6000), 0.4), 1);
   },
+  // Gas venting from a cold rocket: a steady hiss that sighs louder now and then
+  vent(r) {
+    const n = SR * 6, x = highpass(noise(n, r), 2200), w = wobble(n, r, 0.7);
+    for (let i = 0; i < n; i++) x[i] *= 0.45 + 0.55 * w[i] * w[i];
+    return seamless(normalize(lowpass(x, 7000), 0.35), 0.8);
+  },
   // The hush of a big stone room: a very low, soft air sound
   room(r) {
     const n = SR * 6, x = lowpass(noise(n, r), 220);
@@ -253,5 +259,55 @@ const RECIPES = {
     { kind: 'room', vol: 0.1, on: (ch) => ch.hall?.visible !== false },
     { kind: 'crowd', at: V(-14, 4, 0), vol: 0.07, ref: 10, on: (ch) => ch.hall?.visible !== false },
     { kind: 'crowd', at: V(14, 4, -6), vol: 0.06, ref: 10, on: (ch) => ch.hall?.visible !== false },
+  ],
+  // Era 2, Ch1 (Frombork): the brazier on the tower, the lagoon lapping below, the town murmuring, leaves
+  8: () => [
+    { kind: 'fire', at: V(-1.9, 14.6, 1.9), vol: 0.3, ref: 1.5, rolloff: 1.2 },
+    { kind: 'surf', follow: (ch, L) => V(L.x, -19.6, -165), vol: 0.18, ref: 80, wide: true },
+    { kind: 'crowd', at: V(-45, -14, -100), vol: 0.05, ref: 40 },
+    { kind: 'leaves', at: V(-30, -6, -30), vol: 0.07, ref: 40, wide: true },
+  ],
+  // Era 2, Ch3: Prague at night below the study window, the stove crackling
+  10: () => [
+    { kind: 'fire', at: V(2, 13.6, 1.6), vol: 0.18, ref: 1.5, rolloff: 1.2 },
+    { kind: 'crowd', at: V(50, 2, -100), vol: 0.06, ref: 40 },
+    { kind: 'river', follow: (ch, L) => V(-330, -2, L.z), vol: 0.12, ref: 120, wide: true },
+  ],
+  // Era 2, Ch5 (Woolsthorpe): leaves in the orchard round you, the stream down in the valley
+  12: () => [
+    { kind: 'leaves', at: V(5, 3, -1), vol: 0.1, ref: 8, wide: true },
+    { kind: 'leaves', at: V(-12, 4, 10), vol: 0.06, ref: 15, wide: true },
+    { kind: 'river', at: V(235, -14, 0), vol: 0.08, ref: 60, wide: true },
+  ],
+  // Era 2, Ch4: Venice (the lagoon lapping, the Piazza's crowd far below); Padua (the canal, the garden's leaves)
+  11: () => [
+    { kind: 'surf', follow: (ch, L) => V(L.x, 0, 110), vol: 0.18, ref: 80, wide: true, on: (ch) => ch.cur === 'venice' },
+    { kind: 'crowd', at: V(-70, 2, -15), vol: 0.1, ref: 50, on: (ch) => ch.cur === 'venice' },
+    { kind: 'river', follow: (ch, L) => V(L.x, 0, -62), vol: 0.1, ref: 40, wide: true, on: (ch) => ch.cur === 'padua' },
+    { kind: 'leaves', at: V(0, 4, -28), vol: 0.06, ref: 20, wide: true, on: (ch) => ch.cur === 'padua' },
+    { kind: 'crowd', at: V(0, 2, 16), vol: 0.035, ref: 20, on: (ch) => ch.cur === 'padua' },
+  ],
+  // Era 2, Ch6: Tsiolkovsky's stove and the hush of his study; wind in the trees over Goddard's field;
+  // the pines and the far Baltic surf at Peenemünde
+  13: () => [
+    { kind: 'fire', at: V(1.6, 0.45, 1.45), vol: 0.22, ref: 1.5, rolloff: 1.2, on: (ch) => ch.cur === 'kaluga' },
+    { kind: 'room', vol: 0.08, on: (ch) => ch.cur === 'kaluga' },
+    { kind: 'leaves', at: V(-40, 6, -60), vol: 0.07, ref: 40, wide: true, on: (ch) => ch.cur === 'auburn' },
+    { kind: 'leaves', at: V(-30, 8, -40), vol: 0.1, ref: 30, wide: true, on: (ch) => ch.cur === 'baltic' },
+    { kind: 'surf', at: V(300, -2, -500), vol: 0.12, ref: 150, wide: true, on: (ch) => ch.cur === 'baltic' },
+  ],
+  // Era 2, Ch2: the bare trees round Herrevad's fields; then on Hven the sea at the cliffs, the helpers
+  9: () => [
+    { kind: 'leaves', at: V(-20, 5, -30), vol: 0.06, ref: 30, wide: true, on: (ch) => ch.cur === 'abbey' },
+    { kind: 'crowd', at: V(50, 2, 20), vol: 0.04, ref: 20, on: (ch) => ch.cur === 'abbey' },
+    { kind: 'surf', follow: (ch, L) => L.clone().setLength(270).setY(-26), vol: 0.22, ref: 120, wide: true, on: (ch) => ch.cur === 'hven' },
+    { kind: 'crowd', at: V(0, 2, -20), vol: 0.05, ref: 15, on: (ch) => ch.cur === 'hven' },
+  ],
+  // Era 2, Ch7 (Sputnik): oxygen hissing off the rocket, engineers by the bunker; a town at dusk; grass on the hill
+  14: () => [
+    { kind: 'vent', follow: (ch) => ch.W(0, 15, 0), vol: 0.3, ref: 10, on: (ch) => (ch.cur === 'pad' || ch.cur === 'lift') && ch.launchT < 0 },
+    { kind: 'crowd', follow: (ch) => ch.W(-14, 1.5, 18), vol: 0.06, ref: 8, on: (ch) => ch.cur === 'pad' },
+    { kind: 'crowd', at: V(0, 4, -60), vol: 0.1, ref: 40, on: (ch) => ch.cur === 'roofs' },
+    { kind: 'leaves', at: V(30, 2, -20), vol: 0.06, ref: 30, wide: true, on: (ch) => ch.cur === 'hill' },
   ],
 };

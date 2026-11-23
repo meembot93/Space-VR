@@ -1,4 +1,4 @@
-// The chapters of Era 1 and the director that runs them.
+// The chapters of Era 1 and Era 2, and the director that runs them.
 //
 // A chapter module (js/chapters/*.js) exports a class with:
 //   constructor(G)          build the place: ground, models, people (and register interactables)
@@ -29,7 +29,25 @@ export const CHAPTERS = [
   { n: 5, title: 'Greece proves the Earth is round', ready: true, load: () => import('./chapters/greece.js') },
   { n: 6, title: 'Diving for the Antikythera machine', ready: true, load: () => import('./chapters/antikythera.js') },
   { n: 7, title: 'Ptolemy’s spinning sky', ready: true, load: () => import('./chapters/ptolemy.js') },
+  // Era 2: The Telescope and the Rocket. Numbered on from Era 1 inside the game (line ids ch8_.. to
+  // ch14_..); the title page and the flights call them Era 2, Chapters 1 to 7 (see chapterLabel).
+  { n: 8, era: 2, title: 'Copernicus moves the Sun', ready: true, load: () => import('./chapters/copernicus.js') },
+  { n: 9, era: 2, title: 'Tycho’s new star', ready: true, load: () => import('./chapters/tycho.js') },
+  { n: 10, era: 2, title: 'Kepler’s ellipses', ready: true, load: () => import('./chapters/kepler.js') },
+  { n: 11, era: 2, title: 'Galileo’s telescope', ready: true, load: () => import('./chapters/galileo.js') },
+  { n: 12, era: 2, title: 'Newton’s apple and cannon', ready: true, load: () => import('./chapters/newton.js') },
+  { n: 13, era: 2, title: 'The rocket dreamers', ready: true, load: () => import('./chapters/rockets.js') },
+  { n: 14, era: 2, title: 'Sputnik', ready: true, load: () => import('./chapters/sputnik.js') },
 ];
+for (const c of CHAPTERS) c.era ||= 1;
+
+// The eras, and a chapter's number within its era (Era 2's first chapter is n 8, shown as Chapter 1)
+export const ERAS = {
+  1: { title: 'Watchers of the Sky', sub: 'Thirty thousand years of people looking up.' },
+  2: { title: 'The Telescope and the Rocket', sub: 'From a Sun in the middle to a beep from space.' },
+};
+export const chapterNum = (n) => { const c = CHAPTERS.find((x) => x.n === n); return c ? CHAPTERS.filter((x) => x.era === c.era && x.n <= n).length : n; };
+export const chapterLabel = (n) => { const c = CHAPTERS.find((x) => x.n === n); return c?.era > 1 ? `Era ${c.era}, Chapter ${chapterNum(n)}` : `Chapter ${n}`; };
 
 import { VIEW } from './people.js';
 import { LINES } from './script.js';

@@ -1,4 +1,4 @@
-// Starward: Era 1, Watchers of the Sky. Boots the 3D world, the title screen and the chapters.
+// Starward (Era 1, Watchers of the Sky; Era 2, The Telescope and the Rocket). Boots the 3D world, the title screen and the chapters.
 import * as THREE from 'three';
 import { Sky } from './sky.js';
 import { Sound } from './audio.js';
@@ -8,7 +8,7 @@ import { UI } from './ui.js';
 import { Narration } from './narration.js';
 import { Guide } from './guide.js';
 import { CHAPTER_ICONS } from './icons.js';
-import { Director, CHAPTERS } from './chapters.js';
+import { Director, CHAPTERS, ERAS, chapterNum, chapterLabel } from './chapters.js';
 import { makeWorld } from './world.js';
 import { Net } from './net/net.js';
 import { Music } from './music.js';
@@ -101,16 +101,31 @@ choice('gfx', 'gfx', params.get('gfx') || detectLevel(), (v) => {
 });
 choice('subs', 'subs', 'on', (v) => { G.ui.subsOn = v === 'on'; G.ui.subtitle(G.ui.subText || ''); });
 
-// Chapter list: only chapters that are built can be picked
+// Chapter list, one group per era: only chapters that are built can be picked
 let chapterPick = Number(params.get('chapter')) || CHAPTERS.find((c) => c.ready).n;
 const chapList = document.getElementById('chapters');
-for (const c of CHAPTERS) {
-  const b = document.createElement('button');
-  b.innerHTML = `<span class="ico">${CHAPTER_ICONS[c.n] || ''}</span><span>${c.n}. ${c.title}${c.ready ? '' : ' (coming soon)'}</span>`;
-  b.disabled = !c.ready; b.classList.toggle('on', c.n === chapterPick);
-  b.addEventListener('click', () => { if (!G.isHost) return; chapterPick = c.n; for (const o of chapList.children) o.classList.toggle('on', o === b); });
-  chapList.appendChild(b);
+const chapButtons = [];
+const pickChapter = (n) => { chapterPick = n; for (const o of chapButtons) o.classList.toggle('on', Number(o.dataset.n) === n); showEra(); };
+// the line under the title follows the era of the chapter you've picked
+function showEra() {
+  const era = CHAPTERS.find((c) => c.n === chapterPick)?.era || 1, E = ERAS[era];
+  document.getElementById('eraLine').textContent = `Era ${era} · ${E.title}`;
+  document.getElementById('eraSub').textContent = E.sub;
 }
+let eraShown = 0;
+for (const c of CHAPTERS) {
+  if (c.era !== eraShown) {
+    eraShown = c.era;
+    const h = document.createElement('div'); h.className = 'eraHead'; h.textContent = `Era ${c.era} · ${ERAS[c.era].title}`;
+    chapList.appendChild(h);
+  }
+  const b = document.createElement('button'); b.dataset.n = c.n;
+  b.innerHTML = `<span class="ico">${CHAPTER_ICONS[c.n] || ''}</span><span>${chapterNum(c.n)}. ${c.title}${c.ready ? '' : ' (coming soon)'}</span>`;
+  b.disabled = !c.ready; b.classList.toggle('on', c.n === chapterPick);
+  b.addEventListener('click', () => { if (G.isHost) pickChapter(c.n); });
+  chapList.appendChild(b); chapButtons.push(b);
+}
+showEra();
 
 // ---------- Actions: everything a player does to the story goes through here ----------
 // On the host it goes straight to the chapter; a friend's headset sends it to the host.
@@ -240,14 +255,15 @@ if (params.has('autostart')) deskBtn.click(); // testing
 function chapterEnded() {
   const n = G.director.n, next = CHAPTERS.find((c) => c.n === n + 1 && c.ready);
   if (next) {
-    G.ui.subtitle(`End of Chapter ${n}`, `Next: Chapter ${next.n}, ${next.title}`);
+    const crossing = next.era !== CHAPTERS.find((c) => c.n === n)?.era;
+    if (crossing) G.ui.subtitle(`The end of Era 1: ${ERAS[1].title}`, `Next: Era ${next.era}, ${ERAS[next.era].title}`);
+    else G.ui.subtitle(`End of ${chapterLabel(n)}`, `Next: ${chapterLabel(next.n)}, ${next.title}`);
     setTimeout(async () => {
       await G.ui.fadeOut(1.5);
       G.ui.subtitle('');
       // build the next chapter while the screen is dark, then fly to it through the stars (js/flight.js)
       if (G.isHost) {
-        chapterPick = next.n;
-        for (const b of chapList.children) b.classList.toggle('on', b.textContent.startsWith(next.n + '.'));
+        pickChapter(next.n);
         await G.director.load(next.n);
       }
       await G.flight.play(n, next.n);
@@ -257,14 +273,15 @@ function chapterEnded() {
     return;
   }
   if (n === 7) G.ui.subtitle('The end of Era 1: Watchers of the Sky. Thank you for watching the sky!', 'Era 2 is on the way.');
-  else G.ui.subtitle(`End of Chapter ${n}. Thank you for watching the sky!`, 'More chapters are on the way.');
+  else if (n === 14) G.ui.subtitle('The end of Era 2: The Telescope and the Rocket. Thank you for watching the sky!', 'Era 3, the Space Race, is on the way.');
+  else G.ui.subtitle(`End of ${chapterLabel(n)}. Thank you for watching the sky!`, 'More chapters are on the way.');
   setTimeout(async () => {
     await G.ui.fadeOut(1.5);
     G.ui.subtitle('');
     G.started = false;
     const s = renderer.xr.getSession(); if (s) s.end().catch(() => {});
     G.mode = null; overlay.style.display = 'flex';
-    endCard.style.display = 'block'; endCard.textContent = `You finished Chapter ${n}. Press Enter VR to play it again.`;
+    endCard.style.display = 'block'; endCard.textContent = `You finished ${chapterLabel(n)}. Press Enter VR to play it again.`;
     document.exitPointerLock?.();
     if (G.isHost) loading = G.director.load(chapterPick);
   }, 6000);

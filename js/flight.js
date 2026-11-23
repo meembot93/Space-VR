@@ -6,7 +6,7 @@
 // be built (in the dark, before the flight) without being seen. Comfort: you move straight ahead,
 // slowly and smoothly, never turning, with the ribbon steady under you as a floor to look at.
 import * as THREE from 'three';
-import { CHAPTERS } from './chapters.js';
+import { CHAPTERS, ERAS, chapterLabel } from './chapters.js';
 
 // Where and when each chapter happens (shown on the ribbon and on arrival)
 export const PLACES = {
@@ -17,6 +17,13 @@ export const PLACES = {
   5: { year: 'about 350 BC', place: 'Athens, Greece' },
   6: { year: '1901 AD', place: 'Antikythera, Greece' },
   7: { year: 'about 150 AD', place: 'Alexandria, Egypt' },
+  8: { year: '1543', place: 'Frombork, Poland' },
+  9: { year: '1572', place: 'Denmark' },
+  10: { year: '1600', place: 'Prague' },
+  11: { year: '1610', place: 'Padua, Italy' },
+  12: { year: '1666', place: 'Woolsthorpe, England' },
+  13: { year: '1903 to 1944', place: 'Russia, America, Germany' },
+  14: { year: '1957', place: 'Kazakhstan, Soviet Union' },
 };
 const GAP = 36;     // metres between chapter markers on the ribbon
 const DROP = 1.25;  // how far below your eyes the ribbon runs
@@ -110,7 +117,9 @@ export class Flight {
     this.rig.position.copy(p); this.rig.rotation.set(0, Math.atan2(-d.x, -d.z), 0);
     this.from = from; this.to = to; this.t = 0; this.secs = secs;
     this.card.material.map?.dispose();
-    this.card.material.map = labelTex([[`Chapter ${to}`, 56, '#ffd98a'], [info?.title || '', 80, '#fff3d6'], [`${P.place || ''}, ${P.year || ''}`, 56, '#ffd98a']], 1400, 420);
+    // crossing into a new era: its name first, then the chapter
+    const newEra = info && CHAPTERS.find((c) => c.n === from)?.era !== info.era;
+    this.card.material.map = labelTex([[newEra ? `Era ${info.era}: ${ERAS[info.era].title}` : chapterLabel(to), newEra ? 64 : 56, '#ffd98a'], [info?.title || '', 80, '#fff3d6'], [`${newEra ? chapterLabel(to) + ' · ' : ''}${P.place || ''}, ${P.year || ''}`, 52, '#ffd98a']], 1400, 420);
     this.card.material.opacity = 0; this.card.material.needsUpdate = true;
     this.fade = 1; this.active = true; this.chimed = false;
     G.soundscape?.setLevel(0);
