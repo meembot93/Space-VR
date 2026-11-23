@@ -45,6 +45,10 @@ export const CHAPTER_ICONS = {
   // Kepler: an ellipse with the Sun at one focus
   10: badge(`<ellipse cx="32" cy="32" rx="21" ry="14" opacity="0.85"/><circle cx="40" cy="32" r="4.5" fill="${GOLD}" stroke="none"/>
     <circle cx="24" cy="32" r="1.6" fill="#cfd8ff" stroke="none"/><circle cx="18" cy="22" r="3" fill="#e0643a" stroke="none"/>`),
+  // Galileo: a telescope tube, Jupiter and its four moons in a row
+  11: badge(`<path d="M12 46 L34 30" stroke-width="5"/><path d="M10 48 L13 45" stroke-width="7"/>
+    <circle cx="44" cy="20" r="4.5" fill="${GOLD}" stroke="none"/><circle cx="33" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/>
+    <circle cx="38" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/><circle cx="51" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/><circle cx="56" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/>`),
   // Tycho: the W of Cassiopeia with the bright new star above it
   9: badge(`<path d="M14 40 L22 32 L30 42 L38 33 L48 40" stroke-width="2" opacity="0.8"/>
     <path d="M32 12 l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" fill="${GOLD}" stroke="none"/>`),

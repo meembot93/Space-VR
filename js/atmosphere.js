@@ -166,6 +166,14 @@ export class Atmosphere {
       this.motes = makeSpecks(120, 4, 0xfff0c8, 0.02); this.motes.material.opacity = 0.35; this.root.add(this.motes);
       this.fires = fireLights(ch, ['candle', 'stove']);
     }
+    if (n === 11) {
+      // evening haze on the Venice lagoon; night mist on Padua's canal; the candle and the workshop glow
+      const m = makeMist(scatter(40, () => [(Math.random() - 0.5) * 1400, 150 + Math.random() * 900], () => 0.2, [0.3, 1.6], [50, 100]), 0xe0c8b0);
+      this.root.add(m); this.mists.push({ m, amt: 0.5, on: (c) => c.cur === 'venice' });
+      const m2 = makeMist(scatter(24, () => [(Math.random() - 0.5) * 600, -62 + (Math.random() - 0.5) * 10], () => 0, [0.3, 1.2], [20, 40]), 0xb8c4dc);
+      this.root.add(m2); this.mists.push({ m: m2, amt: 0.7, on: (c) => c.cur === 'padua' });
+      this.fires = fireLights(ch, ['candle', 'workLight']);
+    }
     if (n === 9) {
       // frost mist over Herrevad's fields; the lamp on Hven's terrace flickers
       const m = makeMist(scatter(40, () => { const a = Math.random() * 6.28, r = 30 + Math.random() * 300; return [Math.cos(a) * r, Math.sin(a) * r]; }, ground, [0.2, 1.2], [30, 60]), 0xc8d0dc);
