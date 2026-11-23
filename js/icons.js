@@ -42,4 +42,7 @@ export const CHAPTER_ICONS = {
   8: badge(`<circle cx="32" cy="32" r="22" opacity="0.5"/><circle cx="32" cy="32" r="15" opacity="0.7"/><circle cx="32" cy="32" r="9" opacity="0.9"/>
     <circle cx="32" cy="32" r="4.5" fill="${GOLD}" stroke="none"/>
     <circle cx="47" cy="32" r="2.6" fill="#3f7fd0" stroke="none"/><circle cx="20" cy="17" r="2.2" fill="#e0643a" stroke="none"/>`),
+  // Tycho: the W of Cassiopeia with the bright new star above it
+  9: badge(`<path d="M14 40 L22 32 L30 42 L38 33 L48 40" stroke-width="2" opacity="0.8"/>
+    <path d="M32 12 l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" fill="${GOLD}" stroke="none"/>`),
 };

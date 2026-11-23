@@ -25,13 +25,14 @@ const MOODS = {
   // Ch6: the sea and the bronze machine, glinting
   ch6: { chords: [[-12, -5, 0, 4, 6], [-10, -3, 2, 6], [-8, -1, 4, 7], [-12, -5, 2, 7]], tempo: 9, twinkle: [16, 18, 19, 23, 24, 28], drone: -24, lead: 'lyre', scale: [4, 6, 7, 11, 12, 14, 16] },
   // Ch7: Ptolemy's great spinning sky, the finale
+  ch9: { chords: [[-12, -5, 0, 4, 7], [-10, -3, 2, 5, 9], [-7, 0, 4, 7, 12], [-5, 2, 5, 9, 11]], tempo: 12, twinkle: [12, 16, 19, 23, 24, 28], drone: -24, lead: 'flute', scale: [0, 2, 4, 5, 7, 9, 11, 12] },
   ch8: { chords: [[-12, -5, 0, 3, 7], [-8, -1, 3, 8], [-10, -3, 2, 5], [-7, 0, 5, 10]], tempo: 11, twinkle: [12, 15, 19, 22, 24, 27], drone: -24, lead: 'reed', scale: [0, 2, 3, 5, 7, 8, 10, 12] },
   ch7: { chords: [[-12, -5, 0, 4, 7], [-7, 0, 4, 9], [-9, -2, 3, 7], [-5, 2, 7, 11]], tempo: 10, twinkle: [12, 16, 19, 23, 24, 28], drone: -24, lead: 'lyre', scale: [0, 4, 7, 9, 11, 12, 16] },
 };
 
 // The big moments: when Astra starts one of these lines, the music swells up under her
 // instead of dipping (and a bright chord blooms).
-const SWELLS = new Set(['ch1_04', 'ch2_08', 'ch3_06', 'ch4_09', 'ch5_06', 'ch5_12', 'ch6_05', 'ch7_04', 'ch7_12', 'ch8_04', 'ch8_10', 'br3_01']);
+const SWELLS = new Set(['ch1_04', 'ch2_08', 'ch3_06', 'ch4_09', 'ch5_06', 'ch5_12', 'ch6_05', 'ch7_04', 'ch7_12', 'ch8_04', 'ch8_10', 'ch9_02', 'ch9_05', 'ch9_09', 'br3_01']);
 
 export class Music {
   constructor(G) {

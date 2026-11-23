@@ -159,6 +159,12 @@ export class Atmosphere {
       this.root.add(m); this.mists.push({ m, amt: 0.7 });
       this.fires = fireLights(ch, ['candle', 'brazierLight']);
     }
+    if (n === 9) {
+      // frost mist over Herrevad's fields; the lamp on Hven's terrace flickers
+      const m = makeMist(scatter(40, () => { const a = Math.random() * 6.28, r = 30 + Math.random() * 300; return [Math.cos(a) * r, Math.sin(a) * r]; }, ground, [0.2, 1.2], [30, 60]), 0xc8d0dc);
+      this.root.add(m); this.mists.push({ m, amt: 0.8, on: (c) => c.cur === 'abbey' });
+      this.fires = fireLights(ch, ['lampB', 'folkLight']);
+    }
     if (n === 7) {
       // dust turning slowly in the sunbeams of the hall
       this.motes = makeSpecks(220, 14, 0xfff0c8, 0.03); this.motes.material.opacity = 0.45; this.root.add(this.motes);

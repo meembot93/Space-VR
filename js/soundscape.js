@@ -261,4 +261,11 @@ const RECIPES = {
     { kind: 'crowd', at: V(-45, -14, -100), vol: 0.05, ref: 40 },
     { kind: 'leaves', at: V(-30, -6, -30), vol: 0.07, ref: 40, wide: true },
   ],
+  // Era 2, Ch2: the bare trees round Herrevad's fields; then on Hven the sea at the cliffs, the helpers
+  9: () => [
+    { kind: 'leaves', at: V(-20, 5, -30), vol: 0.06, ref: 30, wide: true, on: (ch) => ch.cur === 'abbey' },
+    { kind: 'crowd', at: V(50, 2, 20), vol: 0.04, ref: 20, on: (ch) => ch.cur === 'abbey' },
+    { kind: 'surf', follow: (ch, L) => L.clone().setLength(270).setY(-26), vol: 0.22, ref: 120, wide: true, on: (ch) => ch.cur === 'hven' },
+    { kind: 'crowd', at: V(0, 2, -20), vol: 0.05, ref: 15, on: (ch) => ch.cur === 'hven' },
+  ],
 };

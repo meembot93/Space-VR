@@ -28,7 +28,7 @@ import { D2R, ease, clamp01, at, sunAt, house, windows, steppedGable, gableRoof,
 const LAT = 54.36, YEAR = 1540, SUNLON = 215;     // Frombork, early November
 const TOP = 14;                                    // the tower's top floor, metres above the hilltop
 const HALF = 3;                                    // the tower is 6 x 6 m
-const ORR = new THREE.Vector3(0, TOP + 2.7, -8.5); // where the sky model floats, out over the hillside
+const ORR = new THREE.Vector3(0, TOP + 3.3, -10); // where the sky model floats, out over the hillside
 const TILT = 30;                                   // ...tipped toward you so you see into it (degrees)
 const N1 = noise2(81), N2 = noise2(83);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4();
@@ -393,7 +393,7 @@ export default class Copernicus {
 
   // ---------- The sky model: the planets, the Sun, the trails, the circles ----------
   buildModel() {
-    const M = this.model = new THREE.Group(); M.position.copy(ORR); M.rotation.x = TILT * D2R; M.scale.setScalar(1.6); M.visible = false; this.root.add(M);
+    const M = this.model = new THREE.Group(); M.position.copy(ORR); M.rotation.x = TILT * D2R; M.scale.setScalar(2.2); M.visible = false; this.root.add(M);
     this.bodies = BODIES.map((B) => {
       const g = new THREE.Group();
       const ball = new THREE.Mesh(new THREE.SphereGeometry(B.size, 20, 14), new THREE.MeshBasicMaterial({ color: B.col, transparent: true, fog: false }));
