@@ -45,6 +45,10 @@ export const CHAPTER_ICONS = {
   // Kepler: an ellipse with the Sun at one focus
   10: badge(`<ellipse cx="32" cy="32" rx="21" ry="14" opacity="0.85"/><circle cx="40" cy="32" r="4.5" fill="${GOLD}" stroke="none"/>
     <circle cx="24" cy="32" r="1.6" fill="#cfd8ff" stroke="none"/><circle cx="18" cy="22" r="3" fill="#e0643a" stroke="none"/>`),
+  // The rocket dreamers: a rocket climbing on its flame
+  13: badge(`<path d="M32 10 C38 16 40 24 40 34 L40 42 L24 42 L24 34 C24 24 26 16 32 10 Z" fill="#e8e2d0" stroke="none"/>
+    <circle cx="32" cy="26" r="3.2" fill="${DEEP}" stroke="none"/><path d="M24 36 L18 46 L24 44 Z M40 36 L46 46 L40 44 Z" fill="#c0503a" stroke="none"/>
+    <path d="M27 44 Q32 58 37 44 Z" fill="${GOLD}" stroke="none"/>`),
   // Tycho: the W of Cassiopeia with the bright new star above it
   9: badge(`<path d="M14 40 L22 32 L30 42 L38 33 L48 40" stroke-width="2" opacity="0.8"/>
     <path d="M32 12 l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" fill="${GOLD}" stroke="none"/>`),
