@@ -1,10 +1,34 @@
-// Background music. Each chapter asks for a mood by name (e.g. 'ch2'); if sounds/music/index.json
-// lists a file for it, that file loops, e.g. { "ch2": "stonehenge.mp3" }. Drop in any track you
-// like (your own, or free music whose license allows any use) and list it there.
-// With no file listed, a soft generated score plays instead: slow warm chords and a few
-// twinkling notes, made in WebAudio (no samples, nothing to license).
-// The music dips while Astra is talking.
+// Music. Each chapter's music plays ONCE, at that chapter's big moment (the reveal, or just as
+// Astra makes the main point), then fades away. The rest of the chapter has only the quiet
+// soundscape (fire, wind, sea: js/soundscape.js). MOMENTS below says where each chapter's music lands.
+// If sounds/music/index.json lists a file for the chapter, e.g. { "ch9": "tycho.mp3" }, that file
+// plays once, start to end. With no file, a soft generated score plays for about 50 seconds instead:
+// slow warm chords and a few twinkling notes, made in WebAudio (no samples, nothing to license).
+// The music dips a little while Astra is talking so her words stay clear.
+import { LINES } from './script.js';
 const DIR = new URL('../sounds/music/', import.meta.url).href;
+
+// Where each chapter's music starts. `line`: when Astra says that line, `at`: optionally wait until
+// she reaches that word or phrase (or a fraction, 0.5 = halfway). `when`: or start when the chapter's
+// state says so (for moments with no narration, like a launch). Ch14's liftoff music is started by
+// the chapter itself (G.music.sting), so its entry here is the second piece, near the end.
+const MOMENTS = {
+  ch1: { line: 'ch1_04' },                                  // "Look up": the Milky Way and thousands of stars
+  ch2: { line: 'ch2_08' },                                  // the midsummer sunbeam shines into the circle
+  ch3: { line: 'ch3_06' },                                  // "There! Sirius is back."
+  ch4: { line: 'ch4_09' },                                  // the eclipsed Moon glows red
+  ch5: { line: 'ch5_12' },                                  // Eratosthenes was right: up to space to see the round Earth
+  ch6: { line: 'ch6_05' },                                  // "But look closer": the hidden gears, then the machine builds itself
+  ch7: { line: 'ch7_04' },                                  // Ptolemy's universe: the crystal spheres spin around Earth
+  ch8: { line: 'ch8_04', at: 'put it in the middle' },      // Copernicus puts the Sun in the middle
+  ch9: { line: 'ch9_01', at: 'and stops' },                 // Tycho sees the new star
+  ch10: { line: 'ch10_05', at: 'he found it' },             // Kepler finds the ellipse
+  ch11: { line: 'ch11_07', at: 'going around' },            // Jupiter's moons: "Moons! Four moons!"
+  ch12: { line: 'ch12_07', at: 'really fast' },             // the cannonball goes all the way around: an orbit
+  ch13: { when: (ch) => ch.s?.phase === 'launch' },         // Goddard's rocket lifts off
+  ch14: { line: 'ch14_11' },                                // "something made by people was up there, looking back down"
+};
+const SCORE_SECS = 50; // how long the generated score plays at a moment (when there's no music file)
 
 // Each chapter has its own mood: chords (semitones from A3), how many seconds each chord lasts,
 // high twinkling notes, a low drone, and a lead voice that plays a few slow notes from `scale`:
@@ -38,33 +62,43 @@ const MOODS = {
   ch14: { chords: [[-12, -5, 0, 3, 7], [-10, -3, 2, 5, 9], [-8, -1, 3, 7], [-5, 2, 7, 10, 14]], tempo: 10, twinkle: [12, 15, 19, 22, 24, 27], drone: -24, lead: 'flute', scale: [0, 3, 5, 7, 10, 12, 15] },
 };
 
-// The big moments: when Astra starts one of these lines, the music swells up under her
-// instead of dipping (and a bright chord blooms).
-const SWELLS = new Set(['ch1_04', 'ch2_08', 'ch3_06', 'ch4_09', 'ch5_06', 'ch5_12', 'ch6_05', 'ch7_04', 'ch7_12', 'ch8_04', 'ch8_10', 'ch9_02', 'ch9_05', 'ch9_09', 'ch10_05', 'ch10_09', 'ch11_04', 'ch11_07', 'ch12_07', 'ch12_10', 'ch13_04', 'ch13_07', 'ch14_08', 'ch14_11', 'ch14_12', 'br3_01']);
-
 export class Music {
   constructor(G) {
     this.G = G; this.files = {}; this.cur = null; this.duck = 1;
     this.ready = fetch(DIR + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then((j) => { this.files = j || {}; }).catch(() => {});
   }
 
-  async play(name, mood = null, vol = 0.5) {
-    const A = this.G.audio; if (!A.ctx) return;
+  // A chapter starts: no music yet, just get ready for its moment
+  play(name) {
     this.stop(3);
+    this.armed = MOMENTS[name] ? { name, ...MOMENTS[name] } : null;
+    if (this.armed && this.G.audio.ctx) this.ready.then(() => { if (this.files[name]) this.preload(this.files[name]); });
+  }
+
+  // The moment: play the chapter's music once
+  async moment(name, vol = 0.55) {
+    const A = this.G.audio; if (!A.ctx) return;
+    this.stop(1.5);
     await this.ready;
     const ctx = A.ctx, out = ctx.createGain(); out.gain.value = 0.0001; out.connect(A.master);
-    out.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 4);
-    const cur = this.cur = { out, vol, nodes: [], name };
+    const cur = this.cur = { out, vol, nodes: [], name, t0: this.G.t + 3 };
     if (this.files[name]) {
-      try {
-        const ab = await (await fetch(DIR + this.files[name])).arrayBuffer();
-        const buf = await new Promise((ok, fail) => ctx.decodeAudioData(ab, ok, fail));
-        if (this.cur !== cur) return;
-        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(out); src.start();
-        cur.nodes.push(src); return;
-      } catch (e) { console.warn('Music file failed, using the generated score', e); }
+      const buf = await this.preload(this.files[name]);
+      if (this.cur !== cur) return;
+      if (buf) {
+        out.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 1);
+        const src = ctx.createBufferSource(); src.buffer = buf; src.connect(out); src.start();
+        cur.nodes.push(src); cur.end = this.G.t + buf.duration;
+        src.onended = () => { if (this.cur === cur) { this.cur = null; out.disconnect(); } };
+        return;
+      }
+      console.warn('Music file failed, using the generated score');
     }
-    this.score(cur, MOODS[mood || name] || MOODS.dawn);
+    out.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 3);
+    cur.end = this.G.t + SCORE_SECS;
+    this.score(cur, MOODS[name] || MOODS.dawn);
+    this.swell(16);
+    cur.fadeTimer = setTimeout(() => { if (this.cur === cur) this.stop(8); }, (SCORE_SECS - 8) * 1000);
   }
 
   // The generated score: a low drone, one chord every `tempo` seconds gently overlapping, a few
@@ -183,20 +217,30 @@ export class Music {
   stop(fade = 2) {
     if (this.stingCur) this.stopSting(fade);
     const c = this.cur; if (!c) return; this.cur = null;
-    clearTimeout(c.timer);
+    clearTimeout(c.timer); clearTimeout(c.fadeTimer);
     const ctx = this.G.audio.ctx, t = ctx.currentTime;
     c.out.gain.cancelScheduledValues(t); c.out.gain.setValueAtTime(Math.max(0.0001, c.out.gain.value), t); c.out.gain.exponentialRampToValueAtTime(0.0001, t + fade);
-    setTimeout(() => { for (const n of c.nodes) try { n.stop(); } catch (e) { /* done */ } c.out.disconnect(); }, fade * 1000 + 200);
+    setTimeout(() => { for (const n of c.nodes) try { n.stop(); } catch (e) { /* done */ } try { c.out.disconnect(); } catch (e) { /* done */ } }, fade * 1000 + 200);
   }
 
-  // Duck under Astra's voice (but rise for the big moments); quieter during the flights between chapters
+  // Wait for the chapter's moment; dip a little under Astra's voice; quieter while paused
   update(dt) {
-    const c = this.cur; if (!c || !this.G.audio.ctx) return;
-    const id = this.G.narration.cur?.id;
-    if (id !== this.lastLine) { this.lastLine = id; if (SWELLS.has(id)) this.swell(16); }
-    const swelling = this.G.t < (this.swellUntil || 0);
-    const S = this.stingCur, talking = S ? S.duck : swelling ? 1.5 : this.G.narration.cur ? 0.45 : 1;
-    this.duck += (talking - this.duck) * Math.min(1, dt * (S ? 1.5 / S.fade : swelling ? 0.6 : 2));
-    if (c.out.gain.value > 0.01 && this.G.t > (c.t0 ??= this.G.t + 4)) c.out.gain.setTargetAtTime(c.vol * this.duck * (this.G.paused ? 0.35 : 1), this.G.audio.ctx.currentTime, 0.3);
+    const a = this.armed, G = this.G;
+    if (a && G.audio.ctx) {
+      const c = G.narration.cur;
+      let go = false;
+      if (a.when) { const ch = G.director?.chapter; go = !!ch && !!a.when(ch); }
+      else if (c && c.id === a.line) {
+        a.seen = true;
+        let f = a.at ?? 0;
+        if (typeof f === 'string') { const txt = LINES[c.id] || ''; const i = txt.indexOf(f); f = i < 0 ? 0 : i / Math.max(1, txt.length); }
+        go = G.narration.progress() >= f;
+      } else go = !!a.seen; // the line ended early (skipped): start now anyway
+      if (go) { this.armed = null; this.moment(a.name); }
+    }
+    const c = this.cur; if (!c || !G.audio.ctx) return;
+    const S = this.stingCur, talking = S ? S.duck : G.narration.cur ? 0.7 : 1;
+    this.duck += (talking - this.duck) * Math.min(1, dt * (S ? 1.5 / S.fade : 2));
+    if (c.out.gain.value > 0.01 && G.t > c.t0) c.out.gain.setTargetAtTime(c.vol * this.duck * (G.paused ? 0.35 : 1), G.audio.ctx.currentTime, 0.3);
   }
 }
