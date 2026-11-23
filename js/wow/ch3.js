@@ -1,6 +1,6 @@
 // Chapter 3 extras: the Nile.
-//  - Cameo + wow (ch3_02, "they lined them up with north"): the echo of a pyramid architect appears on
-//    the roof beside you and holds up a merkhet (a plumb line on a sighting stick). A glowing line drops
+//  - Wow (ch3_02, "they lined them up with north"): the priest crosses to the north wall of the roof
+//    and holds up his merkhet (a plumb line on a sighting stick) to the stars over the pole. A glowing line drops
 //    from two stars that hang one above the other over the pole (Kochab and Mizar, the way some
 //    Egyptologists think it was done) straight down to the north horizon, a line of light runs south
 //    from there along the Great Pyramid's east side, and the pyramid's base lights up, square to it.
@@ -8,7 +8,7 @@
 //    Egyptians called Sah, strides up the sky.
 //  - Bridge: once the Nebra disk's stars match the sky, the Pleiades fly up as seven doves.
 import * as THREE from 'three';
-import { Echo } from './echo.js';
+import { holdProp, dropProp } from '../people.js';
 import { glowSprite, shimmer, awe, Timeline, clamp01, D2R } from './fx.js';
 import { dirFromAzEl } from '../sky.js';
 
@@ -30,17 +30,17 @@ export default class Ch3Extras {
   constructor(G, chapter) {
     this.G = G; this.ch = chapter; this.tl = new Timeline();
     this.root = new THREE.Group(); (chapter.egypt || G.scene).add(this.root);
-    const roofY = G.world.height(0, 0);
-    // the architect stands at the north edge of the roof, facing north
-    this.arch = new Echo(G, this.root, { model: 'architect', seed: 21, tint: 0xffd9a0, pos: new THREE.Vector3(-1.4, roofY, -1.6), face: 0,
-      look: { tunic: 0xece4d0, skin: 0x9a6a46, hair: 0x1a1410, height: 1.72 } });
-    // the merkhet: a short stick with a plumb line hanging from its end
+    // the merkhet: a palm-rib sighting stick, and a plumb line (a cord and a stone bob) from its tip.
+    // The priest holds the stick; the cord hangs straight down from it whichever way he tilts it.
+    const wood = new THREE.MeshStandardMaterial({ color: 0x7a5a36, roughness: 0.85 });
     const m = this.merkhet = new THREE.Group();
-    const gold = new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6).rotateZ(Math.PI / 2).translate(0.15, 0, 0), gold);
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.5, 4).translate(0, -0.25, 0), gold); cord.position.x = 0.35;
-    const bob = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.07, 8).rotateX(Math.PI), gold); bob.position.set(0.35, -0.52, 0);
-    m.add(stick, cord, bob); m.userData.mat = gold; this.root.add(m);
+    m.add(new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, 0.42, 6).translate(0, 0.17, 0), wood));
+    const notch = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.012), wood); notch.position.y = 0.39; m.add(notch);
+    this.cord = new THREE.Group();
+    this.cord.add(new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, 0.45, 4).translate(0, -0.225, 0), new THREE.MeshStandardMaterial({ color: 0xe0d6bc, roughness: 1 })));
+    const bob = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.06, 8).rotateX(Math.PI).translate(0, -0.47, 0), new THREE.MeshStandardMaterial({ color: 0x4a4440, roughness: 0.6 }));
+    this.cord.add(bob); this.cord.visible = false; this.root.add(this.cord);
+    this.tip = new THREE.Object3D(); this.tip.position.y = 0.4; m.add(this.tip);
     // the line on the ground: from the north horizon along the Great Pyramid's east side, and its base square
     const top = chapter.pyramidTops?.[0] || new THREE.Vector3(-580, 160, -380);
     const by = top.y - KHUFU_H + 1.2, h = KHUFU_B / 2, ex = top.x + h;
@@ -50,7 +50,7 @@ export default class Ch3Extras {
     this.ground.add(strip(ex, top.z + h, ex, top.z - 2600, 3.5));                                         // due north, past the horizon
     this.ground.add(strip(top.x - h, top.z - h, ex, top.z - h, 2.5), strip(top.x - h, top.z + h, ex, top.z + h, 2.5), strip(top.x - h, top.z - h, top.x - h, top.z + h, 2.5)); // the rest of the base
     this.ground.visible = false; this.root.add(this.ground);
-    this.lineK = 0; this.archOn = 0;
+    this.lineK = 0;
     // Sirius's starburst
     this.flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: rayTex(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.flare.renderOrder = -6; this.flareGlow = glowSprite(0xcfe0ff, 1, 0); this.flareGlow.renderOrder = -6;
@@ -60,15 +60,18 @@ export default class Ch3Extras {
   line(id) {
     const G = this.G, F = G.skyFigures;
     if (id === 'ch3_02') {
-      this.tl.after(6, () => { this.arch.show(true); this.archOn = 1; G.audio.chime?.(this.arch.P.g.position); });
+      this.ch.priestNorth = true;                                                    // he walks over to the north wall
+      this.tl.after(6, () => { this.holding = true; const P = this.ch.priest; if (P) { holdProp(P, this.merkhet, 'Right', [0, 0.06, 0.02]); G.audio.chime?.(P.g.position); } });
       this.tl.after(9.5, () => { this.northLine(); this.lineOn = true; shimmer(G, 3, 0.15); });
     }
-    if (id === 'ch3_03') this.tl.after(2.5, () => { this.arch.show(false); this.lineOn = false; F.stop('north'); });
+    if (id === 'ch3_03') this.tl.after(2.5, () => { this.putAway(); this.lineOn = false; F.stop('north'); });
     if (id === 'ch3_06') {
       this.flareT = 0; awe(G, 10, 0.08, 104); shimmer(G, 2.5, 0.18);
       if (F.height('hunter') > 5) this.tl.after(2.5, () => F.play('hunter', { secs: 22 }));
     }
   }
+
+  putAway() { this.holding = false; this.ch.priestNorth = false; if (this.ch.priest) dropProp(this.ch.priest, 'Right'); this.cord.visible = false; }
 
   // Kochab and Mizar, one straight above the other, and the plumb line between them dropped to the horizon
   northLine() {
@@ -96,14 +99,9 @@ export default class Ch3Extras {
 
   update(dt, t) {
     const G = this.G; this.tl.update(dt);
-    this.arch.update(dt, t);
-    // the architect lifts his merkhet toward the stars over the pole
-    const P = this.arch.P; P.pose = this.arch.on ? 'point' : 'idle';
-    P.g.getWorldPosition(_a); P.pointAt.copy(_a).add(dirFromAzEl(0, 38, _b).multiplyScalar(40));
-    this.arch.hand(this.merkhet.position); this.merkhet.parent.worldToLocal(this.merkhet.position);
-    this.merkhet.rotation.y = Math.PI / 2;
-    this.merkhet.userData.mat.opacity = this.arch.k * 0.9;
-    this.merkhet.visible = this.arch.k > 0.01;
+    // the plumb line hangs straight down from the tip of the priest's stick
+    this.cord.visible = this.holding && !!this.merkhet.parent;
+    if (this.cord.visible) { this.tip.getWorldPosition(_a); this.cord.parent.worldToLocal(this.cord.position.copy(_a)); }
     // the line on the ground grows from the north toward the pyramid
     this.lineK = clamp01(this.lineK + dt * (this.lineOn ? 0.35 : -0.4));
     this.ground.visible = this.lineK > 0.01;
@@ -121,7 +119,7 @@ export default class Ch3Extras {
   }
 
   dispose() {
-    this.arch.dispose(); this.root.parent?.remove(this.root);
+    this.putAway(); this.root.parent?.remove(this.root);
     this.G.scene.remove(this.flare, this.flareGlow);
     this.G.skyFigures.stopAll();
   }

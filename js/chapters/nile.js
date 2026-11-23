@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, walkToward } from '../people.js';
+import { dress } from '../dress.js';
 import { makeHerd, makeFlock, makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
@@ -116,6 +117,8 @@ const isField = (x, z) => {
 };
 // The roof you stand on: the priest's two-storey house at the edge of the village, looking over the fields
 const ROOF = groundHeight(0, 0) + 7.2;
+// where the priest stands: by his sighting post, and (ch3_02) at the north wall with his merkhet
+const PRIEST_HOME = { x: 3.75, z: 1.0, yaw: -Math.PI / 2 + 0.25 }, PRIEST_NORTH = { x: 1.1, z: -3.65 };
 
 // ---------- Textures ----------
 function glowMat(color = 'rgba(255,220,140,1)', blend = THREE.AdditiveBlending) {
@@ -668,7 +671,7 @@ export default class Nile {
     this.people = [];
     // The priest-astronomer: Meem's model (`priest` in models/index.json)
     const pr = this.priest = makePerson({ model: 'priest', seed: 3, tunic: 0xeeeadc, skin: 0x9a6a46, hair: 0x1a1410 });
-    pr.g.position.set(3.75, ROOF, 1.0); pr.g.rotation.y = -Math.PI / 2 + 0.25; this.egypt.add(pr.g);
+    pr.g.position.set(PRIEST_HOME.x, ROOF, PRIEST_HOME.z); pr.g.rotation.y = PRIEST_HOME.yaw; this.egypt.add(pr.g);
     pr.blk = { x: pr.g.position.x, z: pr.g.position.z, r: 0.3 }; G.world.blockers.push(pr.blk);
     // Neighbours asleep on their roofs (people slept outside on summer nights). They sit up at the bell.
     this.sleepers = [];
@@ -686,9 +689,13 @@ export default class Nile {
     // Villagers who come out with lamps when the bell rings, and walk down toward the fields
     this.walkers = [];
     const r = rng(31);
-    for (let i = 0; i < 12; i++) {
+    // two kinds of villager (Meem's villager and the young architect's model), each in their own linen,
+    // and the same model never side by side: they set out from houses far apart
+    const LINEN = [{}, { mul: 0xd8c8a8, val: 0.95, build: 1.06 }, { mul: 0xc8b490, hair: 0x2a2420, build: 0.95 }, { mul: 0xe8dcc0, sat: 1.4, build: 1.03 }];
+    for (let i = 0; i < 8; i++) {
       const spot = this.lampSpots[(i * 7 + 3) % this.lampSpots.length];
-      const P = makePerson({ model: 'villager', seed: 50 + i * 5, tunic: [0xe8e0cc, 0xd8ccb0, 0xeee6d2][i % 3], skin: [0x8a5a3a, 0x7a4e32, 0x9a6844][i % 3], hair: 0x1a1410, beard: false });
+      const P = makePerson({ model: i % 2 ? 'architect' : 'villager', seed: 50 + i * 5, tunic: [0xe8e0cc, 0xd8ccb0, 0xeee6d2][i % 3], skin: [0x8a5a3a, 0x7a4e32, 0x9a6844][i % 3], hair: 0x1a1410, beard: false, height: 1.62 + (i % 3) * 0.06 });
+      dress(P, LINEN[(i >> 1) % 4]);
       P.g.position.set(spot.x, groundHeight(spot.x, spot.z), spot.z); P.g.visible = false;
       P.home = P.g.position.clone();
       P.goal = new THREE.Vector3(50 + r() * 70, 0, P.home.z * 0.6 + (r() - 0.5) * 60);
@@ -1108,6 +1115,14 @@ export default class Nile {
     const pr = this.priest;
     pr.pose = s.phase === 'found' ? 'cheer' : s.point ? 'point' : 'idle';
     pr.pointAt.copy(dirFromAzEl(sirAz, Math.max(sirEl, 0.5), _b)).multiplyScalar(60).add(pr.g.position).setY(pr.g.position.y + 2.2);
+    // ch3_02 (js/wow/ch3.js): he crosses to the north wall and holds his merkhet up to the stars over
+    // the pole, then goes back to his sighting post
+    const home = PRIEST_HOME, go = this.priestNorth ? PRIEST_NORTH : home;
+    if (walkToward(pr, go.x, go.z, dt, { speed: 0.9, stop: 0.08 })) {
+      let dy = (this.priestNorth ? Math.PI : home.yaw) - pr.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      pr.g.rotation.y += dy * Math.min(1, dt * 3);
+      if (this.priestNorth) { pr.pose = 'point'; pr.pointAt.copy(dirFromAzEl(0, 38, _b)).multiplyScalar(40).add(pr.g.position); }
+    }
     if (s.phase === 'bell' || s.phase === 'sunrise') { pr.pose = 'point'; pr.pointAt.copy(this.bellPos); }
     animatePerson(pr, t, dt);
     // The bell swings and rings

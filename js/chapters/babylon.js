@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
+import { dress } from '../dress.js';
 import { makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
@@ -198,7 +199,7 @@ export default class Babylon {
     const z0 = ZIG_Z + TIERS[1][1], z1 = z0 + 45, steps = 60;
     for (let i = 0; i < steps; i++) {
       const f = i / steps, y = lerp(BASE, TIERS[1][2], f), z = lerp(z1, z0, f);
-      k.box(7, 0.4 + (y - BASE), 0.8, i % 2 ? 0xa48a66 : 0x9e8462, [0, BASE + (y - BASE + 0.4) / 2, z]);
+      k.box(7 - (i % 2) * 0.03, 0.4 + (y - BASE), 0.8, i % 2 ? 0xa48a66 : 0x9e8462, [0, BASE + (y - BASE + 0.4) / 2, z]);   // (every other step a hair narrower: no shared side faces)
     }
     for (const sx of [-1, 1]) k.box(0.8, 1, 46, 0x8e7656, [sx * 3.9, lerp(BASE, TIERS[1][2], 0.5) + 0.5, (z0 + z1) / 2], [Math.atan2(TIERS[1][2] - BASE, 45), 0, 0]);
     // a short stair from the second tier up to the terrace (south side)
@@ -221,7 +222,7 @@ export default class Babylon {
     });
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(14, 15);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 22).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: tex }));
-    floor.position.set(0, 0.002, ZIG_Z); this.root.add(floor);
+    floor.position.set(0, 0.012, ZIG_Z); this.root.add(floor);   // (1.2 cm over the terrace's own top, so the two never flicker)
     // Parapet around the edge with stepped battlements, a gap where the little stair comes up
     const PAR = 0xa68b67;
     const wall = (x0, z0, x1, z1) => {
@@ -378,16 +379,26 @@ export default class Babylon {
     this.comet = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.12), new THREE.MeshBasicMaterial({ map: ct, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
     this.comet.scale.setScalar(130); this.skyBits.add(this.comet);
     this.flash = new THREE.Sprite(glowMat('rgba(220,225,255,1)')); this.flash.position.copy(dirFromAzEl(298, 2)).multiplyScalar(700); this.flash.scale.set(500, 160, 1); this.flash.material.opacity = 0; this.skyBits.add(this.flash);
-    // ch4_05: the watchers before him, one after another, back through the years (ghostly)
+    // ch4_05: the notes of the watchers before him, one after another, back through the years: a line of
+    // little tables, each piled with one watcher's clay tablets, older and darker the further back they go,
+    // each lit by its own oil lamp as Astra names them
     this.ghosts = [];
-    const ghostMat = new THREE.MeshBasicMaterial({ color: 0x9ac8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-    this.ghostMat = ghostMat;
     for (let i = 0; i < 5; i++) {
-      const P = makePerson({ model: 'skywatcher', seed: 600 + i, beard: true });
-      P.g.position.set(this.deskX - 1.5 - i * 0.95, 0, this.shrineFront + 0.95 + i * 0.25); P.g.rotation.y = 0.5 + i * 0.05; P.pose = i % 2 ? 'hold' : 'idle'; P.g.visible = false;
-      P.g.traverse((o) => { if (o.isMesh) o.material = ghostMat; });
-      const tb = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.03), ghostMat); if (i % 2) holdProp(P, tb, 'Right', [0, 0.08, 0.04]);
-      this.root.add(P.g); this.ghosts.push(P);
+      const k = new Kit(), r = rng(600 + i), wood = [0x6a4a2c, 0x5e4228, 0x553c24, 0x4c3620, 0x43301c][i];
+      k.box(0.56, 0.04, 0.38, wood, [0, 0.58, 0]);
+      for (const [x, z] of [[-0.24, -0.15], [0.24, -0.15], [-0.24, 0.15], [0.24, 0.15]]) k.box(0.04, 0.56, 0.04, wood, [x, 0.28, z]);
+      k.box(0.48, 0.03, 0.3, wood, [0, 0.14, 0]);                                                         // a shelf under it
+      // the tablets: a pile on top and a few leaning, older ones darker and more worn
+      const clay = new THREE.Color(0xc8a070).lerp(new THREE.Color(0x6a5440), i / 5);
+      const tab = (x, y, z, rx, ry) => { const c = clay.clone().multiplyScalar(0.9 + r() * 0.2); k.box(0.1, 0.035, 0.14, c.getHex(), [x, y, z], [rx, ry, 0]); };
+      for (let j = 0; j < 3 + i; j++) tab(-0.12 + r() * 0.04, 0.618 + j * 0.036, -0.02 + r() * 0.04, 0, (r() - 0.5) * 0.4);
+      for (let j = 0; j < 3; j++) tab(-0.02 + j * 0.105, 0.66, 0.08, -1.1, 0);   // side by side, not overlapping
+      for (let j = 0; j < 2 + (i % 3); j++) tab(-0.15 + j * 0.13, 0.173, 0, 0, (r() - 0.5) * 0.6);
+      k.add(new THREE.LatheGeometry([[0, 0], [0.04, 0.005], [0.045, 0.025], [0.015, 0.035], [0, 0.035]].map(([a, b]) => new THREE.Vector2(a, b)), 8), 0xa0603a, [0.18, 0.6, -0.1]);   // the lamp
+      const g = new THREE.Group(); g.add(k.mesh(FLAT));
+      const flame = new THREE.Sprite(glowMat('rgba(255,180,90,1)')); flame.position.set(0.18, 0.7, -0.1); flame.scale.setScalar(0.5); flame.material.opacity = 0; g.add(flame);
+      g.position.set(this.deskX - 1.5 - i * 0.95, 0, this.shrineFront + 0.95 + i * 0.25); g.rotation.y = 0.5 + i * 0.05; g.visible = false; g.userData.flame = flame;
+      this.root.add(g); this.ghosts.push(g);
     }
     // ch4_10: what Babylon left us: sixty minutes, 360 degrees, the twelve signs of the zodiac
     const face = (kind) => canvasTex(512, 512, (g, w) => {
@@ -455,10 +466,13 @@ export default class Babylon {
       if (k >= 1 && sk < 3) this.cometT = null;
     }
     this.flash.material.opacity = sk >= 4 ? Math.max(0, Math.sin(t * 17) * Math.sin(t * 5.3)) * 0.8 * (Math.sin(t * 0.9) > 0.3 ? 1 : 0) : 0;
-    // ch4_05: the line of earlier watchers
+    // ch4_05: the notes of the earlier watchers
     this.ghostV = damp(this.ghostV || 0, s.ghosts, 2, dt);
-    this.ghostMat.opacity = Math.min(1, this.ghostV) * 0.45;
-    this.ghosts.forEach((P, i) => { P.g.visible = this.ghostV > i + 0.05; if (P.g.visible) { animatePerson(P, t, dt); if (P.model && !P.ghosted) { P.ghosted = true; P.g.traverse((o) => { if (o.isMesh) o.material = this.ghostMat; }); } } });
+    this.ghosts.forEach((g, i) => {
+      const k = clamp(this.ghostV - i, 0, 1); g.visible = s.phase === 'archive' || this.ghostV > 0.02;   // the tables wait in the dark; the lamps light one by one
+      if (!g.visible) return;
+      g.userData.flame.material.opacity = k * k * (0.75 + 0.15 * Math.sin(t * 9 + i * 2));
+    });
     // ch4_10: the clock, the circle, the zodiac, out under the Moon
     const wv = s.wheel;
     this.wheelMats.forEach((m, i) => { m.opacity = damp(m.opacity, wv === i + 1 ? 0.9 : 0, 2.5, dt); });
@@ -508,7 +522,7 @@ export default class Babylon {
         k.box(x1 - x0, 0.05, 0.42, WOOD, [(x0 + x1) / 2, y - 0.025, SHELF_Z]);
         for (let x = x0 + 0.13; x < x1 - 0.1; x += 0.15) this.shelfSpots.push([x, y, x0 < 0]);
       }
-      for (let x = x0; x <= x1 + 0.01; x += (x1 - x0) / 4) k.box(0.07, 2.42, 0.42, WOOD - 0x0a0806, [x, 1.21, SHELF_Z]);
+      for (let x = x0; x <= x1 + 0.01; x += (x1 - x0) / 4) k.box(0.07, 2.42, 0.44, WOOD - 0x0a0806, [x, 1.21, SHELF_Z]);   // (1 cm proud of the boards, front and back)
       k.box(x1 - x0, 2.4, 0.04, 0x3a2a1c, [(x0 + x1) / 2, 1.2, SHELF_Z - 0.2]);
     }
     // The reading desk: a long sloping board on legs, right in front of the left shelves
@@ -595,7 +609,7 @@ export default class Babylon {
     body.position.z = 0.0225; g.add(body);
     const tex = canvasTex(360, 460, draw);
     const face = new THREE.Mesh(new THREE.PlaneGeometry(TAB_W - 0.012, TAB_H - 0.012), new THREE.MeshLambertMaterial({ map: tex }));
-    face.position.z = 0.0455; g.add(face);
+    face.position.z = 0.047; g.add(face);   // 2 mm proud of the clay, so it never flickers
     g.userData.tex = tex; g.userData.face = face;
     return g;
   }
@@ -655,7 +669,7 @@ export default class Babylon {
   redrawMine() { const T = this.clay.userData.tex; const g = T.userData.ctx; this.drawMine(g, 360, 460); T.needsUpdate = true; }
   // Where mark i is, in the world
   markPos(i, out = new THREE.Vector3()) {
-    const M = MARKS[i]; return this.clay.localToWorld(out.set((M.u - 0.5) * (TAB_W - 0.012), (0.5 - M.v) * (TAB_H - 0.012), 0.0455));
+    const M = MARKS[i]; return this.clay.localToWorld(out.set((M.u - 0.5) * (TAB_W - 0.012), (0.5 - M.v) * (TAB_H - 0.012), 0.047));
   }
 
   buildPeople() {
@@ -671,14 +685,25 @@ export default class Babylon {
     // The sky-watcher, between the shelves and the writing table, and his young apprentice by the parapet
     this.watcher = add(new THREE.Vector3(0.6, 0, this.shrineFront + 1.3), 0, {}, 'watcher');
     this.G.world.blockers.push(this.watcher.blk);
-    this.apprentice = add(new THREE.Vector3(-7.4, 0, ZIG_Z + 7.6), faceDir(this.moonDir), { height: 1.6 }, 'apprentice');
+    this.apprentice = add(new THREE.Vector3(-7.4, 0, ZIG_Z + 7.6), faceDir(this.moonDir), { height: 1.62, model: 'architect' }, 'apprentice');
+    dress(this.apprentice, { mul: 0xb89c80, sat: 1.2, hue: 0.02, build: 1.02 });   // young, in a plain woollen wrap
     this.G.world.blockers.push(this.apprentice.blk);
     // Townspeople below: temple servants on the tier under you, and people in the courtyard and on the stairs
     const md = faceDir(this.moonDir);
-    for (const [x, y, z] of [[-5, -6, ZIG_Z + 13.5], [2.5, -6, ZIG_Z + 14.2], [6.5, -6, ZIG_Z + 13], [-13, -6, ZIG_Z + 2]]) add(new THREE.Vector3(x, y, z), md + (Math.random() - 0.5) * 0.4, {}, 'town');
-    for (const [x, z] of [[-6, 66], [-2.5, 70], [3, 67], [7.5, 72], [12, 64], [-11, 74]]) add(new THREE.Vector3(x, BASE, ZIG_Z + z), md + (Math.random() - 0.5) * 0.6, {}, 'town');
+    // Every one of them a different person (Meem's models from the other chapters, in Babylonian wool):
+    // shaven-headed temple servants, a scribe, porters, an old woman come to see the Moon
+    const TOWN = [
+      ['priest', { mul: 0xe0d4bc }], ['instrument_maker', { mul: 0xa08a6a, sat: 0.8 }], ['builder', { hue: 0.92, sat: 0.9, val: 0.9 }], ['villager', { mul: 0xc0a888 }],
+      ['skywatcher', { hue: 0.6, sat: 0.55, val: 0.8, hair: 0x6a6460 }], ['sailor', { hue: 0.08, sat: 0.6, val: 0.9 }],
+      ['aristotle', { mul: 0xa89070, sat: 0.7, hair: 0x2a2018 }], ['storyteller', { hue: 0.03, sat: 0.7, val: 1.1 }], ['builder_far', { hue: 0.55, sat: 0.4, val: 0.85, hair: 0x5a5450 }],
+      ['villager', { mul: 0x9a8468, val: 0.9, build: 1.08 }],
+    ];
+    let ti = 0;
+    const town = (pos, face) => { const [model, look] = TOWN[ti++]; dress(add(pos, face, { model }, 'town'), look); };
+    for (const [x, y, z] of [[-5, -6, ZIG_Z + 13.5], [2.5, -6, ZIG_Z + 14.2], [6.5, -6, ZIG_Z + 13], [-13, -6, ZIG_Z + 2]]) town(new THREE.Vector3(x, y, z), md + (Math.random() - 0.5) * 0.4);
+    for (const [x, z] of [[-6, 66], [-2.5, 70], [3, 67], [9, 70], [-11, 74]]) town(new THREE.Vector3(x, BASE, ZIG_Z + z), md + (Math.random() - 0.5) * 0.6);
     const stair = (z) => lerp(BASE, -6, (ZIG_Z + TIERS[1][1] + 45 - z) / 45);
-    add(new THREE.Vector3(-1.5, stair(ZIG_Z + 44), ZIG_Z + 44), md, {}, 'town');
+    town(new THREE.Vector3(-1.5, stair(ZIG_Z + 44), ZIG_Z + 44), md);   // (the other villager is 30 m away, up on the tier)
   }
 
   buildMoon() {
@@ -1090,7 +1115,6 @@ export default class Babylon {
       }
       animatePerson(P, t, dt);
       if (P.role === 'watcher') this.nodHead(P, dt);
-      if (P.model && !P.tinted && P.role === 'town') this.tint(P);
     }
 
     // ----- Guide: hover where the story wants it, or out in front of you
@@ -1126,13 +1150,6 @@ export default class Babylon {
     this.nodT = (this.nodT ?? 99) + dt;
     if (this.nodT < 1.6) H.rotateX(Math.sin(this.nodT / 1.6 * Math.PI * 2) * 0.3 * Math.sin(this.nodT / 1.6 * Math.PI));
     if (this.s.watcher === 'moon') H.rotateX(-0.35); // looking up
-  }
-
-  // Give each townsperson's clothes a slightly different shade, so the crowd isn't all one person
-  tint(P) {
-    P.tinted = true;
-    const k = [0.75, 0.9, 1.1, 0.82, 1.0][this.people.indexOf(P) % 5], hue = [0, 0.02, -0.02, 0.04, -0.03][this.people.indexOf(P) % 5];
-    P.model.scene.traverse((o) => { if (o.isMesh && o.material?.color) { o.material = o.material.clone(); o.material.color.multiplyScalar(k).offsetHSL(hue, 0, 0); } });
   }
 
   // ----- Little synthesized sounds (nothing recorded)

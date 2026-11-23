@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
+import { dress } from '../dress.js';
 import { makeHerd, makeFlock, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
@@ -98,6 +99,25 @@ function glowSprite(color = 'rgba(255,220,140,1)') {
   });
   return new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
 }
+
+// Who's who. Every person near you is a different one of Meem's models, dressed in undyed wool, hide
+// and plant-dyed browns, greys and ochres; where a model has to come back (the haul team is big), the
+// copy wears other clothes and stands well away from the first.
+const HAULERS = [
+  ['builder', {}], ['sailor', { hue: 0.55, sat: 0.45, val: 0.8, build: 1.05 }], ['instrument_maker', { mul: 0x9a8264, sat: 0.8 }], ['skywatcher', { hue: 0.08, sat: 0.4, val: 0.85, hair: 0x4a3828 }],
+  ['storyteller', { hue: 0.97, sat: 0.9, val: 0.95 }], ['priest', { mul: 0xa48a6c, hair: 0x2a1c12 }], ['villager', { mul: 0x8a7458, build: 1.08 }], ['architect', { mul: 0xb0a080, sat: 0.6 }],
+  ['builder', { hue: 0.12, sat: 0.55, val: 1.25, hair: 0x7a6a5a, build: 0.95 }], ['sailor', { hue: 0.6, sat: 0.3, val: 0.6, hair: 0x2a2018 }],
+];
+const PIT = [['aristotle', { mul: 0x8a7a64, sat: 0.6, hair: 0x3a2a1a }], ['instrument_maker', { mul: 0x6e6050, hair: 0x4a3a2a, build: 1.07 }], ['skywatcher', { hue: 0.5, sat: 0.3, val: 0.7, hair: 0x9a948c }]];
+const CROWD = [
+  ['builder_far', { hue: 0.05, sat: 0.6, val: 1.15 }], ['storyteller', { hue: 0.06, sat: 0.5, val: 0.7 }], ['builder_far', { hue: 0.58, sat: 0.35, val: 0.75, build: 1.06 }], ['villager', { mul: 0x7a6a54 }],
+  ['builder_far', { hue: 0.93, sat: 0.8, val: 0.85, build: 0.95 }], ['architect', { mul: 0x8a7050, sat: 1.1 }], ['priest', { mul: 0x9a9080, val: 0.85 }],
+];
+// (the families gather a little beyond the crowd, so nobody stands near their double)
+const FAMILIES = [
+  ['sailor', { hue: 0.06, sat: 0.55, val: 0.8 }], ['instrument_maker', { mul: 0x7a6c5a, sat: 0.7, build: 1.05 }], ['aristotle', { mul: 0x9a8a72, sat: 0.5 }],
+  ['builder', { hue: 0.65, sat: 0.3, val: 0.95, hair: 0x5a4a3a }], ['architect', { mul: 0x9a8064, val: 0.95 }], ['priest', { mul: 0x8a7c6a, hair: 0x1a1410, build: 1.04 }],
+];
 
 export default class Stonehenge {
   constructor(G) {
@@ -416,17 +436,18 @@ export default class Stonehenge {
       const d = 6.5 + i * 1.15, side = i % 2 ? 1 : -1;
       const tan = new THREE.Vector3(-this.u.z, 0, this.u.x);
       const p = at(SLOT, d).addScaledVector(tan, side * 0.55);
-      const H = add(p, faceOut, {}, 'haul');
+      const [model, look] = HAULERS[i];
+      const H = dress(add(p, faceOut, { model }, 'haul'), look);
       // after the stone is up they step aside, either side of the axis, to watch the gap
       const side2 = i % 2 ? 1 : -1, w = at(AXIS + side2 * (40 + Math.floor(i / 2) * 11), 9 + (i % 4) * 0.8);
       H.watch = w; H.watchFace = Math.atan2(at(AXIS, 40).x - w.x, at(AXIS, 40).z - w.z);
     }
     // A team by the pit with levers, and a crowd waiting near the Heel Stone
-    for (let i = 0; i < 3; i++) add(at(SLOT + 5 + i * 5, R_SARSEN + 3.5), Math.atan2(-this.u.x, -this.u.z), {}, 'pit');
+    for (let i = 0; i < 3; i++) dress(add(at(SLOT + 5 + i * 5, R_SARSEN + 3.5), Math.atan2(-this.u.x, -this.u.z), { model: PIT[i][0] }, 'pit'), PIT[i][1]);
     for (let i = 0; i < 7; i++) {
       // standing either side of the sunrise line, so nobody blocks the view through the gap
       const p = at(AXIS + (i < 4 ? -16 - i * 5 : 16 + (i - 4) * 5) + (r() - 0.5) * 2, 30 + r() * 6);
-      add(p, Math.atan2(-p.x, -p.z), { tunic: 0x8a7a64, model: 'builder_far' }, 'crowd');   // ~30 m away: the light model
+      dress(add(p, Math.atan2(-p.x, -p.z), { model: CROWD[i][0] }, 'crowd'), CROWD[i][1]);   // ~30 m away: light models where there are some
     }
     // each person is a small round obstacle that moves with them (updated every frame)
     for (const P of this.people) { P.blk = { x: 0, z: 0, r: 0.3 }; G.world.blockers.push(P.blk); }
@@ -497,17 +518,18 @@ export default class Stonehenge {
       f.position.y = 0.98; f.scale.set(0.35, 0.5, 1); g.add(f); g.userData.flame = f; return g;
     };
     // the shepherd, walking his flock slowly about the field
-    const shep = makePerson({ model: 'builder', seed: 301, tunic: 0x6a5a40, beard: true });
+    const shep = dress(makePerson({ model: 'skywatcher', seed: 301, tunic: 0x6a5a40, beard: true }), { hue: 0.06, sat: 0.35, val: 0.75, hair: 0x8a8278 });
     shep.g.position.copy(sh).setY(groundHeight(sh.x, sh.z)); this.root.add(shep.g); shep.glance = true;
     shep.routine = [0, 1, 2, 3].map((i) => { const p = along(17 + (i % 2) * 8, -6 - (i > 1 ? 6 : 0)); return { x: p.x, z: p.z, pose: i === 2 ? 'beckon' : 'idle', secs: 5 + i }; });
     const crook = new Kit(); crook.tube([[0, 0, 0], [0, 1.5, 0], [0.08, 1.65, 0], [0.16, 1.55, 0]], 0.02, 0x6a5038, 4);
     holdProp(shep, crook.mesh(), 'Right', [0, 0.05, 0.03]);
     this.shepherd = shep; this.walkers.push(shep);
     // families with torches, coming out from the village to the stones before dawn
-    const route = [along(130, 4), along(95, 2), along(60, -2), along(25, -16), at(AXIS - 34, 40), at(AXIS - 30, 33)];
+    const route = [along(130, 4), along(95, 2), along(60, -2), along(25, -16), at(AXIS - 48, 42), at(AXIS - 45, 34)];
     for (let i = 0; i < 6; i++) {
-      const P = makePerson({ model: 'builder_far', seed: 320 + i * 9,   // seen from far off, so the light model
+      const P = makePerson({ model: FAMILIES[i][0], seed: 320 + i * 9,   // seen from far off, so light models where there are some
         tunic: [0x8a7a64, 0x7a6a50, 0x9a8466][i % 3], height: i === 4 ? 1.3 : 1.7 + (i % 2) * 0.08 });
+      dress(P, FAMILIES[i][1]);
       const k = 1 + Math.floor(i / 2), p = route[k];
       const off = (i % 2 ? 1 : -1) * 0.7, back = (i % 2) * 1.4;
       P.g.position.set(p.x + off, groundHeight(p.x, p.z), p.z + back); this.root.add(P.g);
@@ -778,7 +800,7 @@ export default class Stonehenge {
     if (s.home && !this.homeSet) {
       this.homeSet = true;
       const V = at(150, 120);
-      for (const P of [...this.people.filter((p) => p.role === 'crowd'), ...this.walkers.slice(1)]) { P.routine = [{ x: V.x + (P.phase % 3) * 2, z: V.z + (P.phase % 2) * 2, pose: 'idle', secs: 1e9 }]; P.ri = 0; P.rt = 0; P.walker = true; }
+      [...this.people.filter((p) => p.role === 'crowd'), ...this.walkers.slice(1)].forEach((P, j) => { P.routine = [{ x: V.x + (j % 5) * 2.6, z: V.z + Math.floor(j / 5) * 2.6, pose: 'idle', secs: 1e9 }]; P.ri = 0; P.rt = 0; P.walker = true; });
       for (const P of this.people) if (P.role === 'crowd') this.walkers.push(P);
     }
     for (const P of this.walkers) {
