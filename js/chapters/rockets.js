@@ -30,7 +30,7 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { glowPoints, rumble, whoosh, awe, shimmer, beeps } from '../wow/fx.js';
 import { Space, lonLat } from '../wow/space.js';
-import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
+import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(131), N2 = noise2(133), N3 = noise2(137);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _col = new THREE.Color();
@@ -39,8 +39,15 @@ const UP = V3(0, 1, 0);
 const RX = 2.6, RZ = 2.2, RH = 2.9;                 // Tsiolkovsky's veranda study
 const LAT_K = 54.5, SL_K = 275, LAT_A = 42.2, SL_A = 355, LAT_P = 54.1, SL_P = 89;
 const EYE_K = V3(0.6, 1.6, 1.0);                     // where you stand in Kaluga (eyes)
+const CHAIR = V3(-0.95, 0, -0.78), SEAT_Y = 0.47;     // Tsiolkovsky's chair at the desk (seat top), facing north
+const SEAT_FRONT = V3(-0.95, 0, -1.1), DESK_SIDE = V3(-0.36, 0, -1.1), TALK_SPOT = V3(-0.42, 0, -0.3);
 const FRAME = V3(0, 0, -2.2);                        // Goddard's launch frame
-const LAND = V3(-38, 0, -42);                        // the cabbage patch, 56 m away
+const LAND = V3(-38, 0, -42);
+// the flight: straight up 4.2 m in the frame, then an arc 12.5 m high (above the frame's foot) to the cabbages
+const FLY = (() => { const u0 = 0.22, h0 = 4.2, M = 12.5 - h0, D = h0 + 0.1; const a = 2 * M + 2 * Math.sqrt(M * (M + D)), b = a + D; return { u0, h0, a, b, apex: u0 + (1 - u0) * a / (2 * b) }; })();
+const IGNITER_Y = 2.24;   // the igniter hangs in the mouth of the nozzle (rocket's own height)
+const HENRY_LIGHT = V3(1.3, 0, -0.75);   // where Henry stands to light it, a pole's length from the nozzle
+const CAMERA_A = V3(4.3, 0, -1.5), ESTHER = V3(4.76, 0, -1.5);   // Esther's movie camera (lens to the west, at the rocket) and her place behind it                        // the cabbage patch, 56 m away
 const PAD = V3(0, 0, -55);                           // the V-2's firing table
 const CLOUD = 200;                                   // the cloud deck over Peenemünde
 const PEEN = [54.15, 13.8], WSANDS = [32.4, -106.5], MOSCOW = [55.75, 37.6];
@@ -56,24 +63,216 @@ export function kalugaHeight(x, z) {
   if (Math.abs(x) < RX + 0.05 && Math.abs(z) < RZ + 0.05) return 0;
   return valley(z) + (N1(x / 40, z / 40) - 0.5) * 1.6 * clamp((Math.hypot(x, z) - 15) / 30, 0, 1) + (N2(x / 6, z / 6) - 0.5) * 0.12;
 }
-function auburnHeight(x, z) { return (N1(x / 90 + 7, z / 90) - 0.5) * 5 * clamp((Math.hypot(x, z) - 30) / 80, 0, 1) + (N2(x / 9, z / 9) - 0.5) * 0.25; }
-function balticHeight(x, z) { return (N3(x / 60, z / 60) - 0.5) * 2 * clamp((Math.hypot(x, z - PAD.z) - 45) / 60, 0, 1) + (N2(x / 7, z / 7) - 0.5) * 0.1; }
+// (level where the people and the props stand, within 8 m of the frame; rolling further out)
+export function auburnHeight(x, z) { const d = Math.hypot(x - 1.5, z); return (N1(x / 90 + 7, z / 90) - 0.5) * 5 * clamp((d - 30) / 80, 0, 1) + (N2(x / 9, z / 9) - 0.5) * 0.25 * clamp((d - 8) / 10, 0, 1); }
+// (level round the firing table, along the walk back and at your post, so the concrete and the people sit right on it)
+function balticHeight(x, z) {
+  const dp = Math.hypot(x, z - PAD.z), dw = Math.abs(x - 3) < 9 && z > PAD.z && z < 6 ? 0 : Math.min(dp - 14, Math.hypot(x, z) - 8);
+  return (N3(x / 60, z / 60) - 0.5) * 2 * clamp((dp - 45) / 60, 0, 1) + (N2(x / 7, z / 7) - 0.5) * 0.1 * clamp(Math.min(dp - 14, dw) / 6, 0, 1);
+}
 
-function groundMesh(size, seg, hf, colf) {
+function groundMesh(size, seg, hf, colf, patch = null) {
   const g = new THREE.PlaneGeometry(size, size, seg, seg); g.rotateX(-Math.PI / 2);
   const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color();
   for (let i = 0; i < p.count; i++) {
     let x = p.getX(i), z = p.getZ(i); const r0 = Math.hypot(x, z), kk = r0 > 0 ? Math.pow(r0 / (size / 2), 1.7) * (size / 2) / r0 : 0; x *= kk; z *= kk;
-    const y = hf(x, z); p.setXYZ(i, x, y, z); colf(x, z, y, c); cols.set([c.r, c.g, c.b], i * 3);
+    // under the fine ground patch near you, this coarse ground ducks out of the way (one surface, no flicker)
+    const under = patch && Math.abs(x - patch.x) < patch.w / 2 - 0.5 && Math.abs(z - patch.z) < patch.d / 2 - 0.5;
+    const y = hf(x, z) - (under ? 0.3 : 0); p.setXYZ(i, x, y, z); colf(x, z, y, c); cols.set([c.r, c.g, c.b], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals();
   return new THREE.Mesh(g, FLAT);
+}
+// The ground right round you, fine enough (about 30 cm) that it matches the height function exactly,
+// so feet, frame legs and tripod spurs stand on it, not above or in it. Its rim folds down a little to
+// meet the coarse ground. colf(x, z, y, c) colours it; edge() lets the coarse colours take over at the rim.
+function groundPatch({ x: cx, z: cz, w, d }, step, hf, colf) {
+  const nx = Math.round(w / step), nz = Math.round(d / step);
+  const g = new THREE.PlaneGeometry(w, d, nx, nz); g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) + cx, z = p.getZ(i) + cz, rim = Math.min(w / 2 - Math.abs(x - cx), d / 2 - Math.abs(z - cz));
+    const y = hf(x, z) - (rim < 0.01 ? 0.06 : 0); p.setXYZ(i, x, y, z); colf(x, z, y, c, clamp01(rim / 6)); cols.set([c.r, c.g, c.b], i * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals();
+  return new THREE.Mesh(g, FIG_MAT);
 }
 // a cylinder between two points (pipes, struts, branches)
 function pipe(k, a, b, r, col, seg = 5) {
   const d = _d.subVectors(b, a), L = d.length(); if (L < 1e-4) return;
   const g = new THREE.CylinderGeometry(r, r, L, seg); g.translate(0, L / 2, 0);
   g.applyQuaternion(_q.setFromUnitVectors(UP, d.normalize())); g.translate(a.x, a.y, a.z); k.add(g, col);
+}
+
+// a curve of points through a list (bent wood, hoses, cables)
+function bend(k, pts, r, col, sides = 6) { k.tube(pts.map((p) => (p.toArray ? p.toArray() : p)), r, col, sides); }
+// A bentwood (Thonet No. 14) chair at (x, z), facing -z: round cane seat, splayed legs, a leg ring,
+// and the back legs sweeping up into the hooped back.
+function bentwoodChair(k, x, z, seatY) {
+  const BW = 0x3a2214, CANE = 0xb89a5a, R = 0.2;
+  k.cyl(R, R, 0.02, 20, CANE, [x, seatY - 0.01, z]); k.add(new THREE.TorusGeometry(R, 0.018, 5, 24), BW, [x, seatY - 0.012, z], [Math.PI / 2, 0, 0]);
+  for (let i = 0; i < 10; i++) k.box(0.004, 0.003, R * 1.9 * Math.sin(Math.acos((i - 4.5) / 5.2)), 0x9a7e44, [x + (i - 4.5) * 0.038, seatY + 0.001, z]);
+  // front legs: splayed, tapering
+  for (const s of [-1, 1]) pipe(k, V3(x + s * 0.13, seatY - 0.02, z - 0.14), V3(x + s * 0.17, 0, z - 0.2), 0.016, BW, 6);
+  // back legs run on up into the back
+  for (const s of [-1, 1]) bend(k, [[x + s * 0.18, 0, z + 0.22], [x + s * 0.15, seatY * 0.5, z + 0.17], [x + s * 0.15, seatY, z + 0.15], [x + s * 0.155, seatY + 0.25, z + 0.19], [x + s * 0.14, seatY + 0.47, z + 0.22]], 0.016, BW);
+  k.add(new THREE.TorusGeometry(0.14, 0.015, 5, 16, Math.PI), BW, [x, seatY + 0.47, z + 0.22], [-0.12, 0, 0]);
+  bend(k, [[x - 0.1, seatY + 0.02, z + 0.16], [x - 0.11, seatY + 0.2, z + 0.18], [x, seatY + 0.33, z + 0.2], [x + 0.11, seatY + 0.2, z + 0.18], [x + 0.1, seatY + 0.02, z + 0.16]], 0.011, BW);
+  k.add(new THREE.TorusGeometry(0.17, 0.011, 4, 20), BW, [x, 0.2, z], [Math.PI / 2, 0, 0]);
+  for (const [ox, oz] of [[-0.13, -0.08], [0.13, -0.08], [-0.13, 0.1], [0.13, 0.1]]) pipe(k, V3(x + ox, seatY - 0.02, z + oz), V3(x + ox * 0.95, seatY - 0.09, z + oz * 1.05), 0.008, BW, 4);
+}
+
+// Sitting, for Meem's rigged models (Tripo, Mixamo bones): the thighs go forward level with the
+// seat, the shins down to the floor, and the whole body drops so the hips rest on the seat.
+// Call after animatePerson. k: 0 standing .. 1 seated. seatY: seat top, in the figure's parent space.
+const _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sd = new THREE.Vector3(), _sq = new THREE.Quaternion(), _sq2 = new THREE.Quaternion();
+function aimBoneTo(bone, child, want, k) {
+  bone.updateWorldMatrix(true, false); child.updateWorldMatrix(false, false);
+  bone.getWorldPosition(_sa); child.getWorldPosition(_sb);
+  _sq.setFromUnitVectors(_sd.subVectors(_sb, _sa).normalize(), want);
+  bone.getWorldQuaternion(_sq2).premultiply(_sq); bone.parent.getWorldQuaternion(_q).invert(); _sq2.premultiply(_q);
+  bone.quaternion.slerp(_sq2, k);
+}
+function sitPose(P, k, seatY, floorY = 0) {
+  if (!P.rig || k <= 0.001) return;
+  const B = P.rig.bones;
+  if (!B.LeftUpLeg || !B.LeftLeg || !B.LeftFoot) return;
+  if (P.hipRest == null) {   // hip joint and ankle heights standing (legs are at rest here: animatePerson reset them)
+    P.inner.position.y = 0; P.g.updateWorldMatrix(true, true);
+    P.hipRest = B.LeftUpLeg.getWorldPosition(_sa).y - P.g.getWorldPosition(_sb).y;
+    P.ankleRest = B.LeftFoot.getWorldPosition(_sa).y - _sb.y;
+  }
+  // drop the body so the hip joints sit just above the seat (the thighs have some thickness)
+  P.inner.position.y = lerp(0, seatY + 0.1 - P.hipRest, k);
+  P.inner.updateWorldMatrix(true, true);
+  ['Left', 'Right'].forEach((side, i) => {
+    const up = B[side + 'UpLeg'], low = B[side + 'Leg'], foot = B[side + 'Foot'];
+    _a.set((i ? -1 : 1) * 0.12, -0.12, 1).normalize().transformDirection(P.inner.matrixWorld);
+    aimBoneTo(up, low, _a, k);
+    // the shin reaches down to the floor, angled forward a little if it is longer than the drop
+    low.updateWorldMatrix(true, false); low.getWorldPosition(_b); foot.getWorldPosition(_c);
+    const L = _b.distanceTo(_c), drop = Math.max(0.05, _b.y - (floorY + P.ankleRest)), fwd = Math.sqrt(Math.max(0.0025, L * L - drop * drop));
+    _c.set((i ? -1 : 1) * 0.02, -drop, fwd).normalize();
+    _c.transformDirection(P.inner.matrixWorld);
+    aimBoneTo(low, foot, _c, k);
+  });
+}
+
+// ---------- Dressed figures (for people with no Tripo model yet) ----------
+// Better than the plain clay stand-in: a smooth turned body (coat or skirt), boots, gloves, collar,
+// scarf, a period hat and a face, so each one reads as a different person in their own clothes.
+// Works with animatePerson (stand-in arms) and swings its own legs when walking (animateFigure).
+// o: { height, coat, coatLen (0 hip .. 1 ankle), skirt, trousers, boots, skin, hair, hat, hatCol,
+//      scarf, collar (fur colour), beard, glasses, gloves, seed }
+const FIG_MAT = new THREE.MeshLambertMaterial({ vertexColors: true });
+function makeFigure(o = {}) {
+  const H = (o.height || 1.75) / 1.75, coat = o.coat ?? 0x3a3a40, skin = o.skin ?? 0xd8b098, hair = o.hair ?? 0x4a3020;
+  const boots = o.boots ?? 0x1e1a18, legCol = o.trousers ?? 0x2a2a2e, gl = o.gloves ?? 0x2a2420;
+  const k = new Kit();
+  // the coat (or dress): a turned profile from the hem up to the shoulders, slightly flared
+  const hemY = lerp(0.82, 0.22, o.coatLen ?? 0.6), prof = [[0.0, hemY - 0.01], [0.27, hemY], [0.25, hemY + 0.12], [0.2, 0.92], [0.185, 1.0], [0.2, 1.15], [0.215, 1.3], [0.2, 1.38], [0.13, 1.43], [0.07, 1.45], [0.0, 1.45]];
+  if (o.skirt) prof[1][0] = 0.3;
+  const lg = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 18); lg.scale(1, 1, 0.78); k.add(lg, coat);
+  // buttons, a belt, pocket flaps
+  for (let i = 0; i < 4; i++) k.ball(0.012, 0, 0x1a1a1a, [0.035, 1.28 - i * 0.12, 0.165 - i * 0.004]);
+  if (o.belt) k.cyl(0.19, 0.19, 0.04, 16, o.belt, [0, 0.98, 0], 0, [1, 1, 0.8]);
+  for (const s of [-1, 1]) k.box(0.12, 0.012, 0.03, coat, [s * 0.12, 0.86, 0.17], [0.2, 0, 0], 0.85);
+  // collar: fur, a turned-up coat collar, or a knitted scarf with its ends hanging
+  if (o.collar != null) k.add(new THREE.TorusGeometry(0.1, 0.045, 6, 14), o.collar, [0, 1.43, 0.01], [Math.PI / 2 - 0.15, 0, 0], [1, 0.85, 1]);
+  else k.cyl(0.09, 0.12, 0.08, 10, coat, [0, 1.46, 0], 0, [1, 1, 0.9], 0.9);
+  if (o.scarf != null) { k.add(new THREE.TorusGeometry(0.085, 0.03, 5, 12), o.scarf, [0, 1.46, 0.01], [Math.PI / 2, 0, 0]); k.box(0.07, 0.32, 0.025, o.scarf, [0.06, 1.3, 0.17], [0.1, 0, 0.08]); }
+  // neck, head, face (nose, ears, eyes, brows, mouth), hair
+  k.cyl(0.05, 0.055, 0.09, 8, skin, [0, 1.5, 0]);
+  k.ball(0.105, 2, skin, [0, 1.62, 0.005], 0, [0.92, 1.12, 1.02]);
+  k.cyl(0.006, 0.019, 0.045, 6, skin, [0, 1.615, 0.112], [-1.35, 0, 0], 0.95);
+  for (const s of [-1, 1]) { k.ball(0.022, 0, skin, [s * 0.097, 1.615, -0.005], 0, [0.5, 1, 0.8], 0.92); k.ball(0.011, 0, 0x2a2420, [s * 0.036, 1.638, 0.093]); k.box(0.04, 0.008, 0.01, hair, [s * 0.038, 1.665, 0.094], [0, 0, -s * 0.12]); }
+  k.box(0.04, 0.006, 0.01, 0x8a4a40, [0, 1.565, 0.098]);
+  if (o.glasses) for (const s of [-1, 1]) k.add(new THREE.TorusGeometry(0.019, 0.003, 4, 10), 0x2a2a2a, [s * 0.036, 1.638, 0.1]);
+  if (o.beard) k.ball(0.085, 1, hair, [0, 1.545, 0.045], 0, [1, 0.85, 0.8]);
+  if (o.moustache) k.box(0.06, 0.012, 0.015, hair, [0, 1.58, 0.1]);
+  k.ball(0.108, 1, hair, [0, 1.655, -0.02], 0, [0.95, 0.85, 1.0]);
+  if (o.longHair) k.ball(0.09, 1, hair, [0, 1.56, -0.07], 0, [1.1, 1.2, 0.7]);
+  // hats
+  const hc = o.hatCol ?? 0x2a2a2a;
+  if (o.hat === 'cloche') { k.ball(0.125, 2, hc, [0, 1.67, -0.005], 0, [1, 0.82, 1.05]); k.cyl(0.15, 0.15, 0.012, 18, hc, [0, 1.625, 0.0], [0.12, 0, 0], 0.9); k.add(new THREE.TorusGeometry(0.115, 0.012, 4, 16), o.hatBand ?? 0x8a2a3a, [0, 1.65, 0], [Math.PI / 2 - 0.12, 0, 0]); k.ball(0.03, 0, o.hatBand ?? 0x8a2a3a, [0.1, 1.67, 0.06]); }
+  else if (o.hat === 'fedora') { k.cyl(0.1, 0.115, 0.12, 14, hc, [0, 1.74, -0.01]); k.cyl(0.18, 0.18, 0.012, 18, hc, [0, 1.69, -0.01], [-0.06, 0, 0]); k.cyl(0.117, 0.117, 0.03, 14, 0x1a1a1a, [0, 1.7, -0.01]); k.box(0.03, 0.02, 0.18, hc, [0, 1.8, -0.01], 0, 0.8); }
+  else if (o.hat === 'cap') { k.ball(0.12, 1, hc, [0, 1.69, -0.01], 0, [1.05, 0.55, 1.15]); k.box(0.17, 0.012, 0.08, hc, [0, 1.67, 0.11], [0.2, 0, 0], 0.8); }
+  else if (o.hat === 'ushanka') { k.cyl(0.13, 0.12, 0.16, 14, hc, [0, 1.73, -0.01]); for (const s of [-1, 1]) k.box(0.03, 0.12, 0.1, hc, [s * 0.12, 1.62, -0.01]); k.box(0.24, 0.05, 0.03, hc, [0, 1.72, 0.12], [-0.2, 0, 0]); }
+  else if (o.hat === 'shawl') { k.ball(0.125, 1, hc, [0, 1.64, -0.01], 0, [1.02, 1.05, 1.08]); k.cyl(0.001, 0.2, 0.35, 12, hc, [0, 1.4, -0.03], 0, [1, 1, 0.75]); }
+  else if (o.hat === 'fieldcap') { k.box(0.2, 0.08, 0.24, hc, [0, 1.73, -0.01]); k.box(0.2, 0.02, 0.06, hc, [0, 1.69, 0.13], [0.35, 0, 0]); }
+  const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.userData.kind = 'characters';
+  inner.add(new THREE.Mesh(k.geometry(), FIG_MAT));
+  // legs (trousers or stockings, boots), each turning at the hip
+  const legs = [];
+  for (const sx of [-1, 1]) {
+    const lk = new Kit(); lk.cyl(0.062, 0.05, 0.78, 10, legCol, [0, -0.43, 0]); lk.cyl(0.055, 0.058, 0.18, 10, boots, [0, -0.73, 0]); lk.box(0.1, 0.07, 0.24, boots, [0, -0.79, 0.04]); lk.ball(0.05, 1, boots, [0, -0.785, 0.15], 0, [1, 0.7, 0.9]);
+    const leg = new THREE.Group(); leg.add(new THREE.Mesh(lk.geometry(), FIG_MAT)); leg.position.set(sx * 0.095, 0.83, 0); inner.add(leg); legs.push(leg);
+  }
+  // arms in sleeves, gloved hands
+  const arms = [];
+  for (const sx of [-1, 1]) {
+    const ak = new Kit(); ak.ball(0.07, 1, coat, [0, -0.01, 0]); ak.cyl(0.065, 0.055, 0.58, 10, coat, [0, -0.29, 0]); ak.cyl(0.06, 0.06, 0.05, 10, coat, [0, -0.56, 0], 0, 1, 0.8);
+    ak.ball(0.045, 1, gl, [0, -0.63, 0.005], 0, [0.8, 1.2, 1]); ak.box(0.02, 0.05, 0.03, gl, [sx * -0.035, -0.6, 0.03]);
+    const arm = new THREE.Group(); arm.add(new THREE.Mesh(ak.geometry(), FIG_MAT)); arm.position.set(sx * 0.215, 1.36, 0); inner.add(arm); arms.push(arm);
+  }
+  inner.scale.setScalar(H);
+  return { g, inner, arms, legs, pose: 'idle', phase: (o.seed || 1) * 1.7, pointAt: new THREE.Vector3(), placeholder: true, H };
+}
+function animateFigureLegs(P, dt) { P.legs.forEach((l) => { l.rotation.x = damp(l.rotation.x, 0, 10, dt); }); }
+function animateFigure(P, t, dt) {
+  animatePerson(P, t, dt);
+  const sw = P.pose === 'walk' ? Math.sin(P.stride || 0) * 0.45 : 0;
+  P.legs.forEach((l, i) => { l.rotation.x = damp(l.rotation.x, i ? -sw : sw, 10, dt); });
+}
+// aim a figure's arm (from its shoulder) at a world point
+const _fa = new THREE.Vector3(), _fq = new THREE.Quaternion(), FDOWN = new THREE.Vector3(0, -1, 0);
+function aimArm(P, i, world, dt) {
+  const arm = P.arms[i]; _fa.copy(world); P.inner.worldToLocal(_fa); _fa.sub(arm.position).normalize();
+  _fq.setFromUnitVectors(FDOWN, _fa); arm.quaternion.slerp(_fq, Math.min(1, dt * 8));
+}
+
+// Henry's igniter: a brass blowtorch lashed to the end of a long pole (so he can light the motor from
+// a step away), with its fuel tank, pump knob, burner tube and a roaring blue flame. +y runs up the pole.
+function poleTorch(len = 1.9) {
+  const g = new THREE.Group(), k = new Kit(), BR = 0xc09a48, POLE = 0x7a5a36;
+  k.cyl(0.018, 0.024, len, 7, POLE, [0, len / 2, 0]);
+  for (const y of [0.06, 0.12, len - 0.32, len - 0.22, len - 0.12]) k.cyl(0.027, 0.027, 0.018, 7, 0x8a7a58, [0, y, 0]);   // twine lashings
+  k.cyl(0.042, 0.042, 0.13, 14, BR, [0.05, len - 0.2, 0]); k.ball(0.042, 1, BR, [0.05, len - 0.135, 0], 0, [1, 0.4, 1]); k.ball(0.042, 1, BR, [0.05, len - 0.265, 0], 0, [1, 0.4, 1]);
+  k.cyl(0.006, 0.006, 0.06, 5, 0x3a3a3a, [0.05, len - 0.1, 0]); k.cyl(0.014, 0.014, 0.012, 8, 0x2a2a2a, [0.05, len - 0.068, 0]);   // the pump
+  k.cyl(0.006, 0.006, 0.05, 5, BR, [0.085, len - 0.16, 0], [0, 0, -0.6]); k.cyl(0.013, 0.013, 0.02, 8, 0x5a1a10, [0.105, len - 0.145, 0], [0, 0, -0.6]);   // the valve
+  k.tube([[0.05, len - 0.13, 0], [0.05, len - 0.06, 0], [0.04, len + 0.02, 0], [0.025, len + 0.12, 0]], 0.009, 0x8a7a4a, 6);
+  k.cyl(0.016, 0.013, 0.09, 10, 0x6a6a6a, [0.022, len + 0.16, 0], [0, 0, 0.12]); k.cyl(0.019, 0.019, 0.012, 10, 0x4a4a4a, [0.017, len + 0.205, 0]);
+  g.add(k.mesh(FIG_MAT));
+  const fm = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const cone = (r, L, m) => { const cg = new THREE.CylinderGeometry(0.0, r, L, 10, 1, true); cg.translate(0, L / 2, 0); return new THREE.Mesh(cg, m); };
+  const fl = new THREE.Group(); fl.position.set(0.015, len + 0.21, 0); fl.add(cone(0.02, 0.2, fm(0x6a9aff, 0.55)), cone(0.011, 0.09, fm(0xd8e8ff, 0.9)), glow(0x9ab8ff, 0.22, 0.7), cone(0.03, 0.28, fm(0xff9a40, 0.22))); g.add(fl);
+  const ph = Math.random() * 6;
+  g.userData.flicker = (t, bright = 1) => { fl.scale.set(1 + 0.1 * Math.sin(t * 31 + ph), 0.9 + 0.2 * Math.sin(t * 23 + ph * 2), 1); fl.visible = bright > 0.05; };
+  g.userData.tip = fl;
+  return g;
+}
+
+// Walk toward (x, z) but around things in the way: obstacles are circles { x, z, r } (props, and other
+// people). If the straight line passes through one ahead, head for a point just beside it instead.
+function walkAround(P, x, z, dt, opts, obstacles) {
+  const g = P.g.position; let tx = x, tz = z;
+  for (let pass = 0; pass < 2; pass++) {
+    const dx = tx - g.x, dz = tz - g.z, L = Math.hypot(dx, dz); if (L < 0.05) break;
+    const ux = dx / L, uz = dz / L; let hit = null, best = Infinity;
+    for (const o of obstacles) {
+      if (o.P === P) continue;
+      const ox = o.P ? o.P.g.position.x : o.x, oz = o.P ? o.P.g.position.z : o.z, R = (o.r ?? 0.3) + 0.3;
+      const along = (ox - g.x) * ux + (oz - g.z) * uz; if (along < 0 || along > L + R * 0.5) continue;
+      const side = (ox - g.x) * -uz + (oz - g.z) * ux;
+      if (Math.abs(side) < R && along < best && Math.hypot(ox - x, oz - z) > R) { best = along; hit = { ox, oz, R, side }; }
+    }
+    if (!hit) break;
+    const s = hit.side > 0 ? -1 : 1;   // pass on the side we are already on
+    tx = hit.ox + -uz * s * (hit.R + 0.15) - ux * 0.1; tz = hit.oz + ux * s * (hit.R + 0.15) - uz * 0.1;
+  }
+  const arrivedAtDetour = (tx !== x || tz !== z);
+  const done = walkToward(P, tx, tz, dt, { ...opts, stop: arrivedAtDetour ? 0.02 : opts.stop ?? 0.15 });
+  return done && !arrivedAtDetour;
 }
 
 // ---------- Chalk drawings in the air ----------
@@ -190,7 +389,7 @@ export default class Rockets {
       eq: 0, train: 0, cradle: 0, station: 0,     // ch13_04
       labels: 0, lox: 0, henry: 0, torch: 0, lit: 0,   // Auburn
       arc: 0, descend: 0, papers: 0, vacuum: 0, correction: 0,
-      v2: 0, lights: 0,                           // Peenemünde: 1 erector down, 2 ignition, 3 lift-off
+      v2: 0, lights: 0, braun: 0,                           // Peenemünde: 1 erector down, 2 ignition, 3 lift-off
       space: 0, race: 0,                          // 1 the edge of space, 2 the map
       journal: 0,
     };
@@ -219,7 +418,7 @@ export default class Rockets {
       G.sky.fogFar = 1400; G.sky.mist = 0.12; this.lat = LAT_K; this.sl = SL_K;
       G.sky.setPlace({ lat: LAT_K, year: 1903, sunLon: SL_K });
     } else if (name === 'auburn') {
-      G.world.height = auburnHeight; G.world.bounds = 7; G.world.blockers = [{ x: FRAME.x, z: FRAME.z, r: 0.7 }, { x: 4.3, z: 2.9, r: 1.0 }, { x: 4.3, z: -1.5, r: 0.4 }];
+      G.world.height = auburnHeight; G.world.bounds = 7; G.world.blockers = [{ x: FRAME.x, z: FRAME.z, r: 0.7 }, { x: 4.3, z: 2.9, r: 1.0 }, { x: 4.3, z: -1.5, r: 0.4 }, { x: ESTHER.x, z: ESTHER.z, r: 0.3 }];
       G.sky.fogFar = 2600; G.sky.mist = 0; this.lat = LAT_A; this.sl = SL_A;
       G.sky.setPlace({ lat: LAT_A, year: 1926, sunLon: SL_A });
       G.sky.hideMoon();
@@ -297,7 +496,9 @@ export default class Rockets {
   buildStudy() {
     const k = new Kit(), r = rng(13), A = this.A, LOG = 0x7a5232, LOG2 = 0x6c4a2c, FR = 0xe8e2d4;
     for (let i = 0; i < 11; i++) k.box(0.47, 0.06, RZ * 2, i % 2 ? 0x8a6a46 : 0x7e603e, [-RX + 0.24 + i * 0.47, -0.03, 0]);
-    k.box(2.2, 0.01, 1.4, 0x8a2a24, [0.2, 0.005, 0.2]); k.box(1.9, 0.012, 1.1, 0xc89a40, [0.2, 0.006, 0.2]); k.box(1.5, 0.014, 0.7, 0x3a4a6a, [0.2, 0.007, 0.2]);
+    // the rug: one raised layer per border, each a clear step above the last (no flicker)
+    k.box(2.2, 0.012, 1.4, 0x8a2a24, [0.2, 0.006, 0.2]); k.box(1.9, 0.012, 1.1, 0xc89a40, [0.2, 0.014, 0.2]); k.box(1.5, 0.012, 0.7, 0x3a4a6a, [0.2, 0.022, 0.2]);
+    for (let i = 0; i < 12; i++) for (const sx of [-1, 1]) k.box(0.012, 0.004, 0.06, 0xd8c8a0, [0.2 + sx * 1.106, 0.004, 0.2 - 0.62 + i * 0.113]);
     // log walls (south and east), with the corner ends sticking out
     for (let i = 0; i < 12; i++) {
       const y = 0.12 + i * 0.235, c = i % 2 ? LOG : LOG2;
@@ -314,16 +515,32 @@ export default class Rockets {
     // the ceiling: boards and beams
     k.box(RX * 2 + 0.5, 0.1, RZ * 2 + 0.5, 0x5a4230, [0, RH + 0.1, 0]);
     for (let i = 0; i < 5; i++) k.box(RX * 2, 0.16, 0.16, 0x4a3420, [0, RH - 0.02, -RZ + 0.4 + i * 0.9]);
+    // outside: the pitched roof of boards, deep snow on it, log gables with a little attic window, the stove's brick chimney
+    k.add(gableRoof(RX * 2 + 0.3, RZ * 2 + 0.3, 1.3, 0.45), 0x4a3a2c, [0, RH + 0.16, 0]);
+    k.add(gableRoof(RX * 2 + 0.36, RZ * 2 + 0.3, 1.3, 0.47), 0xe6ecf4, [0, RH + 0.26, 0]);
+    for (const sx of [-1, 1]) { k.add(gableWall(RZ * 2 + 0.2, 1.3, 0.24), sx > 0 ? LOG : 0xe8e2d4, [sx * (RX + 0.04), RH + 0.16, 0], [0, Math.PI / 2, 0]); k.box(0.3, 0.42, 0.04, 0xe8e2d4, [sx * (RX + 0.18), RH + 0.75, 0], [0, Math.PI / 2, 0]); }
+    k.box(0.5, 1.9, 0.5, 0x8a4a38, [RX - 0.65, RH + 1.0, RZ - 0.75]); k.box(0.6, 0.1, 0.6, 0x6a3a2a, [RX - 0.65, RH + 1.95, RZ - 0.75]); k.box(0.52, 0.06, 0.52, 0xeef2f8, [RX - 0.65, RH + 2.03, RZ - 0.75]);
     // a geranium pot on the sill
     for (const x of [1.4, 2.0]) { k.cyl(0.07, 0.05, 0.12, 8, 0xa0502a, [x, 0.9, -RZ + 0.08]); k.ball(0.09, 0, 0x2a5a2a, [x, 1.02, -RZ + 0.08]); for (let j = 0; j < 4; j++) k.ball(0.03, 0, 0xd02a2a, [x + (r() - 0.5) * 0.1, 1.08 + r() * 0.05, -RZ + 0.08 + (r() - 0.5) * 0.08]); }
     // the desk against the north windows, piled with papers and books; a chair
     const dx = -0.9, dz = -1.62, WOOD = 0x5a3a22;
-    k.box(1.5, 0.05, 0.72, WOOD, [dx, 0.78, dz]); for (const [ox, oz] of [[-0.68, -0.3], [0.68, -0.3], [-0.68, 0.3], [0.68, 0.3]]) k.box(0.05, 0.78, 0.05, 0x3a2416, [dx + ox, 0.39, dz + oz]);
-    k.box(0.4, 0.6, 0.65, WOOD, [dx + 0.5, 0.45, dz]);
-    for (let i = 0; i < 16; i++) k.box(0.21, 0.003, 0.29, i % 3 ? 0xece0c0 : 0xd8c8a0, [dx - 0.55 + r() * 0.8, 0.807 + i * 0.002, dz - 0.15 + r() * 0.35], [0, r() * 1.2 - 0.6, 0]);
+    // a writing desk: moulded top, an apron with a drawer, turned legs, a pedestal of drawers with brass pulls
+    k.box(1.5, 0.04, 0.72, WOOD, [dx, 0.785, dz]); k.box(1.53, 0.015, 0.75, 0x4a2c18, [dx, 0.762, dz]);
+    k.box(0.9, 0.1, 0.02, 0x4e301c, [dx - 0.25, 0.7, dz + 0.33]); k.box(0.5, 0.07, 0.01, 0x5e3c24, [dx - 0.35, 0.7, dz + 0.345]); k.ball(0.012, 0, 0xc8a050, [dx - 0.35, 0.7, dz + 0.355]);
+    k.box(1.4, 0.1, 0.02, 0x4e301c, [dx, 0.7, dz - 0.33]); k.box(0.02, 0.1, 0.62, 0x4e301c, [dx - 0.7, 0.7, dz]);
+    for (const [ox, oz] of [[-0.68, -0.3], [-0.68, 0.3]]) { const lx = dx + ox, lz = dz + oz; k.cyl(0.024, 0.016, 0.5, 8, 0x3a2416, [lx, 0.25, lz]); k.ball(0.032, 0, 0x3a2416, [lx, 0.52, lz]); k.cyl(0.028, 0.028, 0.12, 8, 0x3a2416, [lx, 0.6, lz]); k.cyl(0.02, 0.026, 0.04, 8, 0x3a2416, [lx, 0.02, lz]); }
+    k.box(0.4, 0.68, 0.65, WOOD, [dx + 0.5, 0.39, dz]); k.box(0.42, 0.05, 0.67, 0x3a2416, [dx + 0.5, 0.03, dz]);
+    for (let i = 0; i < 3; i++) { const y = 0.16 + i * 0.2; k.box(0.34, 0.17, 0.012, 0x6a4428, [dx + 0.5, y, dz + 0.33]); k.box(0.07, 0.015, 0.02, 0xc8a050, [dx + 0.5, y + 0.02, dz + 0.345]); k.box(0.04, 0.03, 0.006, 0xb89040, [dx + 0.5, y + 0.06, dz + 0.34]); }
+    // a pen tray, a blotter, a candle, his spectacles, a glass of tea in a holder
+    k.box(0.5, 0.006, 0.36, 0x2a3a2a, [dx - 0.25, 0.808, dz + 0.14]); k.box(0.2, 0.02, 0.06, 0x2a1a10, [dx + 0.05, 0.815, dz - 0.25]);
+    k.cyl(0.03, 0.035, 0.07, 8, 0xd8c8a0, [dx - 0.6, 0.84, dz - 0.26]); k.cyl(0.035, 0.04, 0.012, 10, 0xb89040, [dx - 0.6, 0.81, dz - 0.26]);
+    for (const s2 of [-1, 1]) k.add(new THREE.TorusGeometry(0.018, 0.002, 4, 10), 0xb0a080, [dx + 0.16 + s2 * 0.022, 0.812, dz + 0.12], [Math.PI / 2, 0, 0]);
+    k.cyl(0.032, 0.028, 0.09, 10, 0xb08a3a, [dx + 0.3, 0.85, dz + 0.18]); k.cyl(0.029, 0.029, 0.07, 10, 0x8a3a12, [dx + 0.3, 0.86, dz + 0.18]); k.add(new THREE.TorusGeometry(0.025, 0.004, 4, 8, Math.PI), 0xb08a3a, [dx + 0.335, 0.85, dz + 0.18], [0, 0, -Math.PI / 2]);
+    for (let i = 0; i < 9; i++) k.box(0.21, 0.002, 0.29, i % 3 ? 0xece0c0 : 0xd8c8a0, [dx - 0.55 + r() * 0.8, 0.814 + i * 0.004, dz - 0.15 + r() * 0.35], [0, r() * 1.2 - 0.6, 0]);
     for (let i = 0; i < 6; i++) k.box(0.26, 0.05, 0.19, [0x5a2a1a, 0x2a3a4a, 0x4a3a1a, 0x3a2a3a, 0x6a4a2a, 0x2a4a2a][i], [dx + 0.6, 0.83 + i * 0.05, dz - 0.15], [0, r() * 0.3, 0]);
     k.cyl(0.03, 0.035, 0.05, 8, 0x1a1a2a, [dx - 0.1, 0.83, dz - 0.25]); k.cyl(0.003, 0.003, 0.2, 3, 0xe8e0d0, [dx - 0.08, 0.9, dz - 0.24], [0.3, 0, 0.3]);
-    k.box(0.45, 0.04, 0.45, WOOD, [dx + 0.1, 0.46, dz + 0.85]); k.box(0.45, 0.5, 0.04, WOOD, [dx + 0.1, 0.72, dz + 1.06]); for (const [ox, oz] of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]]) k.box(0.04, 0.46, 0.04, 0x3a2416, [dx + 0.1 + ox, 0.23, dz + 0.85 + oz]);
+    // his bentwood chair (a Thonet, as in every Russian house), pulled up to the desk; he sits on it to write
+    this.chair = bentwoodChair(k, CHAIR.x, CHAIR.z, SEAT_Y);
     // the kerosene lamp (its light is the room's light)
     const lx = dx + 0.45, lz = dz - 0.22;
     k.cyl(0.07, 0.09, 0.03, 10, 0x8a6a2a, [lx, 0.82, lz]); k.cyl(0.02, 0.03, 0.12, 8, 0x8a6a2a, [lx, 0.89, lz]); k.ball(0.07, 1, 0x6a8a6a, [lx, 0.99, lz], 0, [1, 0.8, 1]);
@@ -337,10 +554,15 @@ export default class Rockets {
     for (const z of [-1.85, -0.55]) k.box(0.3, 2.0, 0.03, WOOD, [bx, 1.0, z]);
     // the white tiled stove in the south-east corner, a bench beside it
     const sx = RX - 0.65, sz = RZ - 0.75;
-    k.box(1.1, 2.1, 1.3, 0xe8e2d6, [sx, 1.05, sz]); k.box(1.2, 0.1, 1.4, 0xd8d0c0, [sx, 2.12, sz]); k.box(1.16, 0.08, 1.36, 0xd8d0c0, [sx, 0.55, sz]);
-    for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) k.box(0.005, 0.12, 0.12, j % 2 ? 0x4a6a9a : 0xd8d0c0, [sx - 0.555, 0.8 + i * 0.22, sz - 0.45 + j * 0.3]);
-    k.box(0.02, 0.36, 0.42, 0x1a0e08, [sx - 0.555, 0.45, sz]);
-    this.stoveGlow = glow(0xff7a30, 0.5, 0.8); this.stoveGlow.position.set(sx - 0.6, 0.45, sz); A.add(this.stoveGlow);
+    // (a Russian tiled stove: a plinth, walls of square glazed tiles, each with a blue flower painted in the middle,
+    // a stepped cornice and crown, the brass-framed firebox door low on the room side)
+    k.box(1.1, 2.1, 1.3, 0xd8d0c0, [sx, 1.05, sz]); k.box(1.18, 0.16, 1.38, 0xc8c0b0, [sx, 0.08, sz]);
+    for (const [y, g, h] of [[2.12, 0.06, 0.06], [2.17, 0.1, 0.05], [2.22, 0.06, 0.06]]) k.box(1.1 + g * 2, h, 1.3 + g * 2, 0xe8e2d6, [sx, y, sz]);
+    k.box(0.9, 0.18, 1.1, 0xe8e2d6, [sx, 2.33, sz]); k.box(1.14, 0.06, 1.34, 0xe8e2d6, [sx, 0.6, sz]);
+    const tile = (x, y, z, ry) => { k.box(0.2, 0.2, 0.012, 0xf0ece2, [x, y, z], [0, ry, 0]); const n = V3(Math.sin(ry), 0, Math.cos(ry)).multiplyScalar(0.008); k.box(0.1, 0.03, 0.006, 0x3a5a9a, [x + n.x, y, z + n.z], [0, ry, 0]); k.box(0.03, 0.1, 0.006, 0x3a5a9a, [x + n.x, y, z + n.z], [0, ry, 0]); k.box(0.035, 0.035, 0.008, 0xc89a3a, [x + n.x * 1.2, y, z + n.z * 1.2], [0, ry, 0]); };
+    for (let i = 0; i < 6; i++) { const y = 0.76 + i * 0.22; for (let j = 0; j < 5; j++) tile(sx - 0.556, y, sz - 0.48 + j * 0.24, -Math.PI / 2); for (let j = 0; j < 4; j++) tile(sx - 0.4 + j * 0.23, y, sz - 0.656, Math.PI); }
+    k.box(0.02, 0.36, 0.42, 0x1a0e08, [sx - 0.555, 0.38, sz]); k.box(0.03, 0.42, 0.04, 0xb8964a, [sx - 0.56, 0.38, sz - 0.23]); k.box(0.03, 0.42, 0.04, 0xb8964a, [sx - 0.56, 0.38, sz + 0.23]); k.box(0.03, 0.04, 0.5, 0xb8964a, [sx - 0.56, 0.6, sz]); k.box(0.03, 0.04, 0.5, 0xb8964a, [sx - 0.56, 0.17, sz]);
+    this.stoveGlow = glow(0xff7a30, 0.5, 0.8); this.stoveGlow.position.set(sx - 0.6, 0.38, sz); A.add(this.stoveGlow);
     this.stoveLight = new THREE.PointLight(0xff7030, 1.2, 4, 1.8); this.stoveLight.position.set(sx - 0.8, 0.5, sz); A.add(this.stoveLight);
     // the chalkboard on the south wall (he was a teacher)
     const board = canvasTex(512, 320, (g, w, h) => {
@@ -357,8 +579,21 @@ export default class Rockets {
     k.box(0.06, 0.02, 0.5, 0x2a2a2a, [-1.35, 0.88, RZ - 0.3]); k.box(0.18, 0.04, 0.08, 0x3a2a1a, [-1.8, 0.8, RZ - 0.3]);
     // a samovar on a little table by the stove
     k.box(0.6, 0.04, 0.5, WOOD, [1.95, 0.7, 0.15]); for (const [ox, oz] of [[-0.25, -0.2], [0.25, -0.2], [-0.25, 0.2], [0.25, 0.2]]) k.box(0.04, 0.7, 0.04, 0x3a2416, [1.95 + ox, 0.35, 0.15 + oz]);
-    k.cyl(0.1, 0.13, 0.05, 10, 0xc8902a, [1.95, 0.75, 0.15]); k.ball(0.15, 1, 0xd8a03a, [1.95, 0.93, 0.15], 0, [1, 1.2, 1]); k.cyl(0.04, 0.06, 0.12, 8, 0xc8902a, [1.95, 1.14, 0.15]); k.ball(0.06, 0, 0xf0f0f0, [1.95, 1.24, 0.15]);
-    k.box(0.1, 0.02, 0.02, 0xc8902a, [1.8, 0.86, 0.15]); for (const ox of [-0.18, 0.18]) k.cyl(0.035, 0.03, 0.07, 8, 0xe8e8f0, [1.95 + ox, 0.76, 0.0]);
+    // the samovar: a turned brass urn on a square foot, two looped handles, a tap with its little wheel,
+    // the chimney crowned by the teapot keeping warm; a tray, glasses in holders, a sugar bowl
+    { const X = 1.95, Z = 0.15, BR = 0xc8922e, BR2 = 0xa87420;
+      k.box(0.16, 0.03, 0.16, BR2, [X, 0.735, Z]); for (const [ox, oz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) k.ball(0.018, 0, BR2, [X + ox * 0.065, 0.73, Z + oz * 0.065]);
+      k.add(new THREE.LatheGeometry([[0.05, 0.75], [0.06, 0.78], [0.045, 0.82], [0.1, 0.85], [0.13, 0.9], [0.135, 0.98], [0.125, 1.05], [0.1, 1.09], [0.06, 1.1], [0.05, 1.1]].map(([a, b]) => new THREE.Vector2(a, b)), 16), BR, [X, 0, Z]);
+      for (let f = 0; f < 12; f++) { const a = f / 12 * 6.283; k.box(0.008, 0.16, 0.01, BR2, [X + Math.cos(a) * 0.134, 0.97, Z + Math.sin(a) * 0.134], [0, -a, 0]); }
+      for (const sz of [-1, 1]) k.add(new THREE.TorusGeometry(0.04, 0.007, 4, 10, Math.PI), 0x2a1a10, [X, 1.04, Z + sz * 0.14], [0, Math.PI / 2, sz * Math.PI / 2]);
+      k.cyl(0.012, 0.012, 0.09, 6, BR, [X - 0.17, 0.92, Z], [0, 0, Math.PI / 2]); k.cyl(0.006, 0.01, 0.04, 6, BR, [X - 0.21, 0.9, Z]); k.cyl(0.018, 0.018, 0.006, 8, BR2, [X - 0.19, 0.95, Z]);
+      k.cyl(0.035, 0.04, 0.08, 10, BR2, [X, 1.14, Z]); k.add(new THREE.TorusGeometry(0.045, 0.008, 4, 12), BR, [X, 1.18, Z], [Math.PI / 2, 0, 0]);
+      k.add(new THREE.LatheGeometry([[0.03, 1.19], [0.06, 1.2], [0.07, 1.24], [0.055, 1.28], [0.03, 1.29], [0.012, 1.31], [0.0, 1.31]].map(([a, b]) => new THREE.Vector2(a, b)), 12), 0xf0f0f0, [X, 0, Z]);
+      k.cyl(0.008, 0.014, 0.07, 6, 0xf0f0f0, [X + 0.08, 1.25, Z], [0, 0, -0.9]); k.add(new THREE.TorusGeometry(0.03, 0.006, 4, 8, Math.PI), 0xf0f0f0, [X - 0.07, 1.24, Z], [0, 0, Math.PI / 2]);
+      for (let f = 0; f < 6; f++) k.ball(0.008, 0, 0x2a4a9a, [X + Math.cos(f) * 0.068, 1.24, Z + Math.sin(f) * 0.068]);
+      k.cyl(0.24, 0.24, 0.012, 20, BR2, [X, 0.728, Z - 0.0]);
+      for (const ox of [-0.17, 0.17]) { k.cyl(0.028, 0.026, 0.08, 10, 0xd8e0e0, [X + ox, 0.77, Z - 0.15]); k.cyl(0.03, 0.028, 0.06, 10, 0x8a7a5a, [X + ox, 0.765, Z - 0.15]); k.cyl(0.026, 0.026, 0.06, 10, 0x9a3a10, [X + ox, 0.77, Z - 0.15]); }
+      k.cyl(0.04, 0.03, 0.05, 10, 0xf0f0f0, [X + 0.18, 0.76, Z + 0.12]); }
     A.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
     // his tin model airship, hanging from the beams
     const ak = new Kit(); ak.ball(0.5, 2, 0xb8c0c8, [0, 0, 0], 0, [1, 0.24, 0.24]);
@@ -381,8 +616,8 @@ export default class Rockets {
     // books that fly off the shelf (ch13_02)
     this.flyBooks = [];
     for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.04), new THREE.MeshLambertMaterial({ color: [0x6a2a1a, 0x2a3a5a, 0x4a3a1a, 0x3a2a4a, 0x5a4a2a, 0x2a4a2a][i], emissive: 0x221a08 })); const home = V3(RX - 0.22, 0.48 + (i % 4) * 0.42, -1.65 + i * 0.16); m.position.copy(home); m.rotation.y = Math.PI / 2; m.userData.home = home; A.add(m); this.flyBooks.push(m); }
-    this.bookGlow = glow(0xffe0a0, 1.2, 0); A.add(this.bookGlow);
-    this.blockK = [{ x: dx, z: dz, r: 0.85 }, { x: sx, z: sz, r: 0.8 }, { x: 1.95, z: 0.15, r: 0.4 }, { x: bx, z: -1.2, r: 0.3 }, { x: dx + 0.1, z: dz + 0.85, r: 0.3 }];
+    this.bookGlow = glow(0xffe0a0, 1.2, 0); A.add(this.bookGlow); this.bookCenter = V3(TALK_SPOT.x, 1.75, TALK_SPOT.z);
+    this.blockK = [{ x: dx, z: dz, r: 0.85 }, { x: sx, z: sz, r: 0.8 }, { x: 1.95, z: 0.15, r: 0.4 }, { x: bx, z: -1.2, r: 0.3 }, { x: CHAIR.x, z: CHAIR.z, r: 0.28 }];
   }
 
   // ---------- the chalk drawings ----------
@@ -441,18 +676,54 @@ export default class Rockets {
   // ---------- 2. Auburn: Aunt Effie's farm, the field, the cabbage patch ----------
   buildAuburn() {
     const k = new Kit(), r = rng(21), B = this.B, wins = [];
-    B.add(groundMesh(2600, 160, auburnHeight, (x, z, y, c) => {
+    const baseCol = (x, z, y, c) => {
       c.setHex(0xe4e8ee).lerp(_col.setHex(0xd0d6e0), N2(x / 5, z / 5));
       const bare = N1(x / 14 + 3, z / 14) + (N2(x / 3, z / 3) - 0.5) * 0.3; if (bare > 0.62) c.lerp(_col.setHex(0x8a7a58), clamp((bare - 0.62) * 6, 0, 0.85));
       if (Math.abs(z - 34 - Math.sin(x / 40) * 4) < 2.2) c.lerp(_col.setHex(0x7a6a52), 0.6);   // the road
       if (Math.abs(x - LAND.x) < 11 && Math.abs(z - LAND.z) < 9 && Math.sin((x - LAND.x) * 2.2) > 0.2) c.lerp(_col.setHex(0x5a4a3a), 0.7);   // the furrows
+    };
+    const PATCH = { x: 0, z: -4, w: 44, d: 40 };
+    B.add(groundMesh(2600, 160, auburnHeight, baseCol, PATCH));
+    // near you: the snow trodden into paths between the shelter, the camera, the sawhorse and the frame,
+    // boot prints, the soot and melt round the launch frame from the test firings, sparkle in the crust
+    const segD = (x, z, ax, az, bx, bz) => { const vx = bx - ax, vz = bz - az, t = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz), 0, 1); return Math.hypot(x - ax - vx * t, z - az - vz * t); };
+    const paths = [[4.3, 2.9, 0.3, -1.6], [4.6, -1.2, 0.5, -1.9], [-0.9, 0.3, 0, -1.6], [1.2, 1.6, 3.6, 2.2], [3.4, 1.8, 30, 24], [0, -2.2, -14, -16]];
+    B.add(groundPatch(PATCH, 0.35, auburnHeight, (x, z, y, c, e) => {
+      baseCol(x, z, y, c);
+      let tr = 0; for (const [ax, az, bx, bz] of paths) tr = Math.max(tr, 1 - segD(x, z, ax, az, bx, bz) / 0.75);
+      if (tr > 0) { const prints = N2(x * 3.1, z * 3.1) > 0.58 ? 0.25 : 0; c.lerp(_col.setHex(0xa8b2c0), clamp01(tr * 1.6) * (0.55 + prints) * e); }
+      const fr = Math.hypot(x - FRAME.x, z - FRAME.z); if (fr < 1.6) c.lerp(_col.setHex(fr < 0.7 ? 0x4a4038 : 0x8a8070), clamp01((1.6 - fr) / 0.9) * 0.8 * e);
+      if (N1(x * 1.7, z * 1.7) > 0.8) c.lerp(_col.setHex(0xffffff), 0.5 * e);
     }));
+    // dead grass and weed stalks poking up through the snow where it is thin
+    for (let i = 0; i < 520; i++) {
+      const x = PATCH.x + (r() - 0.5) * PATCH.w * 0.95, z = PATCH.z + (r() - 0.5) * PATCH.d * 0.95;
+      if (N1(x / 14 + 3, z / 14) + (N2(x / 3, z / 3) - 0.5) * 0.3 < 0.5 && r() < 0.8) continue; if (Math.hypot(x - FRAME.x, z - FRAME.z) < 1.8) continue;
+      const y = auburnHeight(x, z), n = 3 + Math.floor(r() * 3);
+      for (let j = 0; j < n; j++) { const h = 0.12 + r() * 0.22; k.cyl(0.001, 0.007, h, 3, r() < 0.5 ? 0x9a8a5a : 0x7a6a48, [x + (r() - 0.5) * 0.08, y + h / 2 - 0.01, z + (r() - 0.5) * 0.08], [(r() - 0.5) * 0.7, 0, (r() - 0.5) * 0.7]); }
+    }
     // stone walls round the fields
     const wall = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.floor(L / 0.7); for (let i = 0; i < n; i++) { const x = lerp(x0, x1, i / n), z = lerp(z0, z1, i / n), s = 0.35 + r() * 0.25; k.ball(s, 0, [0x8a8a86, 0x7a7670, 0x9a968e][i % 3], [x + (r() - 0.5) * 0.3, auburnHeight(x, z) + s * 0.5, z + (r() - 0.5) * 0.3], [r(), r(), r()], [1.3, 0.8, 1]); if (r() < 0.5) k.ball(s * 0.7, 0, 0x8a8680, [x, auburnHeight(x, z) + s * 1.1, z], [r(), r(), r()]); } };
     wall(-90, -75, 70, -75); wall(-90, -75, -90, 28); wall(70, -75, 70, 28); wall(-90, 28, -10, 28); wall(10, 28, 70, 28);
     // the cabbage patch: rows of frost-bitten cabbages, a few posts
-    for (let i = 0; i < 9; i++) for (let j = 0; j < 12; j++) { const x = LAND.x - 9.5 + i * 2.3 + (r() - 0.5) * 0.3, z = LAND.z - 8 + j * 1.35, y = auburnHeight(x, z); k.ball(0.28, 1, [0x6a8a6a, 0x5a7a62, 0x7a9a7a][(i + j) % 3], [x, y + 0.16, z], [r(), r(), r()], [1, 0.7, 1]); k.ball(0.18, 0, 0xe8ecf0, [x + 0.05, y + 0.3, z], 0, [1, 0.4, 1]); }
-    for (const [x, z] of [[-12, -8], [12, -8], [-12, 8], [12, 8]]) k.box(0.12, 1.3, 0.12, 0x5a4a3a, [LAND.x + x, auburnHeight(LAND.x + x, LAND.z + z) + 0.65, LAND.z + z]);
+    // last year's cabbages, left in the frozen rows: a tight pale head in a rosette of curling outer leaves
+    // (frost-bitten purple-grey at the edges), snow lodged in the hearts; a few already just stumps
+    const CAB = [0x7a9a7a, 0x6a8a72, 0x8aa286], OUTER = [0x4a6a5a, 0x5a6a62, 0x6a5a6a];
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 12; j++) {
+      const x = LAND.x - 9.5 + i * 2.3 + (r() - 0.5) * 0.3, z = LAND.z - 8 + j * 1.35, y = auburnHeight(x, z), sz = 0.8 + r() * 0.4;
+      k.add(new THREE.SphereGeometry(0.14 * sz, 8, 6, 0, 6.29, 0, Math.PI / 2), 0x8a6a5a, [x, y - 0.04, z], 0, [1.3, 0.35, 1.3]);   // a ridge of earth
+      if (r() < 0.12) { k.cyl(0.025, 0.03, 0.18, 6, 0x8a8a6a, [x, y + 0.09, z], [r() * 0.3, 0, r() * 0.3]); k.ball(0.05, 0, 0xe8ecf0, [x, y + 0.02, z], 0, [1.4, 0.4, 1.4]); continue; }
+      k.ball(0.13 * sz, 1, CAB[(i + j) % 3], [x, y + 0.12 * sz, z], [r(), r(), r()], [1, 0.85, 1]);
+      const nL = 6, a0 = r() * 6.28;
+      for (let l = 0; l < nL; l++) { const a = a0 + l / nL * 6.28 + (r() - 0.5) * 0.3, d = 0.14 * sz; k.ball(0.13 * sz, 0, OUTER[(l + i) % 3], [x + Math.cos(a) * d, y + 0.07 * sz, z + Math.sin(a) * d], [0, -a, 0.9 + r() * 0.4], [1.0, 0.18, 0.75]); }
+      k.ball(0.09 * sz, 0, 0xe8ecf0, [x + 0.02, y + 0.22 * sz, z], 0, [1, 0.35, 1]);
+    }
+    // corner stakes with a sagging string, and a scarecrow left over from summer
+    for (const [x, z] of [[-12, -8], [12, -8], [-12, 8], [12, 8]]) { const X = LAND.x + x, Z = LAND.z + z, y = auburnHeight(X, Z); k.cyl(0.035, 0.045, 1.2, 6, 0x5a4a3a, [X, y + 0.55, Z], [(r() - 0.5) * 0.1, 0, (r() - 0.5) * 0.1]); k.ball(0.05, 0, 0xe8ecf0, [X, y + 1.17, Z], 0, [1, 0.5, 1]); }
+    for (const [a, b] of [[[-12, -8], [12, -8]], [[12, -8], [12, 8]], [[12, 8], [-12, 8]], [[-12, 8], [-12, -8]]]) { const A0 = V3(LAND.x + a[0], 0, LAND.z + a[1]), B0 = V3(LAND.x + b[0], 0, LAND.z + b[1]); A0.y = auburnHeight(A0.x, A0.z) + 1.0; B0.y = auburnHeight(B0.x, B0.z) + 1.0; const M = A0.clone().lerp(B0, 0.5); M.y -= 0.35; bend(k, [A0, A0.clone().lerp(M, 0.5).setY(lerp(A0.y, M.y, 0.75)), M, B0.clone().lerp(M, 0.5).setY(lerp(B0.y, M.y, 0.75)), B0], 0.005, 0x9a8a6a, 3); }
+    { const X = LAND.x + 7, Z = LAND.z - 3, y = auburnHeight(X, Z); k.cyl(0.04, 0.05, 2.1, 6, 0x5a4a32, [X, y + 1.0, Z]); k.cyl(0.03, 0.03, 1.4, 6, 0x5a4a32, [X, y + 1.55, Z], [0, 0.3, Math.PI / 2]);
+      k.cyl(0.16, 0.26, 0.7, 8, 0x5a4a6a, [X, y + 1.3, Z], [0, 0.3, 0]); k.cyl(0.05, 0.05, 1.1, 6, 0x6a5a7a, [X, y + 1.55, Z], [0, 0.3, Math.PI / 2]); k.ball(0.13, 1, 0xc8b078, [X, y + 1.82, Z]); k.cyl(0.11, 0.2, 0.1, 10, 0x6a5a3a, [X, y + 1.92, Z]); k.cyl(0.24, 0.24, 0.015, 14, 0x6a5a3a, [X, y + 1.88, Z]);
+      for (let q = 0; q < 6; q++) k.cyl(0.004, 0.004, 0.18, 3, 0xc8b078, [X + Math.cos(0.3) * (q % 2 ? 0.72 : -0.72), y + 1.5, Z - Math.sin(0.3) * (q % 2 ? 0.72 : -0.72)], [r() - 0.5, 0, r() - 0.5]); }
     // Aunt Effie's farmhouse (white clapboard), the red barn and silo, a shed
     const fx = 52, fz = -40, fy = auburnHeight(fx, fz);
     house(k, { x: fx, y: fy, z: fz, w: 10, d: 8, h: 5.6, yaw: -Math.PI / 2, wall: 0xeeeae0, roofCol: 0x3a3a3e }, wins);
@@ -486,14 +757,30 @@ export default class Rockets {
     // a sawhorse by you (the torch rests on it)
     for (const s of [-1, 1]) { pipe(k, V3(-0.9 + s * 0.2, 0, 0.0), V3(-0.9, 0.75, 0.2), 0.03, 0x7a6048); pipe(k, V3(-0.9 + s * 0.2, 0, 0.4), V3(-0.9, 0.75, 0.2), 0.03, 0x7a6048); }
     pipe(k, V3(-0.9, 0.75, -0.3), V3(-0.9, 0.75, 0.7), 0.04, 0x8a6a4a);
-    // Esther's movie camera on its tripod
-    const cxm = 4.3, czm = -1.5;
-    for (let i = 0; i < 3; i++) { const a = i / 3 * 6.28; pipe(k, V3(cxm + Math.cos(a) * 0.35, 0, czm + Math.sin(a) * 0.35), V3(cxm, 1.25, czm), 0.015, 0x4a3a2a, 4); }
-    k.box(0.22, 0.28, 0.32, 0x1e1e22, [cxm, 1.42, czm]); k.cyl(0.04, 0.05, 0.12, 8, 0x2a2a2e, [cxm - 0.12, 1.42, czm + 0.05], [0, 0, Math.PI / 2]);
-    for (const oz of [-0.1, 0.1]) k.cyl(0.11, 0.11, 0.04, 14, 0x2a2a2e, [cxm, 1.67, czm + oz], [Math.PI / 2, 0, 0]);
+    // Esther's movie camera on its tripod: wooden legs with brass clamps and spurs, a pan-and-tilt head with
+    // its handle, a black body with the film magazine's two drums on top, the lens and its hood (aimed west at
+    // the rocket), the eyepiece at the back, and the hand crank on her side
+    const cxm = CAMERA_A.x, czm = CAMERA_A.z, TW = 0x7a5a38, CB = 0x1c1c20, BR = 0xb8964a;
+    for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) {
+      const foot = V3(cxm + Math.cos(a) * 0.4, auburnHeight(cxm + Math.cos(a) * 0.4, czm + Math.sin(a) * 0.4) - 0.04, czm + Math.sin(a) * 0.4), top = V3(cxm + Math.cos(a) * 0.05, 1.2, czm + Math.sin(a) * 0.05);
+      for (const o of [-0.018, 0.018]) pipe(k, foot.clone().add(V3(-Math.sin(a) * o, 0.06, Math.cos(a) * o)), top.clone().add(V3(-Math.sin(a) * o, 0, Math.cos(a) * o)), 0.011, TW, 5);
+      const mid = foot.clone().lerp(top, 0.45); k.box(0.07, 0.03, 0.03, BR, mid.toArray(), [0, -a, 0]); k.cyl(0.006, 0.001, 0.08, 4, 0x4a4a4a, foot.toArray());
+    }
+    k.cyl(0.1, 0.09, 0.05, 12, 0x3a2a1a, [cxm, 1.22, czm]); k.cyl(0.06, 0.07, 0.05, 10, 0x2a2a2a, [cxm, 1.265, czm]); k.box(0.16, 0.025, 0.14, 0x2a2a2a, [cxm, 1.3, czm]);
+    pipe(k, V3(cxm + 0.06, 1.28, czm + 0.04), V3(cxm + 0.42, 1.2, czm + 0.12), 0.01, 0x2a2a2a, 5); k.cyl(0.014, 0.014, 0.08, 6, TW, [cxm + 0.44, 1.19, czm + 0.12], [0, 0, 1.35]);
+    k.box(0.3, 0.2, 0.15, CB, [cxm, 1.41, czm]); k.box(0.31, 0.012, 0.16, 0x3a3a3e, [cxm, 1.515, czm]); k.box(0.012, 0.21, 0.16, 0x3a3a3e, [cxm + 0.15, 1.41, czm]);
+    for (const ox of [-0.075, 0.075]) { k.cyl(0.095, 0.095, 0.07, 22, CB, [cxm + ox, 1.6, czm], [Math.PI / 2, 0, 0]); k.cyl(0.02, 0.02, 0.075, 8, 0x5a5a5e, [cxm + ox, 1.6, czm], [Math.PI / 2, 0, 0]); k.add(new THREE.TorusGeometry(0.095, 0.006, 4, 22), 0x4a4a4e, [cxm + ox, 1.6, czm - 0.036]); }
+    k.cyl(0.035, 0.035, 0.08, 14, 0x2a2a2e, [cxm - 0.19, 1.41, czm + 0.02], [0, 0, Math.PI / 2]); k.cyl(0.04, 0.04, 0.012, 14, BR, [cxm - 0.235, 1.41, czm + 0.02], [0, 0, Math.PI / 2]);
+    k.cyl(0.058, 0.04, 0.07, 14, 0x141416, [cxm - 0.275, 1.41, czm + 0.02], [0, 0, Math.PI / 2]); k.cyl(0.03, 0.03, 0.004, 14, 0x3a4a6a, [cxm - 0.237, 1.41, czm + 0.02], [0, 0, Math.PI / 2]);
+    k.box(0.12, 0.05, 0.04, CB, [cxm + 0.04, 1.47, czm + 0.095]); k.cyl(0.018, 0.022, 0.06, 10, 0x141416, [cxm + 0.18, 1.47, czm + 0.095], [0, 0, Math.PI / 2]); k.cyl(0.024, 0.024, 0.02, 10, 0x2a2420, [cxm + 0.215, 1.47, czm + 0.095], [0, 0, Math.PI / 2]);
+    k.cyl(0.02, 0.02, 0.03, 10, BR, [cxm + 0.02, 1.38, czm - 0.09], [Math.PI / 2, 0, 0]);
+    for (let i = 0; i < 4; i++) k.box(0.05, 0.01, 0.002, 0xc8c0a0, [cxm - 0.05 + i * 0.03, 1.36, czm + 0.076]);
     B.add(k.mesh());
     B.add(windows(wins, { lit: 0.1, seed: 9, dark: 0x2a3442 }));
-    this.crank = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.12, 0.02), new THREE.MeshLambertMaterial({ color: 0x8a8a8a })); this.crank.position.set(cxm + 0.12, 1.42, czm); B.add(this.crank);
+    const ck = new Kit(); ck.box(0.016, 0.085, 0.01, 0x8a8a8a, [0, 0.035, 0]); ck.cyl(0.009, 0.009, 0.05, 6, 0x3a2a1a, [0, 0.075, -0.03], [Math.PI / 2, 0, 0]);
+    this.crank = ck.mesh(FIG_MAT); this.crank.position.set(cxm + 0.02, 1.38, czm - 0.11); B.add(this.crank);
+    this.crankHandle = new THREE.Object3D(); this.crankHandle.position.set(0, 0.075, -0.06); this.crank.add(this.crankHandle);
+    this.camGrip = V3(cxm + 0.1, 1.36, czm + 0.1);   // her other hand on the side of the body, steadying it
     this.chimneyA = makeSmoke(V3(fx, fy + 10, fz + 2.5), { n: 6, rise: 8, size: 1.2, opacity: 0.18, color: 0xd8dce4 }); B.add(this.chimneyA.group);
     // cows by the barn, the farm dog, crows
     this.cowsA = this.life.add(makeHerd('cow', { n: 5, area: { x: 78, z: -28, r: 9 }, height: auburnHeight, seed: 3 })); B.add(this.cowsA.group);
@@ -506,23 +793,57 @@ export default class Rockets {
 
   // Goddard's rocket and its launch frame
   buildGoddardRocket() {
-    const B = this.B, fk = new Kit(), FRM = 0x5a5e62, H = 3.7;
+    const B = this.B, fk = new Kit(), FRM = 0x5a5e62, H = 3.7, BRASS_C = 0xb89a50;
     const fy = auburnHeight(FRAME.x, FRAME.z);
     const corner = (sx, sz, y) => V3(sx * lerp(0.6, 0.2, y / H), y, sz * lerp(0.6, 0.2, y / H));
-    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { pipe(fk, corner(sx, sz, 0), corner(sx, sz, H), 0.022, FRM); fk.box(0.18, 0.03, 0.18, 0x3a3a3a, corner(sx, sz, 0).toArray()); }
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { pipe(fk, corner(sx, sz, 0), corner(sx, sz, H), 0.022, FRM); const c0 = corner(sx, sz, 0); fk.box(0.26, 0.12, 0.26, 0x6a5038, [c0.x, 0.04, c0.z], [0, 0.1 * sx * sz, 0]); fk.cyl(0.045, 0.045, 0.05, 8, 0x3a3a3a, [c0.x, 0.12, c0.z]); }
     for (const y of [0.25, 1.4, 2.5, H]) for (const [a, b] of [[[-1, -1], [1, -1]], [[1, -1], [1, 1]], [[1, 1], [-1, 1]], [[-1, 1], [-1, -1]]]) pipe(fk, corner(...a, y), corner(...b, y), 0.015, FRM, 4);
     for (const [a, b] of [[[-1, -1], [1, -1]], [[1, 1], [-1, 1]]]) { pipe(fk, corner(...a, 0.25), corner(...b, 1.4), 0.01, FRM, 4); pipe(fk, corner(...b, 1.4), corner(...a, 2.5), 0.01, FRM, 4); }
-    pipe(fk, V3(0.6, 0.02, 0.6), V3(1.6, 0.02, 1.8), 0.012, 0x2a2a2a, 4); // a cable to the shelter
+    // pipe fittings at every joint, a guide rail each side that steers the rocket straight up and out of the top
+    for (const y of [0.25, 1.4, 2.5, H]) for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = corner(sx, sz, y); fk.cyl(0.032, 0.032, 0.07, 8, 0x4a4e52, p.toArray()); }
+    for (const sx of [-1, 1]) { pipe(fk, V3(sx * 0.13, 1.4, 0), V3(sx * 0.13, 3.3, 0), 0.008, 0x8a8e92, 5); for (const y of [1.4, 2.5]) pipe(fk, V3(sx * 0.13, y, 0), V3(sx * lerp(0.6, 0.2, y / H), y, -lerp(0.6, 0.2, y / H)), 0.007, 0x6a6e72, 4); }
+    // the oxygen supply: a tall steel cylinder lying on a wooden sled, its valve and a hose to the rocket's tank
+    { const ox = -1.15, oz = 0.75; fk.box(1.5, 0.06, 0.5, 0x7a6048, [ox, 0.05, oz]); for (const d of [-0.2, 0.2]) fk.box(1.6, 0.08, 0.06, 0x6a5038, [ox, 0.03, oz + d]);
+      fk.cyl(0.11, 0.11, 1.25, 14, 0x3a5a3a, [ox, 0.2, oz], [0, 0, Math.PI / 2]); fk.ball(0.11, 1, 0x3a5a3a, [ox + 0.62, 0.2, oz], 0, [0.6, 1, 1]); fk.cyl(0.03, 0.03, 0.08, 8, BRASS_C, [ox + 0.72, 0.2, oz], [0, 0, Math.PI / 2]); fk.cyl(0.04, 0.04, 0.015, 8, 0x5a1a10, [ox + 0.72, 0.26, oz]);
+      bend(fk, [[ox + 0.76, 0.2, oz], [ox + 0.95, 0.1, oz - 0.2], [-0.45, 0.04, 0.45], [-0.3, 0.03, 0.15], [-0.05, 0.05, 0.12]], 0.014, 0x1a1a1a, 6); }
+    // a gasoline can, a toolbox, a coil of rope, an alcohol lamp for warming the lines
+    fk.box(0.22, 0.32, 0.12, 0xa02a1a, [-0.95, 0.16, -1.3], [0, 0.3, 0]); fk.cyl(0.02, 0.02, 0.06, 6, 0x4a4a4a, [-0.92, 0.35, -1.3]);
+    fk.box(0.45, 0.16, 0.2, 0x3a4a5a, [-1.1, 0.08, -0.7], [0, -0.4, 0]); fk.box(0.36, 0.02, 0.03, 0x1a1a1a, [-1.1, 0.2, -0.7], [0, -0.4, 0]);
+    fk.add(new THREE.TorusGeometry(0.16, 0.025, 5, 14), 0x9a8a62, [0.9, 0.03, -1.4], [Math.PI / 2, 0, 0]); fk.add(new THREE.TorusGeometry(0.12, 0.025, 5, 14), 0x9a8a62, [0.9, 0.07, -1.4], [Math.PI / 2, 0, 0]);
+    bend(fk, [[0.55, 0.02, 0.55], [1.0, 0.02, 1.5], [1.9, 0.02, 2.9], [2.9, 0.02, 3.9], [3.4, 0.3, 4.5]], 0.008, 0x2a2a2a, 4); // the firing cable to the shelter
     this.frame = fk.mesh(); this.frame.position.set(FRAME.x, fy, FRAME.z); B.add(this.frame);
     // the rocket: motor on top, two thin pipes down to the tanks, a cone shield over them
-    const rk = new Kit(), MET = 0xb8bcc0;
-    rk.cyl(0.055, 0.055, 0.17, 10, 0x8a8e92, [0, 2.6, 0]); rk.ball(0.055, 1, 0x8a8e92, [0, 2.69, 0], 0, [1, 0.5, 1]);
-    rk.cyl(0.055, 0.028, 0.06, 10, 0x7a7e82, [0, 2.49, 0]); rk.cyl(0.028, 0.075, 0.2, 10, 0x6a6e72, [0, 2.36, 0]);
-    for (const s of [-1, 1]) { pipe(rk, V3(s * 0.085, 2.62, 0), V3(s * 0.085, 1.2, 0), 0.011, MET, 6); rk.box(0.05, 0.02, 0.02, MET, [s * 0.06, 2.62, 0]); }
-    rk.cyl(0.012, 0.13, 0.22, 12, 0xd0d2d4, [0, 1.1, 0]);
-    rk.cyl(0.075, 0.075, 0.38, 12, 0xd8dcdf, [0, 0.78, 0]); rk.ball(0.075, 1, 0xd8dcdf, [0, 0.97, 0], 0, [1, 0.4, 1]);
-    rk.cyl(0.075, 0.075, 0.38, 12, 0xa89a7a, [0, 0.38, 0]); rk.ball(0.075, 1, 0xa89a7a, [0, 0.19, 0], 0, [1, 0.4, 1]);
-    rk.box(0.03, 0.06, 0.03, 0x4a4a4a, [0.08, 0.9, 0]); rk.box(0.03, 0.06, 0.03, 0x4a4a4a, [-0.08, 0.5, 0]); rk.cyl(0.01, 0.01, 0.15, 5, 0x3a3a3a, [0, 0.07, 0]);
+    // (as in the photographs of "Nell": a fist-sized motor and its nozzle at the very top, hanging between
+    // the two long fuel pipes, which are the rocket's whole frame; the tanks far below, behind a cone shield)
+    const rk = new Kit(), MET = 0xb8bcc0, STEEL = 0x8a8e92, BRASS = 0xb89a50, DARK = 0x4a4c4e;
+    // the motor: a little chamber with flanged ends, an injector cap with two feed elbows, the nozzle pointing down
+    rk.cyl(0.05, 0.05, 0.13, 14, STEEL, [0, 2.6, 0]);
+    for (const y of [2.535, 2.665]) rk.cyl(0.062, 0.062, 0.016, 14, 0x9a9ea2, [0, y, 0]);
+    for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; for (const y of [2.535, 2.665]) rk.cyl(0.006, 0.006, 0.026, 5, DARK, [Math.cos(a) * 0.056, y, Math.sin(a) * 0.056]); }
+    rk.ball(0.048, 1, 0x9a9ea2, [0, 2.68, 0], 0, [1, 0.45, 1]); rk.cyl(0.012, 0.012, 0.05, 6, BRASS, [0, 2.72, 0]);
+    rk.cyl(0.05, 0.022, 0.05, 14, 0x7a7e82, [0, 2.505, 0]); rk.cyl(0.022, 0.07, 0.19, 14, 0x5e6266, [0, 2.385, 0]); rk.add(new THREE.TorusGeometry(0.07, 0.006, 4, 14), 0x4a4e52, [0, 2.29, 0], [Math.PI / 2, 0, 0]);
+    // the igniter: a little cup of black powder hung in the nozzle's mouth on two wires
+    rk.cyl(0.014, 0.01, 0.03, 8, 0x2a1a12, [0, IGNITER_Y, 0]); for (const sx of [-1, 1]) bend(rk, [[sx * 0.008, IGNITER_Y + 0.01, 0], [sx * 0.03, 2.3, 0.01], [sx * 0.065, 2.36, 0.02], [sx * 0.1, 2.4, 0.02]], 0.002, sx > 0 ? 0xa03020 : 0x202020, 3);
+    // the two fuel pipes, from the tanks up the sides and bending in to the chamber (gasoline one side, oxygen the other)
+    for (const s of [-1, 1]) {
+      bend(rk, [[s * 0.1, 1.24, 0], [s * 0.1, 2.3, 0], [s * 0.1, 2.55, 0], [s * 0.095, 2.62, 0], [s * 0.065, 2.64, 0]], 0.0095, MET, 6);
+      rk.cyl(0.016, 0.016, 0.03, 8, BRASS, [s * 0.1, 1.7, 0]); rk.cyl(0.016, 0.016, 0.03, 8, BRASS, [s * 0.1, 2.2, 0]);
+      rk.cyl(0.014, 0.014, 0.025, 8, BRASS, [s * 0.058, 2.64, 0], [0, 0, Math.PI / 2]);
+      // brace straps between the pipes
+    }
+    for (const y of [1.45, 1.95, 2.42]) rk.box(0.2, 0.012, 0.01, 0x6a6e72, [0, y, 0]);
+    // the shield: an upside-down cone of asbestos-lined sheet, the pipes passing through
+    rk.cyl(0.016, 0.135, 0.24, 16, 0xd6d6d0, [0, 1.12, 0]); rk.add(new THREE.TorusGeometry(0.135, 0.006, 4, 16), 0x9a9a94, [0, 1.0, 0], [Math.PI / 2, 0, 0]);
+    // the liquid oxygen tank (frosted white), then the gasoline tank, joined by a pipe; valves, a pressure line
+    rk.cyl(0.075, 0.075, 0.36, 16, 0xe8ecef, [0, 0.79, 0]); rk.ball(0.075, 1, 0xe8ecef, [0, 0.97, 0], 0, [1, 0.42, 1]); rk.ball(0.075, 1, 0xe8ecef, [0, 0.61, 0], 0, [1, 0.42, 1]);
+    for (const y of [0.68, 0.9]) rk.add(new THREE.TorusGeometry(0.077, 0.004, 4, 16), 0xc8ccd0, [0, y, 0], [Math.PI / 2, 0, 0]);
+    rk.cyl(0.012, 0.012, 0.1, 6, MET, [0, 0.54, 0]);
+    rk.cyl(0.07, 0.07, 0.34, 16, 0x9a8a64, [0, 0.33, 0]); rk.ball(0.07, 1, 0x9a8a64, [0, 0.5, 0], 0, [1, 0.42, 1]); rk.ball(0.07, 1, 0x9a8a64, [0, 0.16, 0], 0, [1, 0.42, 1]);
+    for (const y of [0.22, 0.44]) rk.add(new THREE.TorusGeometry(0.072, 0.004, 4, 16), 0x7a6a48, [0, y, 0], [Math.PI / 2, 0, 0]);
+    for (const [x, y] of [[0.1, 0.92], [-0.1, 0.42]]) { rk.cyl(0.013, 0.013, 0.05, 8, BRASS, [x * 0.82, y, 0], [0, 0, Math.PI / 2]); rk.cyl(0.004, 0.004, 0.04, 4, DARK, [x * 0.95, y + 0.025, 0]); rk.cyl(0.016, 0.016, 0.006, 8, 0xa02a1a, [x * 0.95, y + 0.045, 0]); }
+    bend(rk, [[0.1, 0.92, 0], [0.1, 1.05, 0], [0.1, 1.24, 0]], 0.0095, MET, 6); bend(rk, [[-0.1, 0.42, 0], [-0.11, 0.7, 0], [-0.1, 1.0, 0], [-0.1, 1.24, 0]], 0.0095, MET, 6);
+    bend(rk, [[0.04, 0.12, 0.05], [0.09, 0.3, 0.07], [0.08, 0.6, 0.075], [0.05, 0.66, 0.06]], 0.004, 0x3a3a3a, 4);
+    rk.cyl(0.008, 0.008, 0.14, 5, 0x3a3a3a, [0, 0.06, 0]); rk.cyl(0.02, 0.02, 0.01, 8, 0x3a3a3a, [0, 0.0, 0]);
     this.rk = new THREE.Group(); this.rk.add(rk.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.45 })));
     this.rkBase = V3(FRAME.x, fy + 0.3, FRAME.z); this.rk.position.copy(this.rkBase); B.add(this.rk);
     // its flame (shooting down from the nozzle onto the cone shield)
@@ -530,16 +851,19 @@ export default class Rockets {
     const cone = (r, L, m) => { const g = new THREE.CylinderGeometry(r, 0.0, L, 12, 1, true); g.translate(0, -L / 2, 0); return new THREE.Mesh(g, m); };
     this.flameA = new THREE.Group(); this.flameA.position.y = 2.26; this.flameA.add(cone(0.075, 0.9, fm(0xff9a40, 0.7)), cone(0.045, 0.6, fm(0xfff0c0, 0.9)), glow(0xffb060, 1.2, 0.9)); this.flameA.visible = false; this.rk.add(this.flameA);
     this.rkLight = new THREE.PointLight(0xffa050, 0, 12, 1.5); this.rkLight.position.y = 1.8; this.rk.add(this.rkLight);
+    // a pulsing marker on the igniter when it is yours to light (Adults)
+    this.ignMark = new THREE.Group(); this.ignMark.position.y = IGNITER_Y; this.rk.add(this.ignMark);
+    this.ignMark.add(glow(0xffd070, 0.35, 0.8)); const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.006, 6, 28), new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0.8, depthWrite: false, fog: false })); ring.rotation.x = Math.PI / 2; this.ignMark.add(ring); this.ignRing = ring; this.ignMark.visible = false;
     // labels for the parts
-    this.rkLabs = [label('liquid-fuel rocket', 0.22), label('gasoline', 0.16), label('liquid oxygen', 0.16), label('motor', 0.16)];
+    const dk = { color: '#fff6e0', glowCol: 'rgba(20,28,48,0.95)' };   // light text on a dark halo: readable against snow and sky
+    this.rkLabs = [label('liquid-fuel rocket', 0.22, dk), label('gasoline', 0.16, dk), label('liquid oxygen', 0.16, dk), label('motor', 0.16, dk)];
     this.rkLabs[0].position.set(0, 3.25, 0); this.rkLabs[1].position.set(-0.65, 0.38, 0); this.rkLabs[2].position.set(-0.8, 0.85, 0); this.rkLabs[3].position.set(-0.55, 2.55, 0);
     for (const l of this.rkLabs) { l.material.opacity = 0; this.rk.add(l); }
     // smoke, vapour, snow bursts
     this.puffA = new Puffs(B, 220, { color: 0xeef0f4 });
     this.fireA = new Puffs(B, 120, { color: 0xffa050, additive: true });
     // the torch you can take (Adults), and Henry's own
-    const tk = new Kit(); tk.cyl(0.02, 0.025, 1.9, 5, 0x5a4028, [0, 0.95, 0]); tk.cyl(0.04, 0.035, 0.18, 8, 0x8a6a2a, [0, 1.95, 0]);
-    this.torchP = new THREE.Group(); this.torchP.add(tk.mesh()); this.torchFlame = glow(0x9ab8ff, 0.25, 0.9); this.torchFlame.position.y = 2.1; this.torchP.add(this.torchFlame);
+    this.torchP = poleTorch(1.9); this.torchFlame = this.torchP.userData.tip.children[2];
     this.torchHome = { pos: V3(-0.9, 0.0, 0.2), rot: new THREE.Euler(0.0, 0, 1.18) }; this.torchP.position.copy(this.torchHome.pos); this.torchP.rotation.copy(this.torchHome.rot); B.add(this.torchP);
     this.torchGlow = glow(0xffe0a0, 0.6, 0); this.torchP.add(this.torchGlow); this.torchGlow.position.y = 1.2;
   }
@@ -549,12 +873,12 @@ export default class Rockets {
     const B = this.B, eye = V3(1.2, 1.6, 1.6);
     const P = [], S = [], Bv = [];
     for (let i = 0; i <= 200; i++) { const p = this.flightPos(i / 200, _a); P.push(p.x, p.y, p.z); S.push(0.12); Bv.push(1); }
-    for (let i = 0; i <= 50; i++) { const p = this.flightPos(0.5, _a); P.push(p.x, auburnHeight(p.x, p.z) + (p.y - auburnHeight(p.x, p.z)) * i / 50, p.z); S.push(0.07); Bv.push(0.8); }
+    for (let i = 0; i <= 50; i++) { const p = this.flightPos(FLY.apex, _a); P.push(p.x, auburnHeight(p.x, p.z) + (p.y - auburnHeight(p.x, p.z)) * i / 50, p.z); S.push(0.07); Bv.push(0.8); }
     const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); tg.setAttribute('size', new THREE.Float32BufferAttribute(S, 1)); tg.setAttribute('b', new THREE.Float32BufferAttribute(Bv, 1));
     this.trail = new THREE.Points(tg, chalkMat(0xff7a30, false)); this.trail.frustumCulled = false; this.trail.visible = false; B.add(this.trail);
-    const apex = this.flightPos(0.5, V3());
+    const apex = this.flightPos(FLY.apex, V3());
     this.arcLabs = [label('2.5 seconds', 1.6, { color: '#fff0d0', glowCol: 'rgba(120,60,20,0.9)' }), label('12.5 m high', 1.6, { color: '#fff0d0', glowCol: 'rgba(120,60,20,0.9)' }), label('the cabbage patch', 1.8, { color: '#fff0d0', glowCol: 'rgba(20,60,20,0.9)' })];
-    this.arcLabs[0].position.copy(this.flightPos(0.28, V3())).add(V3(0, 2.2, 0)); this.arcLabs[1].position.copy(apex).add(V3(-2, 1.6, 0)); this.arcLabs[2].position.copy(LAND).setY(auburnHeight(LAND.x, LAND.z) + 3.2);
+    this.arcLabs[0].position.copy(this.flightPos(0.33, V3())).add(V3(-1.6, 1.4, 0)); this.arcLabs[1].position.copy(apex).add(V3(-2, 1.6, 0)); this.arcLabs[2].position.copy(LAND).setY(auburnHeight(LAND.x, LAND.z) + 3.2);
     for (const l of this.arcLabs) { l.material.opacity = 0; B.add(l); }
     // the rockets that came after, rising as giant chalk outlines across the field
     const far = 150, mk = (prof, fins, flame, x, name, h) => { const s = new Sketch(B, outline(prof, fins, flame), { spacing: h / 380, dot: h / 140, color: 0xffffff, additive: false, secs: 2.5, seed: Math.round(x) }); s.place(V3(x, auburnHeight(x, -far) - 4, -far), eye.clone().setY(auburnHeight(x, -far))); s.addLabel(name, 0, -flame - 4, 5, { color: '#ffffff', glowCol: 'rgba(20,40,80,0.9)' }); s.y0 = s.g.position.y; return s; };
@@ -583,15 +907,18 @@ export default class Rockets {
     const mr = new Kit(); mr.cyl(0.025, 0.025, 0.12, 8, 0xe8e8f0, [0, 0, 0], [0, 0, -Math.PI / 2]); mr.cyl(0.001, 0.025, 0.05, 8, 0xd04030, [0.085, 0, 0], [0, 0, -Math.PI / 2]);
     this.vacRocket = mr.mesh(new THREE.MeshBasicMaterial({ vertexColors: true })); vb.add(this.vacRocket);
     this.vacGas = glowPoints(60, { sizeScale: 200 }); vb.add(this.vacGas); this.vacGasD = Array.from({ length: 60 }, () => ({ x: 0, v: 0.3 + Math.random() * 0.4, y: (Math.random() - 0.5) * 0.04, z: (Math.random() - 0.5) * 0.04, t: Math.random() }));
-    this.vacLabs = [label('empty space: nothing to push against', 0.05), label('the gas is pushed back...', 0.045), label('...so the rocket is pushed forward', 0.045)];
-    this.vacLabs[0].position.set(0, 0.52, 0); this.vacLabs[1].position.set(-0.2, -0.5, 0); this.vacLabs[2].position.set(0.2, -0.58, 0);
+    this.vacLabs = [label('empty space: nothing to push against', 0.05), label('the gas is pushed back...', 0.045), label('...so the rocket is pushed forward', 0.045), label('Newton: every push has an equal push back', 0.04, { color: '#ffe8c0', glowCol: 'rgba(200,150,60,0.7)' })];
+    this.vacLabs[0].position.set(0, 0.52, 0); this.vacLabs[1].position.set(-0.2, -0.5, 0); this.vacLabs[2].position.set(0.2, -0.58, 0); this.vacLabs[3].position.set(0, 0.6, 0);
     for (const l of this.vacLabs) { l.material.opacity = 0; vb.add(l); }
   }
   // Goddard's flight: 0..1 over 2.5 s, up 12.5 m, over to the cabbage patch
+  // First it climbs straight up, guided by the frame, until its tail is clear of the top (4.2 m);
+  // then it noses over in an arc, 12.5 m at the top, and comes down in the cabbages.
   flightPos(u, out) {
-    const x = lerp(FRAME.x, LAND.x, u), z = lerp(FRAME.z, LAND.z, u);
-    const g0 = auburnHeight(FRAME.x, FRAME.z) + 0.3, g1 = auburnHeight(LAND.x, LAND.z) + 0.2;
-    return out.set(x, lerp(g0, g1, u) + 12.5 * 4 * u * (1 - u) * (1 - 0.15 * u), z);
+    const g0 = auburnHeight(FRAME.x, FRAME.z) + 0.3, g1 = auburnHeight(LAND.x, LAND.z) + 0.2, U0 = FLY.u0;
+    if (u <= U0) { const k = u / U0; return out.set(FRAME.x, g0 + FLY.h0 * k * k, FRAME.z); }
+    const f = (u - U0) / (1 - U0), { a, b } = FLY, hx = Math.pow(f, 1.7);
+    return out.set(lerp(FRAME.x, LAND.x, hx), g0 + FLY.h0 + a * f - b * f * f + (g1 - g0) * 0, lerp(FRAME.z, LAND.z, hx));
   }
 
   // ---------- 3. Peenemünde: misty pines, the firing table, the V-2 ----------
@@ -610,22 +937,87 @@ export default class Rockets {
       k.cyl(0.2 * s, 0.3 * s, 14 * s, 5, 0x4a3426, [x, y + 7 * s, z]);
       for (let j = 0; j < 3; j++) k.cyl(0.001, (2.6 - j * 0.6) * s, 4.5 * s, 7, j % 2 ? 0x1c2a20 : 0x22301e, [x, y + (11 + j * 2.6) * s, z]);
     }
-    // the sand wall round the test stand (an arc of earth to the north)
-    for (let i = 0; i <= 24; i++) { const a = Math.PI * (0.15 + i / 24 * 0.7), x = Math.cos(a) * 34, z = PAD.z - Math.sin(a) * 34; k.box(9, 8, 6, 0x6a6048, [x, 3, z], [0, -a + Math.PI / 2, 0]); k.ball(3.5, 0, 0x4a5a3a, [x, 7, z], 0, [1.6, 0.4, 1]); }
-    // the firing table: a ring on four legs, a blast cone underneath
-    k.cyl(1.4, 1.4, 0.2, 16, 0x3a3e3a, [PAD.x, 1.5, PAD.z]); for (const [ox, oz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) k.box(0.3, 1.5, 0.3, 0x2e322e, [PAD.x + ox, 0.75, PAD.z + oz]);
-    k.cyl(0.1, 1.1, 1.0, 4, 0x4a4e4a, [PAD.x, 0.55, PAD.z], [Math.PI, Math.PI / 4, 0]); k.box(5, 0.1, 5, 0x5a5a56, [PAD.x, 0.05, PAD.z]);
-    // trucks: a fuel bowser and a cable truck; floodlight poles
-    for (const [x, z, yaw] of [[-12, PAD.z + 9, 0.4], [14, PAD.z + 14, -0.3]]) {
-      const c = Math.cos(yaw), s = Math.sin(yaw), P = (lx, ly, lz) => [x + lx * c + lz * s, balticHeight(x, z) + ly, z - lx * s + lz * c];
-      k.box(2.3, 1.6, 2.2, 0x3a4032, P(0, 1.5, 3.2), [0, yaw, 0]); k.box(2.4, 0.4, 7, 0x2a2a26, P(0, 0.75, 0), [0, yaw, 0]);
-      k.cyl(1.0, 1.0, 4.4, 12, 0x5a6050, P(0, 1.95, -1), [Math.PI / 2, yaw, 0]);
-      for (const [ox, oz] of [[-1.2, 3], [1.2, 3], [-1.2, -1.8], [1.2, -1.8], [-1.2, -3], [1.2, -3]]) k.add(new THREE.TorusGeometry(0.42, 0.16, 5, 12), 0x1a1a1a, P(ox, 0.5, oz), [0, yaw + Math.PI / 2, 0]);
+    // the earth wall round the test stand: an arc of banked sand to the north, grassed and scrubby on top
+    {
+      const N = 48, prof = [[-6.5, 0], [-4.5, 2.6], [-2.4, 6.0], [-1.0, 7.2], [1.0, 7.3], [2.6, 6.2], [4.8, 2.8], [6.8, 0]], pos = [], col = [], c = new THREE.Color();
+      const pt = (i, j) => { const a = Math.PI * (0.12 + i / N * 0.76), [o, h] = prof[j], R = 34 + o, w = N2(i * 0.7, j * 1.3); return [Math.cos(a) * R, h * (0.9 + 0.2 * w) - 0.3, PAD.z - Math.sin(a) * R]; };
+      const shade = (j, i) => { const top = prof[j][1] > 6; c.setHex(top ? 0x4a5a32 : 0x8a7a58).lerp(_col.setHex(top ? 0x5a6a3a : 0x6a5a40), N1(i * 0.5, j)); return [c.r, c.g, c.b]; };
+      for (let i = 0; i < N; i++) for (let j = 0; j < prof.length - 1; j++) {
+        const q = [pt(i, j), pt(i + 1, j), pt(i + 1, j + 1), pt(i, j + 1)], cc = shade(j, i);
+        for (const t of [0, 1, 2, 0, 2, 3]) { pos.push(...q[t]); col.push(...cc); }
+      }
+      const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); bg.computeVertexNormals();
+      C.add(new THREE.Mesh(bg, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })));
+      for (let i = 0; i < 26; i++) { const a = Math.PI * (0.14 + r() * 0.72), R = 34 + (r() - 0.5) * 2, x = Math.cos(a) * R, z = PAD.z - Math.sin(a) * R; k.ball(0.8 + r() * 0.8, 0, r() < 0.5 ? 0x2a3a22 : 0x3a4428, [x, 6.6 + r() * 0.4, z], [r(), r(), r()], [1.3, 0.6, 1.2]); }
     }
-    for (const [x, z] of [[-16, PAD.z + 18], [17, PAD.z + 20]]) { const y = balticHeight(x, z); k.box(0.3, 10, 0.3, 0x3a3a36, [x, y + 5, z]); k.box(1.6, 0.8, 0.6, 0x2a2a28, [x, y + 10.2, z]); }
-    // your observation post: a concrete wall with sandbags, the bunker roof behind you
-    k.box(7, 1.15, 0.6, 0x9a9a92, [0, 0.58, -1.4]); for (let i = 0; i < 14; i++) k.box(0.48, 0.16, 0.34, i % 2 ? 0xa89a74 : 0x9a8c68, [-3.2 + i * 0.5, 1.23, -1.45], [0, (i % 3 - 1) * 0.08, 0]);
-    k.box(7, 2.6, 0.6, 0x6a6a64, [0, 1.3, 3.2]); k.box(7.4, 0.5, 2.6, 0x6a6a64, [0, 2.85, 2.2]); for (const s of [-1, 1]) k.box(0.6, 2.6, 2.6, 0x707068, [s * 3.5, 1.3, 2.0]);
+    // the firing table (Brenntisch): a steel ring on four braced legs, the rocket standing on it by its fins,
+    // the exhaust going down through the ring onto a four-sided blast deflector; all on a slab of concrete
+    {
+      const ST = 0x3a3e3a, X = PAD.x, Z = PAD.z, TOP = 1.6;
+      for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) k.box(1.38, 0.14, 1.38, [0x7a7a74, 0x74746e, 0x80807a][(i * 7 + j * 3 + 21) % 3], [X + i * 1.4, 0.07, Z + j * 1.4]);
+      k.add(new THREE.LatheGeometry([[0.95, TOP - 0.2], [1.45, TOP - 0.2], [1.45, TOP], [0.95, TOP], [0.95, TOP - 0.2]].map(([a, b]) => new THREE.Vector2(a, b)), 24), ST, [X, 0, Z]);
+      for (let i = 0; i < 24; i++) { const a = i / 24 * 6.283; k.cyl(0.025, 0.025, 0.03, 6, 0x2a2a2a, [X + Math.cos(a) * 1.35, TOP + 0.01, Z + Math.sin(a) * 1.35]); }
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4, cx = X + Math.cos(a) * 1.2, cz = Z + Math.sin(a) * 1.2; k.box(0.5, 0.06, 0.34, 0x4a4e4a, [cx, TOP + 0.03, cz], [0, -a, 0]); }   // fin pads
+      for (const [ox, oz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        const top = V3(X + ox * 0.75, TOP - 0.2, Z + oz * 0.75), foot = V3(X + ox * 1.15, 0.14, Z + oz * 1.15);
+        pipe(k, foot, top, 0.11, 0x2e322e, 6); k.box(0.5, 0.06, 0.5, 0x2a2e2a, [foot.x, 0.17, foot.z]);
+        for (let b = 0; b < 4; b++) k.cyl(0.03, 0.03, 0.06, 6, 0x1a1a1a, [foot.x + (b % 2 - 0.5) * 0.36, 0.22, foot.z + (b > 1 ? 0.18 : -0.18)]);
+      }
+      for (const [a, b] of [[[-1, -1], [1, -1]], [[1, -1], [1, 1]], [[1, 1], [-1, 1]], [[-1, 1], [-1, -1]]]) pipe(k, V3(X + a[0] * 1.05, 0.55, Z + a[1] * 1.05), V3(X + b[0] * 1.05, 0.55, Z + b[1] * 1.05), 0.04, 0x2e322e, 5);
+      k.cyl(0.05, 1.0, 1.1, 4, 0x5a5e58, [X, 0.79, Z], [0, Math.PI / 4, 0]); k.box(1.9, 0.1, 1.9, 0x4a4e48, [X, 0.19, Z], [0, Math.PI / 4, 0]);
+      // cables and a fuel hose snaking from the trucks to the table, a little ladder, gas cylinders
+      bend(k, [[X + 1.3, 0.17, Z + 0.4], [X + 3, 0.18, Z + 2], [X + 6, 0.06, Z + 4], [X + 9, 0.06, Z + 7], [X + 12, 0.2, Z + 11]], 0.05, 0x1a1a1a, 6);
+      bend(k, [[X - 1.2, 0.5, Z + 0.6], [X - 2, 0.2, Z + 2], [X - 5, 0.08, Z + 4], [X - 9, 0.08, Z + 6.5], [X - 11, 0.5, Z + 8]], 0.07, 0x2a2a28, 6);
+      for (let i = 0; i < 6; i++) k.box(0.5, 0.04, 0.08, 0x5a5a52, [X + 1.75, 0.35 + i * 0.24, Z + 1.05 - i * 0.03], [0, 0.6, 0]);
+      for (const o of [-0.22, 0.22]) pipe(k, V3(X + 1.75 + o * 0.82, 0.14, Z + 1.15 - o * 0.56), V3(X + 1.75 + o * 0.82, 1.62, Z + 0.88 - o * 0.56), 0.025, 0x5a5a52, 4);
+      for (let i = 0; i < 4; i++) { const x = X - 4.6 + i * 0.32, z = Z - 2.4; k.cyl(0.13, 0.13, 1.5, 10, i % 2 ? 0x4a5a6a : 0x5a5a5a, [x, 0.89, z]); k.ball(0.13, 1, 0x4a5a6a, [x, 1.64, z], 0, [1, 0.6, 1]); k.cyl(0.03, 0.03, 0.1, 6, 0x8a7a4a, [x, 1.74, z]); }
+    }
+    // trucks: an Opel Blitz fuel bowser and a cable truck (cab with its long bonnet, mudguards, a tank or a
+    // canvas tilt behind), parked where they backed off; floodlights on timber poles
+    for (const [x, z, yaw, kind] of [[-12, PAD.z + 9, 0.4, 'tank'], [14, PAD.z + 14, -0.3, 'tilt']]) {
+      const c = Math.cos(yaw), s = Math.sin(yaw), y0 = balticHeight(x, z), P = (lx, ly, lz) => [x + lx * c + lz * s, y0 + ly, z - lx * s + lz * c], R = [0, yaw, 0];
+      const BODY = 0x3e4434, DK = 0x22241e;
+      k.box(1.9, 0.18, 6.8, DK, P(0, 0.72, 0), R);
+      k.box(1.1, 0.8, 1.4, BODY, P(0, 1.2, 3.0), R); k.box(1.0, 0.05, 1.3, BODY, P(0, 1.625, 3.0), R);
+      k.box(1.0, 0.7, 0.06, 0x1a1a18, P(0, 1.15, 3.71), R); for (let i = 0; i < 6; i++) k.box(0.9, 0.025, 0.04, 0x4a4a44, P(0, 0.88 + i * 0.1, 3.755), R);
+      for (const sx of [-1, 1]) { k.cyl(0.13, 0.13, 0.12, 10, 0xd8d0b0, P(sx * 0.68, 1.42, 3.65), [Math.PI / 2, yaw, 0]); k.box(0.55, 0.06, 1.6, BODY, P(sx * 0.85, 0.98, 2.9), [0, yaw, sx * 0.25]); }
+      k.box(2.0, 1.4, 1.4, BODY, P(0, 1.55, 1.65), R); k.box(1.8, 0.6, 0.04, 0x2a3038, P(0, 1.85, 2.37), R); k.box(2.05, 0.06, 1.5, BODY, P(0, 2.28, 1.65), R);
+      for (const sx of [-1, 1]) k.box(0.04, 0.5, 0.6, 0x2a3038, P(sx * 1.02, 1.85, 1.75), R);
+      if (kind === 'tank') { k.cyl(0.95, 0.95, 4.0, 18, 0x5a6050, P(0, 1.75, -1.3), [Math.PI / 2, yaw, 0]); for (const oz of [-3.25, 0.65]) k.cyl(0.97, 0.97, 0.08, 18, DK, P(0, 1.75, oz), [Math.PI / 2, yaw, 0]); k.cyl(0.25, 0.25, 0.15, 10, DK, P(0, 2.75, -1.0), R); }
+      else {
+        k.box(2.1, 0.12, 4.2, DK, P(0, 0.87, -1.3), R); for (const sx of [-1, 1]) k.box(0.05, 0.6, 4.2, 0x4a4632, P(sx * 1.03, 1.24, -1.3), R);
+        k.add(new THREE.CylinderGeometry(1.06, 1.06, 4.2, 14, 1, false, -Math.PI / 2, Math.PI), 0x5a5640, P(0, 1.55, -1.3), [Math.PI / 2, yaw, 0], [1, 1, 0.75]);
+        k.add(new THREE.CylinderGeometry(0.55, 0.55, 0.4, 16), 0x5a3a22, P(0, 1.5, -4.0), [0, yaw, Math.PI / 2]);
+      }
+      for (const [ox, oz] of [[-0.85, 2.9], [0.85, 2.9], [-0.85, -1.6], [0.85, -1.6], [-0.85, -2.6], [0.85, -2.6]]) { k.add(new THREE.CylinderGeometry(0.46, 0.46, 0.28, 14), 0x161616, P(ox, 0.46, oz), [0, yaw, Math.PI / 2]); k.add(new THREE.CylinderGeometry(0.24, 0.24, 0.3, 10), 0x3a3e34, P(ox * 1.01, 0.46, oz), [0, yaw, Math.PI / 2]); }
+    }
+    for (const [x, z] of [[-16, PAD.z + 18], [17, PAD.z + 20]]) {
+      const y = balticHeight(x, z); k.cyl(0.14, 0.19, 10.4, 7, 0x4a3a2a, [x, y + 5.0, z]); k.box(2.2, 0.14, 0.14, 0x4a3a2a, [x, y + 9.4, z]);
+      for (const ox of [-0.7, 0.7]) { k.cyl(0.32, 0.26, 0.45, 12, 0x2a2a28, [x + ox, y + 9.85, z - 0.1], [Math.PI / 2 - 0.4, 0, 0]); k.cyl(0.28, 0.28, 0.02, 12, 0xe8ecff, [x + ox, y + 9.94, z - 0.33], [Math.PI / 2 - 0.4, 0, 0]); }
+      for (let i = 0; i < 12; i++) k.box(0.35, 0.04, 0.06, 0x3a2a1a, [x, y + 0.6 + i * 0.7, z + 0.2], [0, 0, (i % 2 - 0.5) * 0.2]);
+      bend(k, [[x, y + 9.2, z + 0.15], [x + (x < 0 ? 3 : -3), y + 4, z + 2], [x + (x < 0 ? 6 : -6), y + 0.05, z + 3]], 0.03, 0x111111, 4);
+    }
+    // your observation post: a parapet of cast concrete (board marks from the shuttering, a rounded top)
+    // with sandbags along it; behind you the bunker's mouth: thick walls, a lintel, a steel door, earth on top
+    {
+      const CON = 0x8e8e86, CON2 = 0x7e7e76, sx0 = -3.5, sx1 = 3.5;
+      k.box(7, 1.0, 0.6, CON, [0, 0.5, -1.4]); k.add(new THREE.CylinderGeometry(0.3, 0.3, 7, 8, 1, false, 0, Math.PI), CON, [0, 1.0, -1.4], [0, 0, Math.PI / 2], [0.4, 1, 1]);
+      for (let i = 0; i < 5; i++) k.box(7.02, 0.014, 0.62, CON2, [0, 0.12 + i * 0.19, -1.4]);
+      for (let i = 0; i < 9; i++) k.box(0.014, 1.0, 0.625, CON2, [sx0 + 0.4 + i * 0.78, 0.5, -1.4]);
+      for (let row = 0; row < 2; row++) for (let i = 0; i < 13; i++) {
+        const x = sx0 + 0.3 + i * 0.53 + (row ? 0.26 : 0); if (x > sx1 - 0.2) continue;
+        k.ball(0.27, 1, [0xa89a74, 0x9a8c68, 0xb0a27c][(i + row) % 3], [x, 1.2 + row * 0.15, -1.45 + (r() - 0.5) * 0.04], [0, (r() - 0.5) * 0.2, (r() - 0.5) * 0.1], [1.0, 0.3, 0.62]);
+      }
+      k.box(8.4, 3.0, 0.9, 0x6e6e68, [0, 1.5, 3.6]); k.box(8.8, 0.6, 3.4, 0x6a6a64, [0, 3.3, 2.4]);
+      for (const sxx of [-1, 1]) { k.box(0.9, 3.0, 2.9, 0x727268, [sxx * 3.75, 1.5, 2.15]); k.box(0.95, 0.4, 0.4, 0x5e5e58, [sxx * 3.75, 0.2, 0.75]); }
+      for (let i = 0; i < 5; i++) k.box(6.58, 0.014, 0.02, 0x5e5e58, [0, 0.5 + i * 0.5, 3.14]);
+      k.box(1.3, 2.1, 0.08, 0x3a3e36, [0, 1.05, 3.11]); for (const y of [0.3, 1.05, 1.8]) k.box(1.2, 0.06, 0.04, 0x2a2e26, [0, y, 3.05]); k.cyl(0.04, 0.04, 0.15, 6, 0x8a8a7a, [0.5, 1.05, 3.0], [Math.PI / 2, 0, 0]);
+      k.box(1.7, 0.25, 0.25, 0x5e5e58, [0, 2.25, 3.03]); k.box(0.9, 0.14, 0.2, 0x121212, [-2.2, 2.2, 3.06]); k.box(0.9, 0.14, 0.2, 0x121212, [2.2, 2.2, 3.06]);
+      k.cyl(0.06, 0.06, 0.9, 8, 0x3a3e36, [1.6, 3.95, 2.6]); k.box(0.14, 0.24, 0.2, 0x3a3e36, [1.6, 4.45, 2.55]);
+      for (let i = 0; i < 14; i++) k.ball(0.6 + r() * 0.5, 0, r() < 0.5 ? 0x4a5a32 : 0x5a5a3a, [-4 + i * 0.62, 3.65, 2.0 + r() * 1.6], [r(), r(), r()], [1.4, 0.35, 1.2]);
+      k.box(0.5, 0.4, 0.4, 0x5a4a2e, [-2.6, 0.2, -0.8]); k.box(0.24, 0.14, 0.18, 0x2a2e26, [-2.6, 0.47, -0.8]); k.cyl(0.02, 0.02, 0.2, 6, 0x1a1a1a, [-2.6, 0.56, -0.8], [0, 0, Math.PI / 2]);
+      k.box(0.2, 0.02, 0.26, 0x2a2a3a, [-2.37, 0.41, -0.8]);
+    }
     C.add(k.mesh());
     // the erector beside the rocket: a lattice tower that lowers away before launch
     const ek = new Kit(), EC = 0x4a5048;
@@ -655,6 +1047,9 @@ export default class Rockets {
     // remembrance: small lights in the grass, one for each of the many who were forced to build it
     this.memorial = glowPoints(70, { sizeScale: 260 }); this.memorial.visible = false; C.add(this.memorial);
     this.memD = Array.from({ length: 70 }, (_, i) => { const a = Math.PI * (0.2 + 0.6 * i / 70) + (r() - 0.5) * 0.03, d = 16 + r() * 3; const x = Math.cos(a) * d * 1.6, z = -Math.sin(a) * d * 0.7 - 8; return { x, y: balticHeight(x, z) + 0.12, z, ph: r() * 6, at: r() }; });
+    // each light is a little grave candle: a glass cup (red or clear) with a pierced tin lid, standing in the grass
+    const lk = new Kit(); this.memD.forEach((q, i) => { const y = q.y - 0.12; lk.cyl(0.04, 0.035, 0.1, 10, i % 3 ? 0x8a1a14 : 0xd8d0c0, [q.x, y + 0.05, q.z]); lk.cyl(0.042, 0.042, 0.02, 10, 0x9a9a8a, [q.x, y + 0.11, q.z]); lk.cyl(0.006, 0.006, 0.02, 4, 0x9a9a8a, [q.x, y + 0.13, q.z]); });
+    this.candles = lk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0, emissive: 0x3a1a08 })); this.candles.visible = false; C.add(this.candles);
     // smoke, steam, deer at the forest edge
     this.puffC = new Puffs(C, 360, { color: 0xc8ccd4, scale: 300 });
     this.fireC = new Puffs(C, 160, { color: 0xffa050, additive: true });
@@ -677,7 +1072,7 @@ export default class Rockets {
     for (let i = 0; i < 4; i++) { const fg = new THREE.ExtrudeGeometry(fin, { depth: 0.06, bevelEnabled: false }); fg.translate(0, 0, -0.03); k.add(fg, i % 2 ? 0x141414 : 0xd8d8d4, [0, 0, 0], [0, i * Math.PI / 2 + Math.PI / 4, 0]); }
     k.cyl(0.45, 0.55, 0.3, 12, 0x2a2a2a, [0, -0.1, 0]);
     this.v2 = new THREE.Group(); this.v2.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })));
-    this.v2Base = V3(PAD.x, 1.62, PAD.z); this.v2.position.copy(this.v2Base); this.C.add(this.v2);
+    this.v2Base = V3(PAD.x, 1.76, PAD.z);   // standing on the table's fin pads this.v2.position.copy(this.v2Base); this.C.add(this.v2);
     const fm = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     const cone = (rr, L, m) => { const cg = new THREE.CylinderGeometry(rr, 0.0, L, 14, 1, true); cg.translate(0, -L / 2, 0); return new THREE.Mesh(cg, m); };
     this.flameC = new THREE.Group(); this.flameC.position.y = -0.25; this.flameC.add(cone(0.75, 11, fm(0xff8a30, 0.55)), cone(0.45, 7, fm(0xffe8b0, 0.85)), glow(0xffa040, 14, 0.9)); this.flameC.visible = false; this.v2.add(this.flameC);
@@ -701,13 +1096,19 @@ export default class Rockets {
 
   buildPeople() {
     const add = (parent, model, pos, look = {}) => { const P = makePerson({ model, seed: 11 + parent.children.length * 3, ...look }); P.g.position.copy(pos); parent.add(P.g); return P; };
+    const fig = (parent, pos, o) => { const P = makeFigure(o); P.fig = true; P.g.position.copy(pos); parent.add(P.g); return P; };
     // Kaluga
-    this.tsi = add(this.A, 'tsiolkovsky', V3(-0.9, 0, -0.98), { tunic: 0x2a2a2a, hair: 0x8a8a8a, beard: true, height: 1.72 }); this.tsi.g.rotation.y = Math.PI;
+    this.tsi = add(this.A, 'tsiolkovsky', CHAIR.clone(), { tunic: 0x2a2a2a, hair: 0x8a8a8a, beard: true, height: 1.72 }); this.tsi.g.rotation.y = Math.PI;
     holdProp(this.tsi, this.trumpetM, 'Left', [0, 0.08, 0.03]); this.trumpetM.visible = false;
     holdProp(this.tsi, this.balloonM, 'Right', [0, 0.12, 0.03]); this.balloonM.visible = false;
     this.walkersK = [];
     for (let i = 0; i < 3; i++) {
-      const x = -40 + i * 35, P = add(this.A, 'townsman', V3(x, kalugaHeight(x, -32), -32), { height: 1.65 + (i % 2) * 0.06 });
+      // three different people (one townsman, a man in an ushanka and sheepskin, a woman in a shawl)
+      const x = -40 + i * 35, at0 = V3(x, kalugaHeight(x, -32), -32);
+      // (no 'townsman' model here: he wears a Renaissance ruff, three centuries too early for Kaluga)
+      const P = i === 1 ? fig(this.A, at0, { height: 1.71, coat: 0x2a2a2e, coatLen: 0.7, collar: 0x4a3a2a, hat: 'cap', hatCol: 0x2a2a30, moustache: true, hair: 0x3a2a1e, trousers: 0x2a2a2e, seed: 6 }) : fig(this.A, at0, i === 0
+        ? { height: 1.74, coat: 0x6a4a2a, coatLen: 0.75, collar: 0xd8c8a8, hat: 'ushanka', hatCol: 0x3a2a1e, beard: true, hair: 0x5a4a3a, boots: 0x2a2a2a, trousers: 0x2a2a30, belt: 0x2a1a10, seed: 3 }
+        : { height: 1.62, coat: 0x2a3a5a, coatLen: 1, skirt: true, hat: 'shawl', hatCol: 0x8a2a2a, scarf: null, hair: 0x6a4a2a, boots: 0x2a1e18, trousers: 0x2a1e18, seed: 9 });
       P.routine = [{ x: x + 30, z: -31, pose: 'idle', secs: 3 + i }, { x: x - 25, z: -33, pose: i % 2 ? 'talk' : 'idle', secs: 4 }];
       if (i !== 1) { const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; }
       this.walkersK.push(P);
@@ -715,20 +1116,35 @@ export default class Rockets {
     // Auburn
     const ah = (x, z) => V3(x, auburnHeight(x, z), z);
     this.god = add(this.B, 'goddard', ah(1.1, -2.9), { tunic: 0x2a2a30, height: 1.78 });
-    this.henry = add(this.B, 'townsman', ah(3.6, 2.0), { height: 1.72 });
-    this.henryTorch = makeTorch({ len: 1.8, color: 0x9ab8ff, size: 0.5 }); holdProp(this.henry, this.henryTorch, 'Right', [0, 0.02, 0.02]);
-    this.roope = add(this.B, 'townsman', ah(5.0, 1.6), { height: 1.68 });
-    this.esther = add(this.B, null, ah(4.65, -1.15), { tunic: 0x2a4a3a, hair: 0x4a3020, height: 1.62, seed: 31 });
-    const hat = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8, 0, 6.29, 0, 1.6), new THREE.MeshLambertMaterial({ color: 0x5a2a3a })); hat.position.y = 1.66; hat.scale.set(1.05, 0.8, 1.05); this.esther.inner.add(hat);
-    this.esther.g.rotation.y = -2.3;
+    // Henry Sachs, Clark University's instrument maker: a flat cap, a work jacket over overalls, a scarf
+    this.henry = fig(this.B, ah(3.6, 2.0), { height: 1.72, coat: 0x5a4a36, coatLen: 0.2, hat: 'cap', hatCol: 0x4a4440, scarf: 0x8a2a22, trousers: 0x34405a, moustache: true, hair: 0x2a2018, gloves: 0x6a5038, boots: 0x2a1e14, seed: 12 });
+    // his blowtorch pole, carried in both hands sloping up in front of him (posed every frame in updatePeopleA)
+    this.henryTorch = poleTorch(1.8); this.henry.g.add(this.henryTorch);
+    // Percy Roope with his stopwatch: no model yet, so a dressed figure (fedora, overcoat, glasses), not a second townsman
+    this.roope = fig(this.B, ah(5.0, 1.6), { height: 1.69, coat: 0x4a4038, coatLen: 0.55, hat: 'fedora', hatCol: 0x3a3430, scarf: 0x8a7a5a, glasses: true, moustache: true, hair: 0x3a2a1e, trousers: 0x3a3a3e, seed: 5 });
+    const sw = new Kit(); sw.cyl(0.028, 0.028, 0.012, 14, 0xc8c8c0, [0, 0, 0], [Math.PI / 2, 0, 0]); sw.cyl(0.024, 0.024, 0.013, 14, 0xf0ece0, [0, 0, 0.001], [Math.PI / 2, 0, 0]); sw.cyl(0.006, 0.006, 0.012, 6, 0xc8c8c0, [0, 0.033, 0]);
+    this.stopwatch = sw.mesh(FIG_MAT); this.stopwatch.position.set(0, -0.66, 0.06); this.roope.arms[0].add(this.stopwatch);
+    // Esther Goddard behind her movie camera: 1920s cloche hat, a long belted coat with a fur collar, gloves
+    this.esther = fig(this.B, ah(ESTHER.x, ESTHER.z), { height: 1.62, coat: 0x2e4a3e, coatLen: 0.82, collar: 0x5a4636, belt: 0x22362c, hat: 'cloche', hatCol: 0x6a2a3e, hatBand: 0xc8a05a, hair: 0x4a3020, longHair: false, gloves: 0x5a3a2a, trousers: 0x6a5a50, boots: 0x2a1e18, skin: 0xe0b8a0, seed: 31 });
+    this.esther.g.rotation.y = -Math.PI / 2;
     // Peenemünde: two engineers walk back to the bunker before the launch
-    this.eng = [0, 1].map((i) => { const x = PAD.x + 3 + i * 1.2, z = PAD.z + 5; return add(this.C, 'townsman', V3(x, balticHeight(x, z), z), { height: 1.7 }); });
+    // Wernher von Braun, 32, who led the team: tall, fair hair swept back, a dark double-breasted suit under a long
+    // black leather coat, no hat; he stands at the end of your parapet and watches it go (no Tripo model yet)
+    this.braun = fig(this.C, V3(-1.7, balticHeight(-1.7, -0.55), -0.55), { height: 1.86, coat: 0x1c1a1a, coatLen: 0.85, collar: null, belt: 0x141212, hair: 0xc8a868, skin: 0xe2bca4, trousers: 0x2a2a30, boots: 0x101010, gloves: 0x1a1414, scarf: 0xd8d4c8, seed: 44 });
+    this.braun.g.rotation.y = Math.PI * 0.94;
+    this.braunLab = label('Wernher von Braun', 0.12, { color: '#f2ecdc', glowCol: 'rgba(10,10,16,0.9)' }); this.braunLab.position.set(0, 2.12, 0); this.braunLab.material.opacity = 0; this.braun.g.add(this.braunLab);
+    // (two different men: an engineer in a white work coat and a hat, and one in a long field-grey coat and cap)
+    // what the Auburn people walk round: the frame, the camera and Esther, the shelter, the sawhorse, each other
+    this.obsA = [{ x: FRAME.x, z: FRAME.z, r: 0.85 }, { x: 4.5, z: -1.5, r: 0.6 }, { x: 4.3, z: 2.9, r: 1.05 }, { x: -0.9, z: 0.2, r: 0.45 }, { P: this.god, r: 0.25 }, { P: this.henry, r: 0.25 }, { P: this.roope, r: 0.25 }];
+    this.eng = [0, 1].map((i) => { const x = PAD.x + 3 + i * 1.2, z = PAD.z + 5, p0 = V3(x, balticHeight(x, z), z); return fig(this.C, p0, i
+      ? { height: 1.78, coat: 0x5a5e50, coatLen: 0.8, hat: 'fieldcap', hatCol: 0x4a4e42, belt: 0x2a2620, hair: 0x6a5a40, glasses: true, trousers: 0x4a4e42, boots: 0x161412, seed: 21 }
+      : { height: 1.7, coat: 0xd8d4c8, coatLen: 0.7, hat: 'fedora', hatCol: 0x3a3a3a, hair: 0x2a2018, trousers: 0x3a3a40, boots: 0x161412, seed: 23 }); });
   }
 
   registerInteractables() {
     const G = this.G, self = this;
     this.torchIt = {
-      hint: 'Grab the torch with GRIP and hold its flame to the rocket\'s motor', deskHint: 'Click the torch to light the rocket',
+      hint: 'Grab the torch with GRIP and touch the flame to the rocket\'s igniter', deskHint: 'Click the torch to light the rocket',
       get disabled() { return self.s.torch !== 1 || self.s.lit || self.cur !== 'auburn'; },
       reach(pos) { self.torchP.localToWorld(_a.set(0, 1.0, 0)); return Math.max(0, pos.distanceTo(_a) - 0.95); },
       aim(o, d) { self.torchP.localToWorld(_a.set(0, 1.0, 0)); _b.copy(_a).sub(o); const t = _b.dot(d); return t > 0 && _b.addScaledVector(d, -t).length() < 0.4 ? t : Infinity; },
@@ -737,14 +1153,15 @@ export default class Rockets {
         if (!h?.grip) return;
         h.grip.getWorldQuaternion(_q); _b.set(0, 0, -1).applyQuaternion(_q).add(_c.set(0, 0.6, 0)).normalize();
         self.torchP.position.copy(h.pos).addScaledVector(_b, -0.3); self.torchP.quaternion.setFromUnitVectors(UP, _b);
-        self.torchP.localToWorld(_a.set(0, 2.05, 0)); self.rk.localToWorld(_c.set(0, 2.3, 0));
-        if (_a.distanceTo(_c) < 0.45) G.act({ type: 'light' });
+        self.torchP.userData.tip.getWorldPosition(_a); self.igniterWorld(_c);
+        if (_a.distanceTo(_c) < 0.25 + 0.08) G.act({ type: 'light' });   // the flame's tip (8 cm beyond the nozzle) within 25 cm
       },
       onRelease() { self.held = null; },
       onTouch() { G.act({ type: 'light' }); },
     };
     G.interactables.push(this.torchIt);
   }
+  igniterWorld(out) { return this.rk.localToWorld(out.set(0, IGNITER_Y, 0)); }
   act(a) {
     if (a.type === 'light' && this.s.torch === 1 && !this.s.lit) { this.s.lit = 1; this.s.byYou = 1; return true; }
     return this.journal.act(a);
@@ -838,6 +1255,10 @@ export default class Rockets {
     s.scene = 'baltic'; this.setScene('baltic');
     G.events.emit('placePlayers', { x: 0, z: 0, yaw: 0 });
     await G.ui.fadeIn(2.5);
+    // the man who led the team that built it (Meem: give him his due, no more)
+    s.phase = 'vonbraun'; s.braun = 1;
+    await D.say('ch13_11');
+    s.braun = 2;
     s.phase = 'v2';
     const l9 = D.sayAsync('ch13_09');
     await D.cue('V-2'); s.v2 = 1;
@@ -952,10 +1373,10 @@ export default class Rockets {
     // the books fly round him (ch13_02)
     this.bookV = damp(this.bookV || 0, s.books ? 1 : 0, 1.5, dt);
     this.flyBooks.forEach((b, i) => {
-      const a2 = t * 0.9 + i / 6 * 6.28, c0 = _a.set(-0.9 + Math.cos(a2) * 0.6, 1.75 + Math.sin(t * 1.3 + i) * 0.12, -0.98 + Math.sin(a2) * 0.6);
+      const a2 = t * 0.9 + i / 6 * 6.28, bc = this.bookCenter, c0 = _a.set(bc.x + Math.cos(a2) * 0.6, bc.y + Math.sin(t * 1.3 + i) * 0.12, bc.z + Math.sin(a2) * 0.6);
       b.position.lerpVectors(b.userData.home, c0, ease(this.bookV)); b.rotation.set(this.bookV * Math.sin(t * 2 + i) * 0.4, Math.PI / 2 + this.bookV * a2, this.bookV * 0.3);
     });
-    this.bookGlow.position.set(-0.9, 1.75, -0.98); this.bookGlow.material.opacity = 0.6 * this.bookV;
+    this.bookGlow.position.copy(this.bookCenter); this.bookGlow.material.opacity = 0.6 * this.bookV;
     // the balloon, let go: zooms round the room, then flops onto the floor; the cat pounces
     if (s.balloon && this.balloonT == null) {
       this.balloonT = 0; dropProp(this.tsi, 'Right'); this.A.add(this.balloonM); this.balloonM.visible = true;
@@ -970,7 +1391,7 @@ export default class Rockets {
     if (!s.balloon && s.phase !== 'rocket') { if (this.balloonM.parent === this.A) this.balloonM.visible = false; }
     this.updateCat(dt, t);
     this.updateTsio(dt, t);
-    for (const P of this.walkersK) { runRoutine(P, dt, { height: kalugaHeight, speed: 0.9 }); animatePerson(P, t, dt); P.lamp?.userData.flicker(t); }
+    for (const P of this.walkersK) { runRoutine(P, dt, { height: kalugaHeight, speed: 0.9 }); (P.fig ? animateFigure : animatePerson)(P, t, dt); P.lamp?.userData.flicker(t); }
   }
 
   updateCat(dt, t) {
@@ -991,15 +1412,31 @@ export default class Rockets {
     G_cam(this.G, _c);
     const face = (yaw) => { let d = yaw - T.g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); T.g.rotation.y += d * Math.min(1, dt * 2.5); };
     this.trumpetM.visible = !!s.trumpet;
-    if (ph === 'arrive' || ph === 'verne') { face(Math.PI); T.pose = 'write'; T.look = this.sk.verne.op > 0.3 && Math.sin(t * 0.5) > 0 ? this.sk.verne.g.position : null; }
+    // he writes sitting at his desk (at the start, and again at night); otherwise he gets up and talks to you.
+    // Getting up: he slides forward off the seat and stands between chair and desk, steps out past the
+    // drawers, then walks to the rug. Sitting down is the same in reverse.
+    const wantSit = ph === 'arrive' || ph === 'verne' || ph === 'night' || ph === 'journal' || ph === 'done';
+    const route = [SEAT_FRONT, DESK_SIDE, TALK_SPOT];
+    T.sitK ??= 1; T.leg ??= 0;   // leg: 0 seated .. 3 at the talk spot (index into the route)
+    let busy = false;
+    if (wantSit) {
+      if (T.leg > 0) { const p = route[T.leg - 1]; if (walkToward(T, p.x, p.z, dt, { speed: 1.0, stop: 0.04 })) T.leg--; busy = true; }
+      else { face(Math.PI); T.sitK = Math.min(1, T.sitK + dt * 1.8); busy = T.sitK < 1; }
+    } else if (T.sitK > 0) { T.sitK = Math.max(0, T.sitK - dt * 1.8); busy = true; face(Math.PI); }
+    else if (T.leg < 3) { const p = route[T.leg]; if (walkToward(T, p.x, p.z, dt, { speed: 1.0, stop: 0.04 })) T.leg++; busy = true; }
+    if (T.leg === 0) { const k = ease(T.sitK); T.g.position.set(lerp(SEAT_FRONT.x, CHAIR.x, k), 0, lerp(SEAT_FRONT.z, CHAIR.z + 0.02, k)); }
+    this.bookCenter.set(T.g.position.x, 1.75, T.g.position.z);
+    if (busy && T.pose === 'walk') { T.look = null; }
+    else if (wantSit || busy) { T.pose = T.sitK > 0.5 ? 'write' : 'idle'; T.look = this.sk.verne.op > 0.3 && Math.sin(t * 0.5) > 0 ? this.sk.verne.g.position : null; }
     else if (ph === 'tsiol') { face(Math.atan2(_c.x - T.g.position.x, _c.z - T.g.position.z)); T.pose = s.trumpet ? 'hold' : 'talk'; T.look = _c.clone(); }
     else if (ph === 'rocket') {
-      if (!s.balloon) { this.balloonM.visible = s.rocket >= 1; }
       face(Math.atan2(1.25 - T.g.position.x, -1.05 - T.g.position.z)); T.pose = s.balloon ? (this.balloonT > 2.6 ? 'cheer' : 'gasp') : 'point'; T.pointAt.copy(this.sk.rocket.g.position); T.look = s.balloon ? this.balloonM.position.clone() : this.sk.rocket.g.position.clone();
     }
-    else if (ph === 'math') { face(Math.PI * 0.85); T.pose = s.cradle ? 'write' : 'point'; T.pointAt.copy(this.stages[1].g.position); T.look = s.cradle ? null : T.pointAt.clone(); }
+    else if (ph === 'math') { face(Math.atan2(-2.1 - T.g.position.x, -1.25 - T.g.position.z)); T.pose = s.cradle ? 'talk' : 'point'; T.pointAt.copy(this.stages[1].g.position); T.look = s.cradle ? this.sk.cradle.g.position.clone() : T.pointAt.clone(); }
     else { face(Math.PI * 1.15); T.pose = 'idle'; T.look = this.sk.station.g.position; }
+    if (ph === 'rocket' && !s.balloon) this.balloonM.visible = s.rocket >= 1;
     animatePerson(T, t, dt);
+    sitPose(T, ease(T.sitK), SEAT_Y);
   }
 
   updateAuburn(dt, t, fast) {
@@ -1014,9 +1451,23 @@ export default class Rockets {
     this.torchGlow.material.opacity = yours ? 0.35 + 0.25 * Math.sin(t * 5) : 0;
     this.torchP.visible = !G.kids || false;
     if (!this.held) { this.torchP.position.copy(this.torchHome.pos); this.torchP.rotation.copy(this.torchHome.rot); }
-    this.torchFlame.material.opacity = yours || this.held ? 0.9 : 0;
-    // the launch
-    if (s.lit && this.fT == null) { this.fT = 0; this.heldDrop = true; this.held = null; }
+    this.torchFlame.material.opacity = yours || this.held ? 0.9 : 0; this.torchP.userData.flicker(t, yours || this.held ? 1 : 0);
+    // the igniter marker (Adults, when it is yours to light)
+    this.ignMark.visible = yours; if (yours) { const pk = 0.5 + 0.5 * Math.sin(t * 6); this.ignRing.scale.setScalar(0.8 + 0.5 * pk); this.ignRing.material.opacity = 0.9 - 0.6 * pk; this.ignMark.children[0].material.opacity = 0.5 + 0.4 * pk; }
+    // the blowtorch roars while it burns near you (yours, or Henry's on its way to the rocket)
+    const henryBurning = G.kids || s.henry >= 1;
+    if (G.audio.ctx && !s.lit && ((yours && this.held) || (henryBurning && s.henry >= 1))) {
+      this.hissT = (this.hissT || 0) - dt;
+      if (this.hissT <= 0) { this.hissT = 0.4; const src = this.held ? this.torchP.userData.tip : this.henryTorch.userData.tip; src.getWorldPosition(_a); G.audio.noise(G.audio.out(_a.clone(), 0.35, 2), { type: 'bandpass', f: 700 + Math.random() * 300, q: 0.8, peak: 0.5, a: 0.08, d: 0.45 }); }
+    }
+    // the fuse catches: a second of sparks and smoke at the nozzle, then the motor roars and the launch follows
+    if (s.lit && this.fuseT == null) { this.fuseT = 0; this.heldDrop = true; this.held = null; if (G.audio.ctx) { const o = G.audio.out(this.rkBase, 0.8, 4); for (let i = 0; i < 14; i++) G.audio.noise(o, { type: 'highpass', f: 2000 + Math.random() * 3000, peak: 0.3 + Math.random() * 0.3, a: 0.002, d: 0.04, t0: i * 0.06 + Math.random() * 0.03 }); } }
+    if (this.fuseT != null && this.fT == null) {
+      this.fuseT += fd; this.igniterWorld(_a);
+      for (let i = 0; i < 3; i++) this.fireA.emit(_a, _b.set((Math.random() - 0.5) * 2.5, -0.5 - Math.random() * 1.5, (Math.random() - 0.5) * 2.5), 0.03, 0.01, 0.35, 1, 0.5, -3);
+      if (Math.random() < 0.5) this.puffA.emit(_a, _b.set((Math.random() - 0.5) * 0.3, -0.2, (Math.random() - 0.5) * 0.3), 0.06, 0.5, 1.6, 0.5, 0.8, 0.35);
+      if (this.fuseT > 0.9) this.fT = 0;
+    }
     if (this.fT != null) this.updateLaunch(dt, t, fd);
     this.puffA.update(dt); this.fireA.update(dt);
     // the flight path, labels
@@ -1047,7 +1498,8 @@ export default class Rockets {
     else if (u < 1) {
       this.flightPos(u, this.rk.position);
       this.flightPos(Math.min(1, u + 0.02), _a); _b.copy(_a).sub(this.rk.position).normalize();
-      _c.copy(UP).lerp(_b, clamp01((u - 0.1) * 1.4)).normalize(); this.rk.quaternion.setFromUnitVectors(UP, _c);
+      if (u >= 0.999) _b.copy(this.rk.position).sub(this.flightPos(0.98, _a)).normalize();
+      this.rk.quaternion.setFromUnitVectors(UP, _b);
       if (!this.liftSnd) { this.liftSnd = true; A.ctx && whoosh(G, 2.5, 0.4, this.rkBase); this.crowsDown.visible = false; this.crowsUp.group.visible = true; this.crowsUp.center.set(-14, 3, -20); }
     } else {
       this.flightPos(1, this.rk.position); this.rk.position.y -= 0.15;
@@ -1095,7 +1547,7 @@ export default class Rockets {
     if (this.vac.visible) {
       this.vac.lookAt(_c);   // the little rocket flies across your view (its nose is +x)
       this.vacShell.material.uniforms.a.value = vv; this.vacInner.material.opacity = 0.55 * vv;
-      this.vacLabs[0].material.opacity = vv; this.vacLabs[1].material.opacity = this.vacLabs[2].material.opacity = s.vacuum === 2 ? vv : 0;
+      this.vacLabs[0].material.opacity = vv; this.vacLabs[1].material.opacity = this.vacLabs[2].material.opacity = this.vacLabs[3].material.opacity = s.vacuum === 2 ? vv : 0;
       if (s.vacuum === 2) this.vacX = (this.vacX ?? -0.22) + fd * 0.12; else this.vacX = -0.22;
       if (this.vacX > 0.26) this.vacX = -0.22;
       this.vacRocket.position.set(this.vacX, 0, 0);
@@ -1110,25 +1562,39 @@ export default class Rockets {
     const rkp = this.rk.getWorldPosition(_d).clone(); rkp.y += 1.5;
     const flying = this.fT != null && this.fT > 2.2 && !this.landed, launched = this.fT != null;
     // Goddard: checking his rocket, then back by the shelter; "All right, Henry. Light it."
-    if (ph === 'field' || ph === 'arrive' || ph === 'verne') { if (walkToward(Gd, 1.1, -2.9, dt, { height: auburnHeight })) { Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(FRAME.x - 1.1, FRAME.z + 2.9), 3, dt); Gd.pose = s.labels ? 'point' : 'work'; Gd.pointAt.copy(this.rk.localToWorld(_a.set(0, s.labels >= 3 ? 0.8 : s.labels >= 2 ? 0.4 : 2.5, 0))); Gd.look = Gd.pointAt.clone(); } }
-    else if (ph === 'ready') { if (walkToward(Gd, 3.2, 1.6, dt, { height: auburnHeight, speed: 1.2 })) { Gd.pose = 'talk'; Gd.look = H.g.position.clone().setY(1.6); G_cam(G, _a); Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(_a.x - 3.2, _a.z - 1.6), 3, dt); if (G.kids) Gd.look = rkp.clone(); } }
-    else if (ph === 'launch' && !this.landed) { walkToward(Gd, 3.2, 1.6, dt, { height: auburnHeight }); Gd.pose = flying ? 'point' : 'gasp'; Gd.pointAt.copy(rkp); Gd.look = rkp.clone(); }
-    else if (ph === 'launch' || ph === 'landed' || ph === 'descend') { if (walkToward(Gd, -14, -16, dt, { height: auburnHeight, speed: 1.4 })) { Gd.pose = s.descend ? 'point' : 'cheer'; Gd.pointAt.set(0, 60, -150); Gd.look = s.descend ? Gd.pointAt.clone() : rkp.clone(); } }
-    else { if (walkToward(Gd, -1.6, 0.3, dt, { height: auburnHeight, speed: 1.2 })) { Gd.pose = s.correction ? 'idle' : 'talk'; G_cam(G, _a); Gd.look = _a.clone(); Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(_a.x + 1.6, _a.z - 0.3), 3, dt); } }
+    if (ph === 'field' || ph === 'arrive' || ph === 'verne') { if (walkAround(Gd, 1.1, -2.9, dt, { height: auburnHeight }, this.obsA)) { Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(FRAME.x - 1.1, FRAME.z + 2.9), 3, dt); Gd.pose = s.labels ? 'point' : 'work'; Gd.pointAt.copy(this.rk.localToWorld(_a.set(0, s.labels >= 3 ? 0.8 : s.labels >= 2 ? 0.4 : 2.5, 0))); Gd.look = Gd.pointAt.clone(); } }
+    else if (ph === 'ready') { if (walkAround(Gd, 3.2, 1.6, dt, { height: auburnHeight, speed: 1.2 }, this.obsA)) { Gd.pose = 'talk'; Gd.look = H.g.position.clone().setY(1.6); G_cam(G, _a); Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(_a.x - 3.2, _a.z - 1.6), 3, dt); if (G.kids) Gd.look = rkp.clone(); } }
+    else if (ph === 'launch' && !this.landed) { walkAround(Gd, 3.2, 1.6, dt, { height: auburnHeight }, this.obsA); Gd.pose = flying ? 'point' : 'gasp'; Gd.pointAt.copy(rkp); Gd.look = rkp.clone(); }
+    else if (ph === 'launch' || ph === 'landed' || ph === 'descend') { if (walkAround(Gd, -14, -16, dt, { height: auburnHeight, speed: 1.4 }, this.obsA)) { Gd.pose = s.descend ? 'point' : 'cheer'; Gd.pointAt.set(0, 60, -150); Gd.look = s.descend ? Gd.pointAt.clone() : rkp.clone(); } }
+    else { if (walkAround(Gd, -1.6, 0.3, dt, { height: auburnHeight, speed: 1.2 }, this.obsA)) { Gd.pose = s.correction ? 'idle' : 'talk'; G_cam(G, _a); Gd.look = _a.clone(); Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(_a.x + 1.6, _a.z - 0.3), 3, dt); } }
     animatePerson(Gd, t, dt);
     // Henry: walks up with the blowtorch on its pole, lights it, hurries back
-    this.henryTorch.userData.flicker(t, 0.8);
+    this.henryTorch.userData.flicker(t, launched ? 0 : 0.8);
     this.henryTorch.visible = !(!G.kids && s.torch === 1) && !(s.byYou);
-    if (s.henry >= 1 && !launched) { if (walkToward(H, 1.1, -1.0, dt, { height: auburnHeight })) { this.henryReady = true; H.g.rotation.y = damp(H.g.rotation.y, Math.atan2(FRAME.x - 1.1, FRAME.z + 1.0), 4, dt); H.pose = s.henry >= 2 ? 'point' : 'hold'; H.pointAt.copy(this.rk.localToWorld(_a.set(0, 2.3, 0))); H.look = H.pointAt.clone(); } }
-    else if (launched && !this.landed) { if (walkToward(H, 4.0, 2.4, dt, { height: auburnHeight, speed: 2.6 })) { H.pose = flying ? 'point' : 'gasp'; H.pointAt.copy(rkp); H.look = rkp.clone(); } }
-    else if (this.landed && (ph === 'launch' || ph === 'landed' || ph === 'descend')) { if (walkToward(H, -16, -17.5, dt, { height: auburnHeight, speed: 1.6 })) { H.pose = 'cheer'; H.look = rkp.clone(); } }
+    if (s.henry >= 1 && !launched) { if (walkAround(H, HENRY_LIGHT.x, HENRY_LIGHT.z, dt, { height: auburnHeight }, this.obsA)) { this.henryReady = true; H.g.rotation.y = damp(H.g.rotation.y, Math.atan2(FRAME.x - HENRY_LIGHT.x, FRAME.z - HENRY_LIGHT.z), 4, dt); H.pose = s.henry >= 2 ? 'point' : 'hold'; H.pointAt.copy(this.igniterWorld(_a)); H.look = H.pointAt.clone(); } }
+    else if (launched && !this.landed) { if (walkAround(H, 4.0, 2.4, dt, { height: auburnHeight, speed: 2.6 }, this.obsA)) { H.pose = flying ? 'point' : 'gasp'; H.pointAt.copy(rkp); H.look = rkp.clone(); } }
+    else if (this.landed && (ph === 'launch' || ph === 'landed' || ph === 'descend')) { if (walkAround(H, -16, -17.5, dt, { height: auburnHeight, speed: 1.6 }, this.obsA)) { H.pose = 'cheer'; H.look = rkp.clone(); } }
     else if (!launched) { H.pose = 'idle'; H.look = null; H.glance = true; }
     else { H.pose = 'idle'; H.look = null; H.glance = true; }
-    animatePerson(H, t, dt);
+    animateFigure(H, t, dt);
+    // the pole: sloping up ahead of him as he walks; reaching its flame into the nozzle when he lights it
+    {
+      const TP = this.henryTorch, L = 1.8 + 0.21, reach = s.henry >= 1 && !launched && this.henryReady;
+      H.g.updateMatrixWorld(true);
+      const base = _a.set(-0.12, 1.0, 0.3), dir = _b.set(0, Math.sin(0.75), Math.cos(0.75));
+      if (reach) { const ign = H.g.worldToLocal(this.igniterWorld(_c)); const sh = _d.set(-0.1, 1.3, 0.05); dir.copy(ign).sub(sh).normalize(); base.copy(ign).addScaledVector(dir, -L); }
+      this.hDir = (this.hDir || V3(0, 0.68, 0.73)).lerp(dir, Math.min(1, dt * 3)).normalize(); this.hBase = (this.hBase || base.clone()).lerp(base, Math.min(1, dt * 3));
+      TP.position.copy(this.hBase); TP.quaternion.setFromUnitVectors(UP, this.hDir);
+      aimArm(H, 0, H.g.localToWorld(_c.copy(this.hBase).addScaledVector(this.hDir, 0.05)), dt); aimArm(H, 1, H.g.localToWorld(_c.copy(this.hBase).addScaledVector(this.hDir, 0.35)), dt);
+    }
     // Esther films; Roope times it with his stopwatch
-    E.pose = 'work'; E.look = rkp.clone(); this.crank.rotation.x = launched || s.labels ? t * 8 : 0; animatePerson(E, t, dt);
+    // Esther: eye to the viewfinder, one hand steadying the camera, the other turning its crank (two turns a second)
+    const cranking = launched || s.labels; this.crank.rotation.z = cranking ? -t * 12.5 : this.crank.rotation.z;
+    this.crankHandle.getWorldPosition(_a); aimArm(E, 0, _a, dt);
+    aimArm(E, 1, this.camGrip, dt);
+    E.inner.rotation.x = 0.08; animateFigureLegs(E, dt);   // leaning in, her eye just at the eyepiece
     Rp.g.rotation.y = damp(Rp.g.rotation.y, Math.atan2(rkp.x - Rp.g.position.x, rkp.z - Rp.g.position.z), 3, dt);
-    Rp.pose = this.landed && ph !== 'papers' ? 'cheer' : flying ? 'point' : 'hold'; Rp.pointAt.copy(rkp); Rp.look = rkp.clone(); animatePerson(Rp, t, dt);
+    Rp.pose = this.landed && ph !== 'papers' ? 'cheer' : flying ? 'point' : 'hold'; Rp.pointAt.copy(rkp); Rp.look = rkp.clone(); animateFigure(Rp, t, dt);
   }
 
   updateBaltic(dt, t, fast) {
@@ -1144,11 +1610,16 @@ export default class Rockets {
     this.eng.forEach((P, i) => {
       if (s.v2 >= 1) { if (walkToward(P, 4.5 + i * 1.3, -3.5, dt, { height: balticHeight, speed: 1.6 })) { P.pose = s.v2 === 3 ? 'point' : 'idle'; P.pointAt.copy(this.v2.position).setY(this.v2.position.y + 10); P.look = P.pointAt.clone(); P.g.rotation.y = damp(P.g.rotation.y, Math.PI, 2, dt); } }
       else { P.pose = 'work'; P.look = null; }
-      animatePerson(P, t, dt);
+      (P.fig ? animateFigure : animatePerson)(P, t, dt);
     });
+    // von Braun watches; his name while his line plays; he looks up as it climbs
+    const B2 = this.braun; this.braunLab.material.opacity = damp(this.braunLab.material.opacity, s.braun === 1 ? 1 : 0, 2.5, dt);
+    B2.pose = this.liftT != null && this.v2Y < 120 ? 'point' : 'idle'; B2.pointAt.copy(this.v2.position).setY(this.v2.position.y + 8);
+    animateFigure(B2, t, dt); B2.inner.rotation.x = this.liftT != null ? -0.08 : 0;
     // remembrance lights
     const mv = this.memV = damp(this.memV || 0, s.lights ? 1 : 0, 0.6, dt);
     this.memorial.visible = mv > 0.01 && this.C.visible;
+    this.candles.visible = this.memorial.visible; this.candles.material.opacity = clamp01(mv * 1.5);
     if (this.memorial.visible) { const M = this.memorial.userData; this.memD.forEach((q, i) => { const on = clamp01(mv * 2 - q.at), b = on * (0.7 + 0.3 * Math.sin(t * 3 + q.ph)); M.pos.set([q.x, q.y, q.z], i * 3); M.col.set([b, b * 0.75, b * 0.4], i * 3); M.size[i] = 0.12; }); M.commit(); }
     // ignition, then lift-off: up through the clouds, leaning away toward the sea
     if (s.v2 >= 2 && this.ignT == null) { this.ignT = 0; if (A.ctx) { rumble(G, 10, 0.7, this.v2Base); A.noise(A.out(this.v2Base, 1.2, 20), { type: 'lowpass', f: 900, f2: 300, q: 0.7, peak: 0.8, a: 1.5, d: 12 }); } this.deer.lead.set(-140, 0, 60); this.deer.animals.forEach((o) => { o.wait = 0; }); }

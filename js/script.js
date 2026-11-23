@@ -152,6 +152,7 @@ export const LINES = {
   ch13_07: "Two and a half seconds. Twelve meters high. It landed in a cabbage patch. That doesn't sound like much. But it was the first liquid-fuel rocket ever to fly, and every big rocket since works the same way.",
   ch13_08: "Newspapers made fun of Goddard. They said a rocket could never work in empty space, with nothing to push against. They were wrong. Almost fifty years later, as astronauts flew to the Moon, one newspaper finally said sorry.",
   ch13_09: "Then came a terrible war. In Germany, engineers built a giant rocket called the V-2. It was a weapon, and prisoners were forced to build it. But in 1944, one of them did something nothing made by people had ever done. It reached space.",
+  ch13_11: "The team that built it was led by a young engineer named Wernher von Braun.",
   ch13_10: "After the war, the rocket builders and their rockets were taken to America, and to the Soviet Union. Two rival countries now held the key to space. And the race was about to begin.",
   // Era 2, Chapter 7: Sputnik
   ch14_01: "October the fourth, 1957. Night, in the desert of Kazakhstan, in the Soviet Union. Engineers have worked in secret for weeks. On the launch pad stands the most powerful rocket ever built.",
