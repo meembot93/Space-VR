@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 26;
-export const CHANGES = ['Athens city walls and gate', 'Acropolis with the Parthenon', 'New stone well in Egypt'];
+export const VERSION = 27;
+export const CHANGES = ['High graphics for Quest 3', 'Real shadows from Sun and fire', 'Sharper view, more stars'];

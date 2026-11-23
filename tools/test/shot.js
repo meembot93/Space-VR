@@ -1,5 +1,5 @@
 // Screenshot a moment of a chapter on desktop: node shot.js <chapter> <line id> <secs after it starts> <az> <el> <out.png> [fov] [extra query]
-// Lines before <line id> are skipped. Used to check the wow moments and sky figures.
+// Lines before <line id> are skipped. PAIR=1 also saves the Graphics High version (see below). Used to check the wow moments and sky figures.
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(process.env.ROOT || path.join(__dirname, '../..'));
@@ -40,7 +40,13 @@ const [n, line, secs, az, el, out, fov = '75', q = ''] = process.argv.slice(2);
   await page.waitForTimeout(600);
   console.log(await page.evaluate(() => JSON.stringify({ mod: G.extras.mod?.constructor.name, go: G.extras.mod?.go, burst: G.extras.mod?.burst, figT: G.extras.mod?.figT, t: G.t, started: G.extras.started })));
   console.log(await page.evaluate(() => ['hunter', 'bull', 'doves'].map((f) => `${f} h=${G.skyFigures.height(f).toFixed(0)} az=${G.skyFigures.bearing(f).toFixed(0)} on=${G.skyFigures.playing(f)}`).join(' | ') + ` stars=${G.sky.starField.opacity.toFixed(2)}`));
-  await page.screenshot({ path: out });
+  // PAIR=1: the same paused moment twice, Graphics Standard (out) then High (out with _high)
+  if (process.env.PAIR) {
+    await page.evaluate(() => G.gfx.set('standard')); await page.waitForTimeout(1500);
+    await page.screenshot({ path: out });
+    await page.evaluate(() => G.gfx.set('high')); await page.waitForTimeout(2500);
+    await page.screenshot({ path: out.replace(/(\.\w+)$/, '_high$1') });
+  } else await page.screenshot({ path: out });
   if (errors.length) console.log(errors.join('\n'));
   await browser.close(); srv.close();
 })();

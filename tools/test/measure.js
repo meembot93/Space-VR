@@ -1,5 +1,5 @@
 // Graphics budget: play a chapter hands-free in the headset emulator and record the peak number of
-// triangles and draw calls.   node measure.js <chapter> [more chapters...]   (ROOT=other/checkout to measure a branch)
+// triangles and draw calls.   node measure.js <chapter> [more chapters...]   (ROOT=other/checkout to measure a branch, Q=&gfx=standard to add to the address)
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(process.env.ROOT || path.join(__dirname, '../..'));
@@ -11,7 +11,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applic
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
     await page.addInitScript({ path: require.resolve('iwer/build/iwer.min.js') });
     await page.addInitScript(() => { const d = new IWER.XRDevice(IWER.metaQuest3); d.installRuntime({ forceInstall: true }); window.__xr = d; });
-    await page.goto(`http://localhost:${srv.address().port}/index.html?fast&fulldetail&rating=kids&chapter=${n}`);
+    await page.goto(`http://localhost:${srv.address().port}/index.html?fast&fulldetail&rating=kids&chapter=${n}${process.env.Q || ''}`);
     await page.waitForFunction(() => !document.getElementById('vrBtn').disabled, null, { timeout: 20000 });
     await page.click('#vrBtn');
     await page.waitForFunction(() => window.G?.mode === 'vr' && G.director.running, null, { timeout: 15000 });

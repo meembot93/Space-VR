@@ -19,6 +19,7 @@ import { Atmosphere } from './atmosphere.js';
 import { VERSION } from './version.js';
 import { Extras } from './extras.js';
 import { SkyFigures } from './skyfigures.js';
+import { Graphics, detectLevel } from './graphics.js';
 
 const params = new URLSearchParams(location.search);
 const G = window.G = { t: 0, mode: null, params, debug: params.has('debug'), isHost: true, started: false };
@@ -31,9 +32,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
-renderer.xr.setFoveation(1);
-// Draw the headset view a bit sharper than the browser's default (closer to the Quest's real screens)
-renderer.xr.setFramebufferScaleFactor(Number(params.get('sharp')) || 1.2);
+// Sharpness, foveation and shadows come from the Graphics setting (js/graphics.js)
 document.body.appendChild(renderer.domElement);
 G.renderer = renderer;
 
@@ -44,6 +43,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+G.gfx = new Graphics(G);
 G.world = makeWorld();
 G.sky = new Sky(scene);
 G.audio = new Sound();
@@ -91,6 +91,14 @@ choice('turning', 'turn', 'snap', (v) => { G.player.smoothTurn = v === 'smooth';
 // starts, so sitting down or being small doesn't put you near the ground. Either way, holding a
 // thumbstick in for a second resets your height (js/player.js).
 choice('posture', 'posture', params.get('posture') || 'seated', (v) => G.player.setSeated(v === 'seated'));
+// Graphics: High on Quest 3 / Quest Pro / PC, Standard on Quest 2. Switching rebuilds the chapter
+// (so the characters load with the right textures).
+let gfxFirst = true;
+choice('gfx', 'gfx', params.get('gfx') || detectLevel(), (v) => {
+  G.gfx.set(v);
+  if (!gfxFirst && G.isHost && !G.started) loading = G.director.load(chapterPick).catch((e) => { note.textContent = e.message; });
+  gfxFirst = false;
+});
 choice('subs', 'subs', 'on', (v) => { G.ui.subsOn = v === 'on'; G.ui.subtitle(G.ui.subText || ''); });
 
 // Chapter list: only chapters that are built can be picked
@@ -262,7 +270,7 @@ function chapterEnded() {
   }, 6000);
 }
 G.events.on('chapterEnd', chapterEnded);
-G.events.on('chapterStart', (d) => G.music.play('ch' + d.n));
+G.events.on('chapterStart', (d) => { G.music.play('ch' + d.n); G.gfx.reset(); });
 G.events.on('chapterEnd', () => G.music.stop(5));
 
 // ---------- Play with friends ----------
@@ -389,6 +397,9 @@ function tick() {
   camera.getWorldDirection(_b); _c.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(_q));
   G.audio.setListener(_a, _b, _c, G.t);
   G.flight.update(dt);
-  renderer.render(G.flight.active ? G.flight.scene : scene, camera);
+  const view = G.flight.active ? G.flight.scene : scene;
+  G.gfx.beforeRender(view, camera, dt);
+  renderer.render(view, camera);
+  G.gfx.afterRender();
 }
 renderer.setAnimationLoop(tick);
