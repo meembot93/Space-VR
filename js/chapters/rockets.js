@@ -625,7 +625,7 @@ export default class Rockets {
     for (const [x, z] of [[-16, PAD.z + 18], [17, PAD.z + 20]]) { const y = balticHeight(x, z); k.box(0.3, 10, 0.3, 0x3a3a36, [x, y + 5, z]); k.box(1.6, 0.8, 0.6, 0x2a2a28, [x, y + 10.2, z]); }
     // your observation post: a concrete wall with sandbags, the bunker roof behind you
     k.box(7, 1.15, 0.6, 0x9a9a92, [0, 0.58, -1.4]); for (let i = 0; i < 14; i++) k.box(0.48, 0.16, 0.34, i % 2 ? 0xa89a74 : 0x9a8c68, [-3.2 + i * 0.5, 1.23, -1.45], [0, (i % 3 - 1) * 0.08, 0]);
-    k.box(7, 2.6, 0.6, 0x6a6a64, [0, 1.3, 3.2]); k.box(7.4, 0.5, 5.4, 0x6a6a64, [0, 2.85, 0.8]); for (const s of [-1, 1]) k.box(0.6, 2.6, 5, 0x707068, [s * 3.5, 1.3, 0.8]);
+    k.box(7, 2.6, 0.6, 0x6a6a64, [0, 1.3, 3.2]); k.box(7.4, 0.5, 2.6, 0x6a6a64, [0, 2.85, 2.2]); for (const s of [-1, 1]) k.box(0.6, 2.6, 2.6, 0x707068, [s * 3.5, 1.3, 2.0]);
     C.add(k.mesh());
     // the erector beside the rocket: a lattice tower that lowers away before launch
     const ek = new Kit(), EC = 0x4a5048;
