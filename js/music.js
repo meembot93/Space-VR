@@ -10,8 +10,8 @@ const DIR = new URL('../sounds/music/', import.meta.url).href;
 
 // Where each chapter's music starts. `line`: when Astra says that line, `at`: optionally wait until
 // she reaches that word or phrase (or a fraction, 0.5 = halfway). `when`: or start when the chapter's
-// state says so (for moments with no narration, like a launch). Ch14's liftoff music is started by
-// the chapter itself (G.music.sting), so its entry here is the second piece, near the end.
+// state says so (for moments with no narration, like a launch). `file`: play this file instead of
+// the one sounds/music/index.json lists for the chapter.
 const MOMENTS = {
   ch1: { line: 'ch1_04' },                                  // "Look up": the Milky Way and thousands of stars
   ch2: { line: 'ch2_08' },                                  // the midsummer sunbeam shines into the circle
@@ -26,7 +26,7 @@ const MOMENTS = {
   ch11: { when: (ch) => ch.s?.phase === 'moon' && ch.s?.scope === 1 }, // the moment you look through the telescope at the Moon (Meem's model moment)
   ch12: { when: (ch) => ch.s?.phase === 'cannon' && ch.s?.mtn === 1 }, // Newton's cannon on the tall mountain appears (Meem's pick)
   ch13: { line: 'ch13_01', at: 'how do you get there' },  // right at the start, dreaming of space (Meem's pick); none for Goddard or the V-2
-  ch14: { line: 'ch14_11' },                                // "something made by people was up there, looking back down"
+  ch14: { when: (ch) => ch.s?.phase === 'liftoff', file: 'sputnik_launch.mp3', vol: 0.95 }, // the instant the countdown ends and the rocket lifts off (Meem's pick)
 };
 const SCORE_SECS = 50; // how long the generated score plays at a moment (when there's no music file)
 
@@ -72,18 +72,20 @@ export class Music {
   play(name) {
     this.stop(3);
     this.armed = MOMENTS[name] ? { name, ...MOMENTS[name] } : null;
-    if (this.armed && this.G.audio.ctx) this.ready.then(() => { if (this.files[name]) this.preload(this.files[name]); });
+    const a = this.armed;
+    if (a && this.G.audio.ctx) this.ready.then(() => { const f = a.file || this.files[name]; if (f) this.preload(f); });
   }
 
   // The moment: play the chapter's music once
-  async moment(name, vol = 0.55) {
+  async moment(name, vol = 0.55, file = null) {
     const A = this.G.audio; if (!A.ctx) return;
     this.stop(1.5);
     await this.ready;
     const ctx = A.ctx, out = ctx.createGain(); out.gain.value = 0.0001; out.connect(A.master);
     const cur = this.cur = { out, vol, nodes: [], name, t0: this.G.t + 3 };
-    if (this.files[name]) {
-      const buf = await this.preload(this.files[name]);
+    file ||= this.files[name];
+    if (file) {
+      const buf = await this.preload(file);
       if (this.cur !== cur) return;
       if (buf) {
         out.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 1);
@@ -236,7 +238,7 @@ export class Music {
         if (typeof f === 'string') { const txt = LINES[c.id] || ''; const i = txt.indexOf(f); f = i < 0 ? 0 : i / Math.max(1, txt.length); }
         go = G.narration.progress() >= f;
       } else go = !!a.seen; // the line ended early (skipped): start now anyway
-      if (go) { this.armed = null; this.moment(a.name); }
+      if (go) { this.armed = null; this.moment(a.name, a.vol, a.file); }
     }
     const c = this.cur; if (!c || !G.audio.ctx) return;
     const S = this.stingCur, talking = S ? S.duck : G.narration.cur ? 0.7 : 1;

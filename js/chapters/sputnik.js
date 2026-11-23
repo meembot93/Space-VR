@@ -9,7 +9,7 @@
 // 2. You ride the lift up the service tower to the nose. The nose fairing opens: inside is Sputnik,
 //    a polished ball with four long antennas, shining in the searchlights. Then it closes.
 // 3. The countdown, from the viewing spot 330 m away: the service tower lowers, sirens, the lights
-//    dim. Meem's launch music plays once (G.music.sting) so its big build lands on liftoff.
+//    dim. No music yet: Meem's launch music starts right at liftoff (MOMENTS in js/music.js).
 // 4. Liftoff: the desert flashes orange, a wall of steam and dust rolls out, the controllers rumble,
 //    the roar arrives late (sound takes about a second to cross 330 m), and the rocket climbs on a
 //    pillar of fire. High up, the four boosters fall away in a glowing cross: the "Korolev cross".
@@ -908,7 +908,6 @@ export default class Sputnik {
     await this.move(D, 'view', yawTo(bearing(-VS.x, -VS.z)), 1);
     s.phase = 'countdown'; s.trucks = 0;
     s.guide = at(bearing(-VS.x, -VS.z) - 14, 9, 3.3).toArray();
-    await G.music.sting?.('sputnik_launch.mp3', 0.95, { duck: 0.06 });
     s.count = 1;
     await D.until(() => this.cT >= 4);
     const l4 = D.sayAsync('ch14_04');
