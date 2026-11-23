@@ -30,7 +30,7 @@ const CASTLE = new THREE.Vector3(0, 0, -34);   // Uraniborg's middle
 const QUAD = new THREE.Vector3(-2.6, 0, -1.2); // the mural quadrant's corner (its arc faces east)
 const SIGHT_T = 40;
 // the parallax demo's layout (metres, in its own little frame): Earth's middle, the Moon, the sky's arc, the new star
-const PE = -0.75, PM = -0.2, SKY_R = 1.75, NS = new THREE.Vector2(0.18, PE + Math.sqrt(SKY_R * SKY_R - 0.18 * 0.18));
+const PE = -0.75, PM = -0.2, SKY_R = 1.75, NS = new THREE.Vector2(1.05, PE + Math.sqrt(SKY_R * SKY_R - 1.05 * 1.05));
 function skyHit(w, d) {   // where a line from w along d meets the sky's arc (a circle of radius SKY_R round the Earth)
   const ox = w.x, oy = w.y - PE, b = ox * d.x + oy * d.y, c = ox * ox + oy * oy - SKY_R * SKY_R, t = -b + Math.sqrt(b * b - c);
   return new THREE.Vector2(w.x + d.x * t, w.y + d.y * t);
@@ -372,21 +372,30 @@ export default class Tycho {
     new THREE.TextureLoader().load(new URL('../../data/earth.jpg', import.meta.url).href, (t) => { t.colorSpace = THREE.SRGBColorSpace; earth.material.map = t; earth.material.color.setHex(0xffffff); earth.material.needsUpdate = true; });
     earth.position.set(0, PE, 0);
     const moon = new THREE.Mesh(new THREE.SphereGeometry(0.045, 20, 14), new THREE.MeshBasicMaterial({ color: 0xd8dce8, transparent: true, fog: false })); moon.position.set(0, PM, 0);
-    this.parPts = glowPoints(900, { sizeScale: 300 }); M.add(earth, moon, this.parPts);
+    this.parPts = glowPoints(900, { sizeScale: 900 }); M.add(earth, moon, this.parPts);
+    // a round dark window of night with a gold rim, so the drawing stands clear of the real sky behind it
+    const back = new THREE.Mesh(new THREE.CircleGeometry(2.05, 64), new THREE.MeshBasicMaterial({ color: 0x050914, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false }));
+    back.position.set(0, -0.2, -0.06);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(2.05, 2.1, 96), new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false }));
+    rim.position.copy(back.position); M.add(back, rim); this.parBack = [back, rim];
+    earth.material.toneMapped = moon.material.toneMapped = false;
+    // drawn last, over the real sky's stars and the ground, so nothing shows through the window
+    back.renderOrder = 30; rim.renderOrder = 31; earth.renderOrder = moon.renderOrder = 32; this.parPts.renderOrder = 33;
+    for (const o of [back, rim, earth, moon, this.parPts]) o.material.depthTest = false;
     this.parEarth = earth; this.parMoon = moon;
-    const L = (txt, h, x, y, col) => { const l = label(txt, h, col ? { color: col } : undefined); l.position.set(x, y, 0.02); l.material.opacity = 0; M.add(l); return l; };
+    const L = (txt, h, x, y, col) => { const l = label(txt, h, col ? { color: col } : undefined); l.material.toneMapped = false; l.material.depthTest = false; l.renderOrder = 34; l.position.set(x, y, 0.02); l.material.opacity = 0; M.add(l); return l; };
     // where each watcher's line through the Moon lands on the sky (computed once)
     this.parW = [-1, 1].map((sd) => { const a = sd * 0.62, w = new THREE.Vector2(Math.sin(a) * 0.26, PE + Math.cos(a) * 0.26), d = new THREE.Vector2(0, PM).sub(w).normalize(); return { w, d, hit: skyHit(w, d) }; });
     const [h1, h2] = this.parW.map((q) => q.hit);
     this.parLabs = {
-      w1: L('Watcher 1', 0.1, this.parW[0].w.x - 0.32, this.parW[0].w.y - 0.02, '#a8ccff'),
-      w2: L('Watcher 2', 0.1, this.parW[1].w.x + 0.32, this.parW[1].w.y - 0.02, '#ffc090'),
-      moon: L('the Moon', 0.09, 0.2, PM, '#e8ecf8'),
-      h1: L('Watcher 1 sees the Moon here', 0.09, h1.x, h1.y + 0.1, '#a8ccff'),
-      h2: L('Watcher 2 sees it here', 0.09, h2.x, h2.y + 0.1, '#ffc090'),
-      jump: L('The Moon jumps!', 0.14, 0, Math.max(h1.y, h2.y) + 0.32),
-      star: L('The new star: the SAME spot for both', 0.11, NS.x, NS.y + 0.16),
-      cap1: L('So the new star is far, far beyond the Moon, out among the stars.', 0.1, 0, PE - 0.42),
+      w1: L('Watcher 1', 0.13, this.parW[0].w.x - 0.32, this.parW[0].w.y - 0.02, '#a8ccff'),
+      w2: L('Watcher 2', 0.13, this.parW[1].w.x + 0.32, this.parW[1].w.y - 0.02, '#ffc090'),
+      moon: L('the Moon', 0.12, 0.2, PM, '#e8ecf8'),
+      h1: L("Watcher 1's Moon", 0.11, h1.x, h1.y + 0.13, '#a8ccff'),
+      h2: L("Watcher 2's Moon", 0.11, h2.x, h2.y + 0.13, '#ffc090'),
+      jump: L('The Moon jumps!', 0.17, 0, Math.max(h1.y, h2.y) + 0.32),
+      star: L('The new star: the SAME spot for both', 0.12, NS.x - 0.2, NS.y - 0.2),
+      cap1: L('So the new star is far, far beyond the Moon, out among the stars.', 0.12, 0, PE - 0.42),
       cap2: L('The heavens CAN change. Aristotle was wrong!', 0.12, 0, PE - 0.6, '#ffe0a0'),
     };
     const ST = this.parStars = []; const r = rng(4); for (let i = 0; i < 70; i++) { const a = (r() - 0.5) * 2.2; ST.push([Math.sin(a) * SKY_R, PE + Math.cos(a) * SKY_R]); }
@@ -614,15 +623,16 @@ export default class Tycho {
     if (s.parallax && !this.parOn) {   // each showing: float it up in front of you, facing you, and start over
       this.parOn = true; this.parT = 0;
       G.camera.getWorldPosition(_a); G.camera.getWorldDirection(_b); _b.y = 0; _b.normalize();
-      M.position.copy(_a).addScaledVector(_b, 4).add(_c.set(0, 0.15, 0)); M.lookAt(_a.x, M.position.y, _a.z); M.scale.setScalar(1.8);
+      M.position.copy(_a).addScaledVector(_b, 4.4).add(_c.set(0, 0.55, 0)); M.lookAt(_a.x, M.position.y, _a.z); M.scale.setScalar(1.8);
       _c.set(-_b.z, 0, _b.x);   // Astra waits off to the side, out of the way
-      s.guide = M.position.clone().addScaledVector(_c, -2.6).add(_d.set(0, 0.6, 0)).toArray(); this.parGuide = true;
+      s.guide = M.position.clone().addScaledVector(_c, -4.4).add(_d.set(0, 0.6, 0)).toArray(); this.parGuide = true;
     }
     if (!s.parallax) { this.parOn = false; if (this.parGuide) { this.parGuide = false; s.guide = null; } }
     this.parV = damp(this.parV || 0, s.parallax ? 1 : 0, 2, dt); M.visible = this.parV > 0.01;
     if (!M.visible) return;
     const T = this.parT = (this.parT || 0) + dt * fast, V = this.parV;
     this.parEarth.material.opacity = this.parMoon.material.opacity = V;
+    this.parBack[0].material.opacity = 0.88 * V; this.parBack[1].material.opacity = 0.6 * V;
     // the steps: 1 watcher one (0-3 s), 2 watcher two and "the Moon jumps" (3-7), 3 the new star (7-11), 4 so... (11+)
     const k1 = clamp01(T / 1), k2 = clamp01((T - 3) / 1), k3 = clamp01((T - 7) / 1), k4 = clamp01((T - 11) / 1), k5 = clamp01((T - 13.5) / 1);
     const Lb = this.parLabs, op = (l, k) => { l.material.opacity = V * k; };

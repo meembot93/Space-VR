@@ -1219,7 +1219,7 @@ export const DIORAMA_LABELS = {
   6: 'Antikythera, Greece, 1901',
   7: 'Alexandria, Egypt, about 150 AD',
   8: 'Frombork, Poland, 1543',
-  9: 'Uraniborg, Hven, Denmark, 1590',
+  9: 'Uraniborg, Hven, Denmark',
   10: 'Prague, 1600',
   11: 'Venice, 1609',
   12: 'Woolsthorpe, England, 1666',
