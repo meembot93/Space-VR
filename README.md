@@ -1,9 +1,15 @@
-# Starward: Era 1, Watchers of the Sky
+# Starward
 
 A storytelling VR experience for Meta Quest, played in the Quest Browser (WebXR + three.js r170):
 a playable documentary through the history of looking up at the sky. Era 1 follows people from
 a Stone Age campfire to Ptolemy's model of the heavens, in 7 chapters, with Astra, a small glowing star,
 as your guide. Astra narrates in Meem's voice. Plan: the "Era 1 Plan: Ancient Sky Watchers" doc.
+
+**Era 2, The Telescope and the Rocket** (chapters n 8-14, shown as Era 2, Chapters 1-7) carries on
+straight after Era 1: Copernicus on his tower at Frombork, Tycho's new star and Uraniborg, Kepler's
+ellipses in Prague, Galileo's telescope in Venice and Padua, Newton's apple and cannon, the rocket
+dreamers (Tsiolkovsky, Goddard, the V-2) and the launch of Sputnik. Shared Era 2 set helpers are in
+`js/era2/common.js`; Meem's music loops are in `sounds/music/` (`index.json` maps chapter to file).
 
 ## Play
 
