@@ -23,7 +23,7 @@ const MOMENTS = {
   ch8: { line: 'ch8_04', at: 'put it in the middle' },      // Copernicus puts the Sun in the middle
   ch9: { line: 'ch9_01', at: 'and stops' },                 // Tycho sees the new star
   ch10: { line: 'ch10_05', at: 'he found it' },             // Kepler finds the ellipse
-  ch11: { line: 'ch11_07', at: 'going around' },            // Jupiter's moons: "Moons! Four moons!"
+  ch11: { when: (ch) => ch.s?.phase === 'moon' && ch.s?.scope === 1 }, // the moment you look through the telescope at the Moon (Meem's model moment)
   ch12: { line: 'ch12_07', at: 'really fast' },             // the cannonball goes all the way around: an orbit
   ch13: { when: (ch) => ch.s?.phase === 'launch' },         // Goddard's rocket lifts off
   ch14: { line: 'ch14_11' },                                // "something made by people was up there, looking back down"
