@@ -45,6 +45,10 @@ export const CHAPTER_ICONS = {
   // Kepler: an ellipse with the Sun at one focus
   10: badge(`<ellipse cx="32" cy="32" rx="21" ry="14" opacity="0.85"/><circle cx="40" cy="32" r="4.5" fill="${GOLD}" stroke="none"/>
     <circle cx="24" cy="32" r="1.6" fill="#cfd8ff" stroke="none"/><circle cx="18" cy="22" r="3" fill="#e0643a" stroke="none"/>`),
+  // Galileo: a telescope tube, Jupiter and its four moons in a row
+  11: badge(`<path d="M12 46 L34 30" stroke-width="5"/><path d="M10 48 L13 45" stroke-width="7"/>
+    <circle cx="44" cy="20" r="4.5" fill="${GOLD}" stroke="none"/><circle cx="33" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/>
+    <circle cx="38" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/><circle cx="51" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/><circle cx="56" cy="20" r="1.6" fill="#cfd8ff" stroke="none"/>`),
   // Newton: an apple, and a cannonball's orbit round a little Earth with a mountain
   12: badge(`<circle cx="32" cy="34" r="20" opacity="0.6" stroke-dasharray="3 3"/><circle cx="32" cy="34" r="12" fill="#3f7fd0" stroke="#9cc8ff"/>
     <path d="M29 23 L32 16 L35 23" fill="#8a7a60" stroke="#c8b898" stroke-width="1.6"/><circle cx="50" cy="26" r="2.4" fill="${GOLD}" stroke="none"/>

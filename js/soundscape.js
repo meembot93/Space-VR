@@ -279,6 +279,14 @@ const RECIPES = {
     { kind: 'leaves', at: V(-12, 4, 10), vol: 0.06, ref: 15, wide: true },
     { kind: 'river', at: V(235, -14, 0), vol: 0.08, ref: 60, wide: true },
   ],
+  // Era 2, Ch4: Venice (the lagoon lapping, the Piazza's crowd far below); Padua (the canal, the garden's leaves)
+  11: () => [
+    { kind: 'surf', follow: (ch, L) => V(L.x, 0, 110), vol: 0.18, ref: 80, wide: true, on: (ch) => ch.cur === 'venice' },
+    { kind: 'crowd', at: V(-70, 2, -15), vol: 0.1, ref: 50, on: (ch) => ch.cur === 'venice' },
+    { kind: 'river', follow: (ch, L) => V(L.x, 0, -62), vol: 0.1, ref: 40, wide: true, on: (ch) => ch.cur === 'padua' },
+    { kind: 'leaves', at: V(0, 4, -28), vol: 0.06, ref: 20, wide: true, on: (ch) => ch.cur === 'padua' },
+    { kind: 'crowd', at: V(0, 2, 16), vol: 0.035, ref: 20, on: (ch) => ch.cur === 'padua' },
+  ],
   // Era 2, Ch2: the bare trees round Herrevad's fields; then on Hven the sea at the cliffs, the helpers
   9: () => [
     { kind: 'leaves', at: V(-20, 5, -30), vol: 0.06, ref: 30, wide: true, on: (ch) => ch.cur === 'abbey' },
