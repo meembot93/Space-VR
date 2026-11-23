@@ -123,5 +123,10 @@
   "file": "newton.glb",
   "height": 1.7,
   "turn": 0
+ },
+ "korolev": {
+  "file": "korolev.glb",
+  "height": 1.72,
+  "turn": 0
  }
 }

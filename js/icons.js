@@ -38,4 +38,8 @@ export const CHAPTER_ICONS = {
     <circle cx="32" cy="32" r="5" fill="#3f7fd0" stroke="#9cc8ff"/>
     <circle cx="46" cy="21" r="5" stroke="#e0643a" stroke-width="1.6"/><circle cx="50" cy="19" r="2.2" fill="#e0643a" stroke="none"/>
     <circle cx="18" cy="42" r="2.6" fill="#ffd77a" stroke="none"/>`),
+  // Copernicus: the Sun in the middle, the planets' circles round it
+  8: badge(`<circle cx="32" cy="32" r="22" opacity="0.5"/><circle cx="32" cy="32" r="15" opacity="0.7"/><circle cx="32" cy="32" r="9" opacity="0.9"/>
+    <circle cx="32" cy="32" r="4.5" fill="${GOLD}" stroke="none"/>
+    <circle cx="47" cy="32" r="2.6" fill="#3f7fd0" stroke="none"/><circle cx="20" cy="17" r="2.2" fill="#e0643a" stroke="none"/>`),
 };

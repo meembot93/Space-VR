@@ -153,6 +153,12 @@ export class Atmosphere {
       R.wind = (c) => (c.sceneNow === 'sea' ? 0 : 1);
       R.windDir = new THREE.Vector3(1, 0, 0.2).normalize();
     }
+    if (n === 8) {
+      // mist lying on the Vistula Lagoon under the Moon; the candle and the brazier flicker
+      const m = makeMist(scatter(45, () => [(Math.random() - 0.5) * 900, -170 - Math.random() * 700], () => -19.4, [0.3, 1.6], [40, 90]), 0xb8c4dc);
+      this.root.add(m); this.mists.push({ m, amt: 0.7 });
+      this.fires = fireLights(ch, ['candle', 'brazierLight']);
+    }
     if (n === 7) {
       // dust turning slowly in the sunbeams of the hall
       this.motes = makeSpecks(220, 14, 0xfff0c8, 0.03); this.motes.material.opacity = 0.45; this.root.add(this.motes);

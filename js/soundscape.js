@@ -254,4 +254,11 @@ const RECIPES = {
     { kind: 'crowd', at: V(-14, 4, 0), vol: 0.07, ref: 10, on: (ch) => ch.hall?.visible !== false },
     { kind: 'crowd', at: V(14, 4, -6), vol: 0.06, ref: 10, on: (ch) => ch.hall?.visible !== false },
   ],
+  // Era 2, Ch1 (Frombork): the brazier on the tower, the lagoon lapping below, the town murmuring, leaves
+  8: () => [
+    { kind: 'fire', at: V(-1.9, 14.6, 1.9), vol: 0.3, ref: 1.5, rolloff: 1.2 },
+    { kind: 'surf', follow: (ch, L) => V(L.x, -19.6, -165), vol: 0.18, ref: 80, wide: true },
+    { kind: 'crowd', at: V(-45, -14, -100), vol: 0.05, ref: 40 },
+    { kind: 'leaves', at: V(-30, -6, -30), vol: 0.07, ref: 40, wide: true },
+  ],
 };

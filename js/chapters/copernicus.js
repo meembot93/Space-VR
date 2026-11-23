@@ -28,8 +28,8 @@ import { D2R, ease, clamp01, at, sunAt, house, windows, steppedGable, gableRoof,
 const LAT = 54.36, YEAR = 1540, SUNLON = 215;     // Frombork, early November
 const TOP = 14;                                    // the tower's top floor, metres above the hilltop
 const HALF = 3;                                    // the tower is 6 x 6 m
-const ORR = new THREE.Vector3(0, TOP + 1.85, -6.6); // where the sky model floats, out over the hillside
-const TILT = 32;                                   // ...tipped toward you so you see into it (degrees)
+const ORR = new THREE.Vector3(0, TOP + 2.7, -8.5); // where the sky model floats, out over the hillside
+const TILT = 30;                                   // ...tipped toward you so you see into it (degrees)
 const N1 = noise2(81), N2 = noise2(83);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4();
 
@@ -266,9 +266,9 @@ export default class Copernicus {
     // the parapet with merlons (gaps to look through)
     for (const [ax, az, bx, bz] of [[-HALF, -HALF, HALF, -HALF], [HALF, -HALF, HALF, HALF], [HALF, HALF, -HALF, HALF], [-HALF, HALF, -HALF, -HALF]]) {
       const len = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(-(bz - az), bx - ax);
-      k.box(len + 0.4, 1.0, 0.4, B, [(ax + bx) / 2, TOP + 0.5, (az + bz) / 2], [0, yaw, 0]);
-      k.box(len + 0.5, 0.1, 0.5, 0xa89a88, [(ax + bx) / 2, TOP + 1.03, (az + bz) / 2], [0, yaw, 0]);
-      for (let d = 0.35; d < len; d += 1.4) { const f = d / len; k.box(0.75, 0.75, 0.4, B2, [ax + (bx - ax) * f, TOP + 1.45, az + (bz - az) * f], [0, yaw, 0]); }
+      k.box(len + 0.4, 0.7, 0.4, B, [(ax + bx) / 2, TOP + 0.35, (az + bz) / 2], [0, yaw, 0]);
+      k.box(len + 0.5, 0.08, 0.5, 0xa89a88, [(ax + bx) / 2, TOP + 0.74, (az + bz) / 2], [0, yaw, 0]);
+      for (let d = 0.3; d < len; d += 1.5) { const f = d / len; k.box(0.5, 0.36, 0.4, B2, [ax + (bx - ax) * f, TOP + 0.96, az + (bz - az) * f], [0, yaw, 0]); }
     }
     // the lean-to over the desk (east side): two posts and a sloping plank roof
     const ex = HALF - 0.45;
@@ -290,7 +290,7 @@ export default class Copernicus {
     k.box(0.004, 0.25, 0.02, 0xf0f0e8, [dx + 0.19, TOP + 0.98, dz + 0.44], [0.2, 0, 0.35]);
     k.cyl(0.09, 0.09, 0.012, 16, 0xc09a40, [dx + 0.2, TOP + 0.86, dz + 0.75]);
     // the triquetrum (Ptolemy's rulers) in the north-west corner, pointed up at the sky
-    const tx = -HALF + 0.95, tz = -HALF + 0.95;
+    const tx = -HALF + 0.75, tz = -0.2;   // against the west parapet
     k.box(0.12, 2.6, 0.12, WOOD, [tx, TOP + 1.3, tz]); k.box(0.5, 0.08, 0.5, DARK, [tx, TOP + 0.04, tz]);
     k.box(0.08, 2.2, 0.06, 0x8a6a42, [tx + 0.45, TOP + 2.1, tz + 0.1], [0, 0, -0.5]);       // the sighting arm, with its two sights
     k.box(0.1, 0.1, 0.1, DARK, [tx + 0.04, TOP + 2.55, tz + 0.1]); k.box(0.06, 0.08, 0.08, DARK, [tx + 0.92, TOP + 1.2, tz + 0.1]);
@@ -393,7 +393,7 @@ export default class Copernicus {
 
   // ---------- The sky model: the planets, the Sun, the trails, the circles ----------
   buildModel() {
-    const M = this.model = new THREE.Group(); M.position.copy(ORR); M.rotation.x = TILT * D2R; M.visible = false; this.root.add(M);
+    const M = this.model = new THREE.Group(); M.position.copy(ORR); M.rotation.x = TILT * D2R; M.scale.setScalar(1.6); M.visible = false; this.root.add(M);
     this.bodies = BODIES.map((B) => {
       const g = new THREE.Group();
       const ball = new THREE.Mesh(new THREE.SphereGeometry(B.size, 20, 14), new THREE.MeshBasicMaterial({ color: B.col, transparent: true, fog: false }));
@@ -492,7 +492,7 @@ export default class Copernicus {
     await D.cue('But at night'); s.cop = 'sight';
     await l2;
     // Ptolemy's sky, floating over the lagoon: circles on circles on circles
-    s.guide = null; s.phase = 'model'; s.cop = 'look'; s.model = 1; s.k = 1;
+    s.guide = [ORR.x + 4.2, ORR.y + 1.2, ORR.z + 2]; s.phase = 'model'; s.cop = 'look'; s.model = 1; s.k = 1;
     const l3 = D.sayAsync('ch8_03');
     await D.cue('spinning circles'); s.epi = 1;
     await D.cue('Circles on circles'); s.epi = 2;
@@ -526,7 +526,7 @@ export default class Copernicus {
     await D.until(() => this.spinDone, fast ? 2 : 14);
     s.spin = 0;
     // Thirty years of quiet work (and a few friends)
-    s.phase = 'years'; s.cop = 'desk';
+    s.phase = 'years'; s.cop = 'desk'; s.guide = null;
     const l8 = D.sayAsync('ch8_08');
     s.years = 1;
     await D.cue('a few friends'); s.friend = 1;
@@ -540,7 +540,7 @@ export default class Copernicus {
     await l9;
     // The revolution begins: the drawing rises into the sky
     s.phase = 'diagram'; s.diagram = 1;
-    s.guide = at(350, 20, TOP + 12).toArray();
+    s.guide = [3.5, TOP + 3, -6];
     await D.say('ch8_10');
     await D.wait(fast ? 0.5 : 3);
     s.diagram = 0; s.guide = null;
@@ -598,7 +598,7 @@ export default class Copernicus {
   updatePeople(dt, t) {
     const G = this.G, s = this.s, C = this.cop;
     // Copernicus: at his desk writing, looking up, at the triquetrum, or talking with you
-    const deskSpot = [HALF - 1.5, 0.15], sightSpot = [-HALF + 1.6, -HALF + 1.4];
+    const deskSpot = [HALF - 1.5, 0.15], sightSpot = [-HALF + 1.6, -0.6];
     const want = s.cop === 'sight' ? sightSpot : s.book >= 1 && s.book < 3 ? [0.8, 0.9] : deskSpot;
     const arrived = walkToward(C, want[0], want[1], dt, { speed: 0.9, height: () => TOP });
     this.copBlk.x = C.g.position.x; this.copBlk.z = C.g.position.z;
