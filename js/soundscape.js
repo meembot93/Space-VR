@@ -261,6 +261,12 @@ const RECIPES = {
     { kind: 'crowd', at: V(-45, -14, -100), vol: 0.05, ref: 40 },
     { kind: 'leaves', at: V(-30, -6, -30), vol: 0.07, ref: 40, wide: true },
   ],
+  // Era 2, Ch3: Prague at night below the study window, the stove crackling
+  10: () => [
+    { kind: 'fire', at: V(2, 13.6, 1.6), vol: 0.18, ref: 1.5, rolloff: 1.2 },
+    { kind: 'crowd', at: V(50, 2, -100), vol: 0.06, ref: 40 },
+    { kind: 'river', follow: (ch, L) => V(-330, -2, L.z), vol: 0.12, ref: 120, wide: true },
+  ],
   // Era 2, Ch2: the bare trees round Herrevad's fields; then on Hven the sea at the cliffs, the helpers
   9: () => [
     { kind: 'leaves', at: V(-20, 5, -30), vol: 0.06, ref: 30, wide: true, on: (ch) => ch.cur === 'abbey' },

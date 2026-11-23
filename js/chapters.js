@@ -33,7 +33,7 @@ export const CHAPTERS = [
   // ch14_..); the title page and the flights call them Era 2, Chapters 1 to 7 (see chapterLabel).
   { n: 8, era: 2, title: 'Copernicus moves the Sun', ready: true, load: () => import('./chapters/copernicus.js') },
   { n: 9, era: 2, title: 'Tycho’s new star', ready: true, load: () => import('./chapters/tycho.js') },
-  { n: 10, era: 2, title: 'Kepler’s ellipses', ready: false, load: () => import('./chapters/kepler.js') },
+  { n: 10, era: 2, title: 'Kepler’s ellipses', ready: true, load: () => import('./chapters/kepler.js') },
   { n: 11, era: 2, title: 'Galileo’s telescope', ready: false, load: () => import('./chapters/galileo.js') },
   { n: 12, era: 2, title: 'Newton’s apple and cannon', ready: false, load: () => import('./chapters/newton.js') },
   { n: 13, era: 2, title: 'The rocket dreamers', ready: false, load: () => import('./chapters/rockets.js') },

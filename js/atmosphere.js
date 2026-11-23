@@ -159,6 +159,13 @@ export class Atmosphere {
       this.root.add(m); this.mists.push({ m, amt: 0.7 });
       this.fires = fireLights(ch, ['candle', 'brazierLight']);
     }
+    if (n === 10) {
+      // river mist along the Vltava; dust in the candlelight of the study
+      const m = makeMist(scatter(30, () => [-330 + (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 1400], () => -3, [0.3, 1.4], [40, 80]), 0xb8c4dc);
+      this.root.add(m); this.mists.push({ m, amt: 0.7 });
+      this.motes = makeSpecks(120, 4, 0xfff0c8, 0.02); this.motes.material.opacity = 0.35; this.root.add(this.motes);
+      this.fires = fireLights(ch, ['candle', 'stove']);
+    }
     if (n === 9) {
       // frost mist over Herrevad's fields; the lamp on Hven's terrace flickers
       const m = makeMist(scatter(40, () => { const a = Math.random() * 6.28, r = 30 + Math.random() * 300; return [Math.cos(a) * r, Math.sin(a) * r]; }, ground, [0.2, 1.2], [30, 60]), 0xc8d0dc);
