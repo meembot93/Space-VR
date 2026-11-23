@@ -17,11 +17,11 @@ export function modelList() {
 
 // Resolves with { scene, animations, info } for a listed model, or null if there isn't one yet.
 // Each call returns a fresh copy (meshes and materials are shared, so copies are cheap).
-export async function loadModel(name) {
+export async function loadModel(name, { sd = false } = {}) {   // sd: skip the HD version (big crowds)
   const info = (await modelList())[name];
   if (!info) return null;
   // High graphics (js/graphics.js) uses the full-texture version when there is one (info.hd)
-  const file = (globalThis.G?.gfx?.hd && info.hd) || info.file;
+  const file = (!sd && globalThis.G?.gfx?.hd && info.hd) || info.file;
   if (!cache.has(file)) cache.set(file, loader.loadAsync(DIR + file).catch((e) => { console.warn('Model failed', name, e); return null; }));
   const gltf = await cache.get(file);
   if (!gltf) return null;

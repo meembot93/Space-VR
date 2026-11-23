@@ -167,6 +167,9 @@ export const LINES = {
   ch14_10: "Remember the beep you heard at the very end of our first journey? Now you know what it was.",
   ch14_11: "For thirty thousand years, people looked up at the sky. Now, for the first time, something made by people was up there, looking back down.",
   ch14_12: "The Space Race had begun. In just twelve years, people would walk on the Moon. But that's the next part of our story.",
+  ch14_13: "Look who came to watch. Everyone who ever looked up at the sky and wondered.",
+  ch14_14: "The storytellers, the builders, the stargazers. Copernicus, Galileo, Newton. Each one stood on the shoulders of the ones who came before.",
+  ch14_15: "This rocket wasn't built by one person, or one country. It was built by all of them.",
 };
 
 // Lines spoken by someone other than Astra (a different voice in the recording)
