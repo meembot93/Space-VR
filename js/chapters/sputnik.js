@@ -26,7 +26,7 @@
 // world's origin; the site slides under you to put you at the pad, on the lift, or at the viewing spot.
 // World axes: -Z north, +X east, +Y up.
 import * as THREE from 'three';
-import { Kit, FLAT } from '../kit.js';
+import { Kit, FLAT, segs } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp } from '../people.js';
 import { makeFlock, makeSmoke, makeCloth, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
@@ -113,40 +113,127 @@ function lathe(pts, seg, colorAt, phiStart = 0, phiLen = Math.PI * 2) {
 }
 
 // ---------- The R-7 ----------
-const GREY = 0xc4c8cc, FROST = 0xeef2f6, BAND = 0x6a6e76, DARK = 0x3a3c42;
+const BAND = 0x6a6e76;
 // The core stage: narrow at the bottom (it fits between the boosters), widest at the top of the
 // boosters' cones, an hourglass at the top
 const CORE = [[0.001, 0], [0.95, 0], [1.0, 1.2], [1.05, 3], [1.15, 6], [1.3, 10], [1.45, 14], [1.48, 17], [1.48, 19.2], [1.4, 20.5], [1.3, 21.5], [1.3, 24.5], [1.38, 25.2], [1.38, 25.9], [1.06, 25.9], [0.001, 25.9]];
-const coreCol = (y) => (y < 1.3 ? DARK : y > 13 && y < 19.6 ? FROST : Math.abs(y - 20.6) < 0.25 || Math.abs(y - 24.6) < 0.2 || Math.abs(y - 10) < 0.12 ? BAND : y > 25.2 ? 0xa8acb2 : GREY);
 // A booster: a long cone to a point (its tip leans in against the core), a cylinder, a flared tail
 const BOOST = [[0.001, 0], [1.2, 0], [1.32, 0.6], [1.34, 2.5], [1.34, 4.5], [1.28, 6.5], [1.12, 9], [0.9, 11.5], [0.66, 14], [0.42, 16.2], [0.2, 18], [0.001, 19]];
-const boostCol = (y) => (y < 0.6 ? DARK : y > 6.6 && y < 14.5 ? FROST : Math.abs(y - 6.5) < 0.15 || Math.abs(y - 2.5) < 0.1 ? BAND : GREY);
 // The nose fairing over Sputnik, in two halves (north and south) that open on hinges at the bottom
 const NOSE = [[1.06, 0], [1.0, 0.9], [0.85, 1.7], [0.6, 2.5], [0.3, 3.05], [0.001, 3.35]];
 const NOSE_Y = 25.9;
 const BOOSTERS = [0, 90, 180, 270];   // bearings round the core
 const D_BASE = 2.38, D_TIP = 1.62, TILT = Math.atan((D_BASE - D_TIP) / 19);
 
-function nozzles(k, n, r, spread, y) {
-  for (let i = 0; i < n; i++) {
-    const a = (i + 0.5) / n * Math.PI * 2, x = Math.cos(a) * spread, z = Math.sin(a) * spread;
-    k.cyl(r * 0.55, r, 0.75, 10, 0x2a2a2e, [x, y - 0.38, z]);
+// The radius of a lathe profile at height y
+function rAt(prof, y) {
+  for (let i = 1; i < prof.length; i++) { const [r0, y0] = prof[i - 1], [r1, y1] = prof[i]; if (y1 > y0 && y >= y0 && y <= y1) return lerp(r0, r1, (y - y0) / (y1 - y0)); }
+  return prof[prof.length - 2][0];
+}
+// A rocket engine: the combustion chamber, the throat and the bell (open below, dark inside), hanging
+// down from y = 0. r = the bell's mouth.
+function engine(k, x, z, r, len, { chamber = true } = {}) {
+  const N = 16, bell = [[r * 0.34, 0], [r * 0.4, -len * 0.12], [r * 0.6, -len * 0.42], [r * 0.82, -len * 0.74], [r, -len], [r * 1.04, -len * 1.01]];
+  k.add(new THREE.LatheGeometry(bell.map(([a, b]) => new THREE.Vector2(a, b)), segs(N)), 0x4a4644, [x, 0, z]);
+  // inside the bell: sooty, a little warm at the throat
+  const inner = bell.slice(0, 5).map(([a, b]) => new THREE.Vector2(a * 0.93, b)).reverse();
+  k.add(new THREE.LatheGeometry(inner, segs(N)), 0x1a1614, [x, 0, z]);
+  k.add(new THREE.TorusGeometry(r * 1.02, 0.018, 4, segs(N)), 0x7a746c, [x, -len, z], [Math.PI / 2, 0, 0]);   // the stiffening ring at the lip
+  k.add(new THREE.TorusGeometry(r * 0.6, 0.014, 4, segs(N)), 0x6a645c, [x, -len * 0.42, z], [Math.PI / 2, 0, 0]);
+  if (chamber) { k.cyl(r * 0.42, r * 0.36, len * 0.3, 12, 0x5a5652, [x, len * 0.15, z]); k.cyl(r * 0.46, r * 0.46, 0.05, 12, 0x8a847a, [x, len * 0.3, z]); }
+}
+// A ring frame standing a little proud of the skin at height y
+function ringFrame(k, prof, y, col = 0x6e766c, t = 0.022) { const r = rAt(prof, y) + t * 0.5; k.add(new THREE.TorusGeometry(r, t, 4, segs(44)), col, [0, y, 0], [Math.PI / 2, 0, 0]); }
+// A raised cable tunnel running up the skin at bearing a (radians round the axis) from y0 to y1
+function tunnel(k, prof, a, y0, y1, w = 0.16, col = 0x8a9488) {
+  const s = Math.sin(a), c = Math.cos(a), pts = [y0, ...prof.map((p) => p[1]).filter((y) => y > y0 && y < y1), y1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const ya = pts[i], yb = pts[i + 1], ra = rAt(prof, ya) + 0.05, rb = rAt(prof, yb) + 0.05;
+    bar(k, new THREE.Vector3(s * ra, ya, c * ra), new THREE.Vector3(s * rb, yb, c * rb), w, col);
   }
 }
+// The painted skin: grey-green panels with seams, rivet rows and frost on the oxygen tanks.
+// L = the hull's length; seams, frost and dark are heights in metres.
+function hullTex(L, { seams = [], frost = [], dark = [], tunnels = [], panels = 16, marks = [] } = {}) {
+  return canvasTex(1024, 2048, (g, w, h) => {
+    const Y = (y) => (1 - y / L) * h, R = rng(Math.round(L * 7));
+    g.fillStyle = '#93a08f'; g.fillRect(0, 0, w, h);
+    // the panels, each a slightly different shade (as real skin panels are)
+    for (let i = 0; i < panels; i++) for (let j = 0; j < seams.length + 1; j++) {
+      const y0 = j ? seams[j - 1] : 0, y1 = j < seams.length ? seams[j] : L, v = Math.floor((R() - 0.5) * 18);
+      g.fillStyle = `rgba(${v > 0 ? '255,255,255' : '20,30,20'},${Math.abs(v) / 200})`; g.fillRect(i * w / panels, Y(y1), w / panels, Y(y0) - Y(y1));
+    }
+    // a soft weathering gradient and grime streaks down from the seams
+    for (let i = 0; i < 260; i++) { const x = R() * w, y = R() * h; g.fillStyle = `rgba(40,46,38,${0.03 + R() * 0.05})`; g.fillRect(x, y, 1 + R() * 3, 20 + R() * 120); }
+    // frost on the oxygen tanks: white, crusted, with darker cracks and streaks
+    for (const [y0, y1] of frost) {
+      const gr = g.createLinearGradient(0, Y(y1), 0, Y(y0)); gr.addColorStop(0, 'rgba(236,242,246,0.7)'); gr.addColorStop(0.08, '#e8eef2'); gr.addColorStop(0.92, '#e4eaee'); gr.addColorStop(1, 'rgba(228,234,238,0.75)');
+      g.fillStyle = gr; g.fillRect(0, Y(y1), w, Y(y0) - Y(y1));
+      for (let i = 0; i < 2600; i++) { const x = R() * w, y = Y(y0) + (Y(y1) - Y(y0)) * R(); g.fillStyle = R() < 0.5 ? 'rgba(255,255,255,0.8)' : 'rgba(170,184,196,0.45)'; g.fillRect(x, y, 1 + R() * 4, 1 + R() * 3); }
+      for (let i = 0; i < 90; i++) { const x = R() * w, y = Y(y1) + R() * (Y(y0) - Y(y1)); g.fillStyle = 'rgba(150,166,178,0.35)'; g.fillRect(x, y, 1.5, 10 + R() * 60); }
+      // ragged edges: frost reaching past the tank ends
+      for (const ye of [y0, y1]) for (let i = 0; i < 160; i++) { g.fillStyle = 'rgba(232,238,242,0.8)'; g.fillRect(R() * w, Y(ye) + (R() - 0.5) * 26, 3 + R() * 10, 2 + R() * 5); }
+    }
+    for (const [y0, y1] of dark) { g.fillStyle = '#3c3e3a'; g.fillRect(0, Y(y1), w, Y(y0) - Y(y1)); }
+    // vertical panel lines and their rivets
+    for (let i = 0; i < panels; i++) {
+      const x = i * w / panels; g.fillStyle = 'rgba(40,46,40,0.55)'; g.fillRect(x, 0, 2, h); g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(x + 2, 0, 1, h);
+      g.fillStyle = 'rgba(50,56,50,0.5)'; for (let y = 6; y < h; y += 9) { g.fillRect(x - 5, y, 2, 2); g.fillRect(x + 6, y, 2, 2); }
+    }
+    // the ring seams: a dark joint, a bright edge, and rows of rivets either side
+    for (const s of seams) {
+      const y = Y(s); g.fillStyle = 'rgba(30,34,30,0.85)'; g.fillRect(0, y - 2, w, 4); g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(0, y + 2, w, 1.5);
+      g.fillStyle = 'rgba(40,46,40,0.6)'; for (let x = 3; x < w; x += 8) { g.fillRect(x, y - 9, 2, 2); g.fillRect(x, y + 7, 2, 2); }
+    }
+    // cable tunnels (the raised ducts) leave a darker shadow line beside them
+    for (const a of tunnels) { const x = (a / (Math.PI * 2)) * w; g.fillStyle = 'rgba(30,36,30,0.35)'; g.fillRect(x - 14, 0, 6, h); }
+    // stencilled marks: little white letters and lines, as on the real thing
+    g.fillStyle = 'rgba(240,240,230,0.8)'; g.font = 'bold 22px sans-serif';
+    for (const [u, y, text] of marks) { const x = u * w; g.fillText(text, x, Y(y)); g.fillRect(x, Y(y) + 6, 40, 3); }
+  });
+}
+// A turned hull with UVs that run with height (u round, v = y / L), for the painted skin
+function hullGeo(prof, seg) {
+  const g = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), seg), L = prof[prof.length - 1][1];
+  const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) uv.setY(i, p.getY(i) / L);
+  return g;
+}
+const CORE_SEAMS = [1.2, 3, 6, 10, 13, 16.2, 19.6, 20.6, 24.6, 25.2], BOOST_SEAMS = [0.6, 2.5, 4.5, 6.5, 9, 11.5, 14.5, 17];
+// The core stage's details: four main chambers and four verniers, the tail ring, ring frames, cable tunnels
 function coreGeo() {
-  const k = new Kit(); k.parts.push(lathe(CORE, 40, coreCol));
-  nozzles(k, 4, 0.3, 0.45, 0);
-  // little vernier engines and cable ducts down the side
-  for (const a of [45, 135, 225, 315]) { const x = Math.sin(a * D2R) * 0.82, z = Math.cos(a * D2R) * 0.82; k.cyl(0.08, 0.14, 0.5, 6, 0x2a2a2e, [x, -0.2, z]); }
-  k.box(0.18, 24, 0.14, 0x9a9ea6, [0, 13, -1.45], [0.012, 0, 0]);
+  const k = new Kit();
+  for (let i = 0; i < 4; i++) { const a = (i + 0.5) / 4 * Math.PI * 2; engine(k, Math.cos(a) * 0.45, Math.sin(a) * 0.45, 0.29, 0.9); }
+  // the verniers: small swivelling engines on brackets between the main chambers' quadrants
+  for (const a of [0, 90, 180, 270]) {
+    const x = Math.sin(a * D2R) * 0.86, z = Math.cos(a * D2R) * 0.86;
+    engine(k, x, z, 0.12, 0.42, { chamber: false }); k.box(0.16, 0.14, 0.16, 0x5a5652, [x, 0.06, z]);
+  }
+  k.add(new THREE.TorusGeometry(0.96, 0.05, 6, segs(40)), 0x4a4e48, [0, 0.02, 0], [Math.PI / 2, 0, 0]);
+  k.cyl(0.9, 0.9, 0.04, 32, 0x2a2826, [0, 0.01, 0]);   // the tail's heat shield
+  for (const y of CORE_SEAMS) ringFrame(k, CORE, y);
+  for (const a of [Math.PI / 2, Math.PI * 1.5]) tunnel(k, CORE, a, 1.3, 24.5);
+  // the core's oxygen vent valves and a couple of access hatches
+  for (const a of [0.3, 3.4]) { const r = rAt(CORE, 19.8); k.cyl(0.07, 0.07, 0.2, 8, 0x5a5e58, [Math.sin(a) * (r + 0.08), 19.8, Math.cos(a) * (r + 0.08)], [Math.PI / 2, a, 0]); }
+  for (const [a, y] of [[0.9, 21.6], [2.6, 22.4], [4.2, 23.1]]) { const r = rAt(CORE, y); k.box(0.5, 0.4, 0.04, 0x828c80, [Math.sin(a) * r, y, Math.cos(a) * r], [0, a, 0]); }
   return k.geometry();
 }
+// A booster's details: four chambers and two verniers, the air rudder, ring frames, its cable tunnel
 function boosterGeo() {
-  const k = new Kit(); k.parts.push(lathe(BOOST, 32, boostCol));
-  nozzles(k, 4, 0.28, 0.48, 0);
-  // the air rudder (a small fin) on the outside, and two vernier engines
-  k.box(0.08, 1.0, 1.1, 0xa8acb0, [1.55, 0.7, 0]);
-  for (const z of [-0.6, 0.6]) k.cyl(0.07, 0.13, 0.45, 6, 0x2a2a2e, [1.0, -0.2, z]);
+  const k = new Kit();
+  for (let i = 0; i < 4; i++) { const a = (i + 0.5) / 4 * Math.PI * 2; engine(k, Math.cos(a) * 0.48, Math.sin(a) * 0.48, 0.27, 0.86); }
+  for (const z of [-0.62, 0.62]) { engine(k, 0.98, z, 0.12, 0.4, { chamber: false }); k.box(0.14, 0.12, 0.14, 0x5a5652, [0.98, 0.06, z]); }
+  k.add(new THREE.TorusGeometry(1.2, 0.05, 6, segs(36)), 0x4a4e48, [0, 0.02, 0], [Math.PI / 2, 0, 0]);
+  k.cyl(1.15, 1.15, 0.04, 28, 0x2a2826, [0, 0.01, 0]);
+  // the air rudder: a triangular fin hinged on the booster's outer side, on a small fairing
+  const fin = new THREE.Shape(); fin.moveTo(0, 0.05); fin.lineTo(0.78, 0.18); fin.lineTo(0.78, 0.5); fin.lineTo(0, 1.45); fin.closePath();
+  k.add(new THREE.ExtrudeGeometry(fin, { depth: 0.07, bevelEnabled: false }), 0x9aa496, [1.33, 0.12, -0.035]);
+  k.box(0.22, 1.5, 0.24, 0x7a8476, [1.36, 0.82, 0]);
+  for (const y of BOOST_SEAMS) ringFrame(k, BOOST, y, 0x6e766c, 0.02);
+  tunnel(k, BOOST, Math.PI / 2, 0.7, 15.5, 0.15);
+  // the ball joint at the tip that pushes on the core, and the lower strut fittings toward the core
+  k.ball(0.12, 1, 0x5a5e58, [0, 18.9, 0]);
+  for (const z of [-0.45, 0.45]) bar(k, new THREE.Vector3(-1.25, 1.3, z), new THREE.Vector3(-1.5, 1.45, z * 0.6), 0.09, 0x5a5e58);
   return k.geometry();
 }
 function noseGeo(south) {
@@ -338,6 +425,7 @@ export default class Sputnik {
       orbit: 0, clock: 0,
       pass: 0, lightLab: 0, memory: 0,
       echoes: 0, moon: 0, title: 0,
+      meet: 0, allGlow: 0,   // the crowd at the viewing spot greets you; everyone glows (ch14_15)
       journal: 0,
     };
     this.t = 0; this.F = G.params.has('fast') ? 4 : 1;
@@ -389,6 +477,7 @@ export default class Sputnik {
       G.sky.setPlace({ lat: LAT, year: YEAR, sunLon: SUNLON + 2 });
     }
     G.world.blockers = [];
+    if (name !== 'space' && !siteOn) this.flameLight.intensity = 0;
   }
   // a site-coordinates point as a world point
   W(x, y, z, out = new THREE.Vector3()) { return out.set(x, y, z).add(this.site.position); }
@@ -402,7 +491,7 @@ export default class Sputnik {
 
   // ---------- 1. The launch site ----------
   buildGround() {
-    const SIZE = 5200, SEG = 180, g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI / 2);
+    const SIZE = 5200, SEG = 120, g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI / 2);
     const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color();
     const steppe = new THREE.Color(0x857c66), scrub = new THREE.Color(0x5e5a4a), frost = new THREE.Color(0x9e9c94), road = new THREE.Color(0x4e4a44), soot = new THREE.Color(0x26221e), gravel = new THREE.Color(0x6a655c);
     const CX = -110, CZ = 260;
@@ -424,9 +513,19 @@ export default class Sputnik {
   buildPad() {
     const k = new Kit(), r = rng(5), CON = 0x8e8c86, CON2 = 0x6e6c68, STEEL = 0x7a7e86, RED = 0x9a3a2a;
     // the concrete apron, round the slot over the flame pit
-    k.box(56, APRON, 22, CON, [0, APRON / 2, 17]);
-    k.box(22, APRON, 34, CON, [-17, APRON / 2, -11]); k.box(22, APRON, 34, CON, [17, APRON / 2, -11]);
-    for (let i = -2; i <= 2; i++) { k.box(56, 0.02, 0.12, CON2, [0, APRON + 0.01, i * 11 + 17]); k.box(0.12, 0.02, 56, CON2, [i * 11, APRON + 0.01, 0]); }
+    // cast in 4 m slabs with tar-filled joints between them; each slab a slightly different shade,
+    // darker and sooty toward the flame pit, a few patched or cracked
+    for (let x = -26; x < 28; x += 4) for (let z = -26; z < 28; z += 4) {
+      if (inSlot(x, z) || inSlot(x + 2, z) || Math.abs(x) < 8 && z < 8 && z > -28) continue;
+      const soot = clamp01(1 - (Math.hypot(x, z) - 6) / 14) * 0.35, v = 0.9 + r() * 0.16 - soot, c = _col.setHex(CON).multiplyScalar(v).getHex();
+      k.box(3.94, APRON, 3.94, c, [x, APRON / 2, z]);
+      if (r() < 0.12) k.box(1 + r() * 1.5, 0.012, 0.8 + r(), _col.setHex(CON2).multiplyScalar(0.9 + r() * 0.2).getHex(), [x + (r() - 0.5) * 1.5, APRON + 0.008, z + (r() - 0.5) * 1.5], [0, r() * 3, 0]);   // a patch
+    }
+    // the narrow strips either side of the slot, out to its walls
+    for (const sx of [-1, 1]) k.box(1.7, APRON, 34, _col.setHex(CON).multiplyScalar(0.75).getHex(), [sx * 7.15, APRON / 2, -11]);
+    k.box(16, APRON, 1.7, _col.setHex(CON).multiplyScalar(0.8).getHex(), [0, APRON / 2, 7.15]);
+    // painted lines: walkways round the pad, raised a little so they never flicker
+    for (const [x, z, w, d] of [[0, 12.5, 30, 0.14], [-12.5, -4, 0.14, 33], [12.5, -4, 0.14, 33]]) k.box(w, 0.012, d, 0xb89a30, [x, APRON + 0.008, z]);
     // the slot: dark concrete walls dropping into the pit; the pit floor glows faintly red-brown with soot
     k.box(12, 0.05, 34, 0x0c0a09, [0, -0.4, -11]);
     for (const sx of [-1, 1]) k.box(0.6, 3, 34, 0x302c28, [sx * 6, -1.3, -11]);
@@ -441,7 +540,22 @@ export default class Sputnik {
     const bx = DOOR.x - 9, bz = DOOR.z;
     k.ball(12, 2, 0x6a6350, [bx, -3.5, bz], 0, [1, 0.62, 0.8]);
     k.box(1.6, 3.6, 7, CON, [DOOR.x - 0.9, 1.8, DOOR.z]); k.box(4.2, 0.5, 7.4, CON, [DOOR.x - 1.4, 3.8, DOOR.z]);
-    k.box(0.15, 2.3, 1.6, 0x3a4a3a, [DOOR.x - 0.08, 1.15, DOOR.z]); k.box(0.1, 0.12, 0.6, 0x9a9a9a, [DOOR.x, 1.1, DOOR.z + 0.4]);
+    k.box(0.15, 2.3, 1.6, 0x3a4a3a, [DOOR.x - 0.08, 1.15 + APRON, DOOR.z]); k.box(0.1, 0.12, 0.6, 0x9a9a9a, [DOOR.x, 1.1 + APRON, DOOR.z + 0.4]);
+    // the blast door's frame, its rivet straps and locking wheel, a step, a caged lamp and a sign
+    const DX = DOOR.x, DZ = DOOR.z, A = APRON;
+    for (const s of [-1, 1]) k.box(0.3, 2.7, 0.3, 0x7a7872, [DX + 0.05, A + 1.35, DZ + s * 0.95]);
+    k.box(0.32, 0.35, 2.2, 0x7a7872, [DX + 0.05, A + 2.85, DZ]);
+    for (const y of [0.35, 1.15, 1.95]) k.box(0.05, 0.1, 1.5, 0x2e3a2e, [DX + 0.01, A + y, DZ]);
+    k.add(new THREE.TorusGeometry(0.2, 0.025, 4, 12), 0x8a8a84, [DX + 0.04, A + 1.2, DZ - 0.25], [0, Math.PI / 2, 0]);
+    for (let i = 0; i < 4; i++) k.box(0.02, 0.38, 0.02, 0x8a8a84, [DX + 0.04, A + 1.2, DZ - 0.25], [i * Math.PI / 4, 0, 0]);
+    k.box(0.9, 0.16, 2.2, 0x8a8882, [DX + 0.45, A + 0.08, DZ]);
+    for (const s of [-1, 1]) k.box(2.6, 2.4, 0.4, CON, [DX + 1.0, A + 1.2, DZ + s * 3.3], [0, s * 0.25, 0]);   // wing walls
+    k.box(0.25, 0.2, 0.3, 0x2a2a2a, [DX + 0.15, A + 3.1, DZ]); k.cyl(0.09, 0.09, 0.18, 8, 0xfff0c8, [DX + 0.25, A + 2.95, DZ], [0, 0, Math.PI / 2]);
+    for (const y of [2.88, 3.02]) k.box(0.04, 0.02, 0.24, 0x2a2a2a, [DX + 0.36, A + y, DZ]);
+    k.box(0.03, 0.45, 0.7, 0xc8c0a0, [DX + 0.04, A + 2.35, DZ + 1.55]); k.box(0.035, 0.08, 0.5, 0xa03020, [DX + 0.045, A + 2.45, DZ + 1.55]);
+    k.cyl(0.25, 0.3, 3.2, 10, 0x6a6a66, [bx + 4.5, 4.4, bz + 3.4]); k.cyl(0.42, 0.42, 0.3, 10, 0x4a4a46, [bx + 4.5, 6.1, bz + 3.4]);   // the air intake
+    k.cyl(0.03, 0.03, 4, 4, 0x8a8a84, [bx + 1, 8.6, bz]);   // the lightning rod
+    for (let i = 0; i < 40; i++) { const a = r() * 6.28, d = 7 + r() * 5, x = bx + Math.cos(a) * d, z = bz + Math.sin(a) * d * 0.8; if (x > DX - 1) continue; k.ball(0.3 + r() * 0.3, 0, 0x5a5640, [x, Math.max(0.2, -3.5 + 7.4 * Math.sqrt(Math.max(0, 1 - ((x - bx) / 12) ** 2 - ((z - bz) / 9.6) ** 2))), z], 0, [1.3, 0.5, 1.1]); }
     for (const [ox, oz] of [[-6, -2], [-8, 2.5]]) { k.cyl(0.18, 0.18, 2.4, 8, 0x5a5e5a, [bx + ox + 6, 4.8, bz + oz]); k.box(0.5, 0.35, 0.35, 0x4a4e4a, [bx + ox + 6.1, 6, bz + oz]); }
     k.box(0.4, 0.4, 24, 0x3a3a3a, [DOOR.x + 6, 0.2, DOOR.z - 14], [0, 0.6, 0]);   // cable duct to the pad
     this.lampPts.push([DOOR.x + 0.3, 3.2, DOOR.z, 0.6]);
@@ -476,15 +590,26 @@ export default class Sputnik {
       T.box(X0 - x0 + 0.2, 0.12, 2.2, 0x6a6e74, [(x0 + X0) / 2 - X1, y, 0]);
       for (const sz of [-1, 1]) { T.box(X0 - x0, 0.05, 0.05, 0xd8b030, [(x0 + X0) / 2 - X1, y + 1.05, sz * 1.08]); for (let x = x0; x <= X0; x += 0.9) T.box(0.05, 1.05, 0.05, 0xd8b030, [x - X1, y + 0.52, sz * 1.08]); }
     };
-    plat(6, 3.6); plat(12, 3.0); plat(18, 1.7); plat(DECK - 0.06, 1.15);
-    T.box(X1 - X0, 0.12, 4, 0x6a6e74, [(X0 + X1) / 2 - X1, DECK - 0.06, 0]);
+    plat(6, 3.6); plat(12, 3.0); plat(18, 1.7);
+    // the top deck: open steel grating (you can see the pad far below through it), with its railings
+    const grate = (K, x0, x1, z0, z1, top) => {
+      for (const z of [z0, z1]) K.box(x1 - x0, 0.1, 0.06, 0x5a5e64, [(x0 + x1) / 2, top - 0.05, z]);
+      for (const x of [x0, x1]) K.box(0.06, 0.1, z1 - z0, 0x5a5e64, [x, top - 0.05, (z0 + z1) / 2]);
+      for (let z = z0 + 0.5; z < z1 - 0.1; z += 0.5) K.box(x1 - x0, 0.08, 0.03, 0x4a4e54, [(x0 + x1) / 2, top - 0.06, z]);
+      for (let x = x0 + 0.05; x < x1 - 0.02; x += 0.055) K.box(0.012, 0.035, z1 - z0, 0x7a7e86, [x, top - 0.0175, (z0 + z1) / 2]);
+    };
+    grate(T, 1.15 - X1, X0 - X1, -1.1, 1.1, DECK);
+    for (const sz of [-1, 1]) { T.box(X0 - 1.15, 0.05, 0.05, 0xd8b030, [(1.15 + X0) / 2 - X1, DECK + 1.05, sz * 1.08]); for (let x = 1.15; x <= X0; x += 0.9) T.box(0.05, 1.05, 0.05, 0xd8b030, [x - X1, DECK + 0.52, sz * 1.08]); T.box(X0 - 1.15, 0.12, 0.02, 0xd8b030, [(1.15 + X0) / 2 - X1, DECK + 0.06, sz * 1.1]); }
+    grate(T, X0 - X1, 0, -2, 2, DECK);
     // a little roof and a lamp at the top
     T.box(4.4, 0.15, 4.4, 0x5a5e64, [(X0 + X1) / 2 - X1, TOPY, 0]);
     this.tower = new THREE.Group(); this.tower.position.set(X1, 0, 0);
     this.tower.add(T.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })));
     this.site.add(this.tower);
     // the lift cage (you ride it): a floor plate and a frame, moving up the shaft
-    const L = new Kit(); L.box(2.4, 0.1, 2.4, 0x5a5e64, [0, -0.05, 0]);
+    const L = new Kit();
+    for (const z of [-1.2, 1.2]) L.box(2.4, 0.1, 0.06, 0x5a5e64, [0, -0.05, z]); for (const x of [-1.2, 1.2]) L.box(0.06, 0.1, 2.4, 0x5a5e64, [x, -0.05, 0]);
+    for (let z = -0.7; z < 1; z += 0.7) L.box(2.4, 0.08, 0.03, 0x4a4e54, [0, -0.06, z]); for (let x = -1.15; x < 1.18; x += 0.055) L.box(0.012, 0.035, 2.4, 0x7a7e86, [x, -0.0175, 0]);
     for (const [x, z] of [[-1.15, -1.15], [1.15, -1.15], [1.15, 1.15], [-1.15, 1.15]]) L.box(0.06, 2.4, 0.06, 0xd8b030, [x, 1.2, z]);
     L.box(2.4, 0.06, 0.06, 0xd8b030, [0, 1.05, 1.15]); L.box(0.06, 0.06, 2.4, 0xd8b030, [1.15, 1.05, 0]); L.box(2.4, 0.06, 2.4, 0x4a4e54, [0, 2.4, 0]);
     this.cage = L.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })); this.cage.position.set(LIFT0, APRON, 0); this.site.add(this.cage);
@@ -493,11 +618,17 @@ export default class Sputnik {
 
   buildRocket() {
     const R = this.rocket = new THREE.Group(); R.position.set(0, BASE, 0); this.site.add(R);
-    this.rocketMat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.35, roughness: 0.42, envMap: this.envN, envMapIntensity: 0.6 });
+    // painted metal skins (grey-green, frosted over the oxygen tanks) and the metal details over them
+    this.rocketMat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.45, envMap: this.envN, envMapIntensity: 0.7 });
+    const skin = (tex) => new THREE.MeshStandardMaterial({ map: tex, metalness: 0.4, roughness: 0.48, envMap: this.envN, envMapIntensity: 0.75 });
+    this.coreTex = hullTex(25.9, { seams: CORE_SEAMS, frost: [[13.2, 19.4]], dark: [[0, 0.3]], tunnels: [Math.PI / 2, Math.PI * 1.5], marks: [[0.1, 21.8, 'А'], [0.6, 21.8, 'А'], [0.35, 2.2, '8К71']] });
+    this.boostTex = hullTex(19, { seams: BOOST_SEAMS, frost: [[6.7, 14.3]], dark: [[0, 0.25]], tunnels: [Math.PI / 2], marks: [[0.17, 1.8, 'БВГД'], [0.3, 5.4, '↑']] });
+    this.coreSkin = skin(this.coreTex); this.boostSkin = skin(this.boostTex);
+    this.coreHull = hullGeo(CORE, 48); this.boostHull = hullGeo(BOOST, 40);
     this.coreG = coreGeo(); this.boostG = boosterGeo();
-    this.core = new THREE.Mesh(this.coreG, this.rocketMat); R.add(this.core);
+    this.core = new THREE.Mesh(this.coreHull, this.coreSkin); this.details = [new THREE.Mesh(this.coreG, this.rocketMat)]; this.core.add(this.details[0]); R.add(this.core);
     this.boosters = BOOSTERS.map((b) => {
-      const g = new THREE.Group(), m = new THREE.Mesh(this.boostG, this.rocketMat);
+      const g = new THREE.Group(), m = new THREE.Mesh(this.boostHull, this.boostSkin), dm = new THREE.Mesh(this.boostG, this.rocketMat); m.add(dm); this.details.push(dm);
       const d = at(b, D_BASE); g.position.copy(d); g.rotation.y = -b * D2R + Math.PI / 2;   // its +x points out
       m.rotation.z = TILT; g.add(m);
       const fl = flameMesh(11, 1.5); fl.position.y = -0.7; m.add(fl);
@@ -510,10 +641,22 @@ export default class Sputnik {
     this.halves = [false, true].map((south) => {
       const hinge = new THREE.Group(); hinge.position.set(0, NOSE_Y, south ? 1.06 : -1.06);
       const m = new THREE.Mesh(noseGeo(south), nm); m.position.set(0, 0, south ? -1.06 : 1.06); hinge.add(m);
+      // inside the half: ring ribs, a stiffener down the middle, the hinge fittings and the seam's lip
+      const rk = new Kit(), sg = south ? 1 : -1;
+      for (const y of [0.15, 0.9, 1.7, 2.45]) rk.add(new THREE.TorusGeometry(rAt(NOSE, y) - 0.035, 0.025, 4, segs(20), Math.PI), 0x8a8e94, [0, y, 0], [sg * Math.PI / 2, 0, 0]);
+      bar(rk, new THREE.Vector3(0, 0.1, sg * 1.0), new THREE.Vector3(0, 2.9, sg * 0.25), 0.06, 0x7a7e86);
+      for (const x of [-0.7, 0.7]) rk.box(0.14, 0.14, 0.2, 0x4a4e54, [x, 0.07, sg * 1.0]);
+      for (const x of [-1, 1]) bar(rk, new THREE.Vector3(x * 1.02, 0.02, 0), new THREE.Vector3(x * 0.3, 3.05, 0), 0.05, 0xb8bcc2);
+      m.add(rk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })));
       R.add(hinge); return { hinge, m, south };
     });
     // the adapter cone Sputnik sits on
     const ad = new Kit(); ad.cyl(0.2, 0.75, 0.9, 16, 0x9a9ea4, [0, NOSE_Y + 0.45, 0]); ad.cyl(0.25, 0.25, 0.05, 16, 0x4a4e54, [0, NOSE_Y + 0.92, 0]);
+    // its bolt ring, the separation pushers and the cable to the satellite
+    ad.add(new THREE.TorusGeometry(0.74, 0.03, 4, segs(24)), 0x6a6e74, [0, NOSE_Y + 0.02, 0], [Math.PI / 2, 0, 0]);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ad.cyl(0.018, 0.018, 0.05, 6, 0x3a3c40, [Math.sin(a) * 0.7, NOSE_Y + 0.06, Math.cos(a) * 0.7]); }
+    for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.4; ad.cyl(0.03, 0.03, 0.35, 6, 0x5a5e64, [Math.sin(a) * 0.3, NOSE_Y + 0.7, Math.cos(a) * 0.3], [0.35 * Math.cos(a), 0, -0.35 * Math.sin(a)]); }
+    bar(ad, new THREE.Vector3(0.45, NOSE_Y + 0.3, 0.1), new THREE.Vector3(0.12, NOSE_Y + 0.95, 0.12), 0.025, 0x2a2a2a);
     R.add(ad.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })));
     this.sp = makeSputnik(this.envN); this.sp.position.set(0, NOSE_Y + 1.25, 0); this.sp.userData.open(0.05); R.add(this.sp);
     this.spGlow = glowSprite(0xfff4e0, 1.2, 0); this.sp.add(this.spGlow);
@@ -523,8 +666,17 @@ export default class Sputnik {
     // The four support arms ("the tulip"): lattice booms from pivots on the pad up to the boosters'
     // shoulders. At liftoff they fall back, pulled by their counterweights.
     const AK = new Kit(), AC = 0x8a8e94;
-    truss(AK, new THREE.Vector3(0, 0, 0), new THREE.Vector3(-3.9, 15.6, 0), 0.9, 0.5, AC, { step: 1.8, leg: 0.12, br: 0.06 });
-    AK.box(1.2, 0.5, 1.2, 0x5a5e64, [-3.9, 15.8, 0]); AK.box(1.6, 1.2, 1.6, 0x4a4e54, [0.6, -0.2, 0]); AK.box(1.1, 1.6, 1.1, 0x3a3c40, [1.6, -1.2, 0]);
+    // each arm: a tall tapering lattice boom, a brace truss behind it, a hinge on the pad, a heavy
+    // counterweight that swings it back at liftoff, and a support head that cradles the rocket
+    truss(AK, new THREE.Vector3(0, 0.3, 0), new THREE.Vector3(-3.9, 15.4, 0), 1.3, 0.6, AC, { step: 1.6, leg: 0.14, br: 0.06 });
+    truss(AK, new THREE.Vector3(1.2, 0.5, 0), new THREE.Vector3(-2.2, 9.5, 0), 0.7, 0.45, 0x7e828a, { step: 1.5, leg: 0.1, br: 0.05 });
+    AK.cyl(0.22, 0.22, 2.0, 12, 0x4a4e54, [0.3, 0.35, 0], [Math.PI / 2, 0, 0]);                 // the hinge pin
+    for (const z of [-0.85, 0.85]) AK.box(0.9, 0.9, 0.18, 0x5a5e64, [0.3, 0.3, z]);           // its brackets
+    AK.box(1.6, 1.1, 1.4, 0x8a8a84, [1.6, 0.45, 0]); AK.box(1.7, 0.1, 1.5, 0x5a5e64, [1.6, 1.05, 0]); for (const y of [0.1, 0.55]) AK.box(1.66, 0.08, 1.46, 0x5a5e64, [1.6, y, 0]);   // the counterweight
+    for (const z of [-0.74, 0.74]) for (const x of [0.82, 2.38]) AK.box(0.08, 1.12, 0.08, 0x4a4e54, [x, 0.5, z]);
+    AK.box(1.4, 0.35, 1.3, 0x5a5e64, [-3.95, 15.55, 0]); AK.box(0.5, 0.5, 1.0, 0x3a3c40, [-4.4, 15.95, 0]);   // the support head and its cup
+    AK.box(0.08, 0.5, 1.3, 0xd8b030, [-3.3, 15.55, 0]);                                       // a yellow warning stripe
+    bar(AK, new THREE.Vector3(-3.4, 15.2, 0.4), new THREE.Vector3(-1.2, 7.5, 0.5), 0.12, 0x3a3a3a);   // the hydraulic line down the boom
     const armGeo = AK.geometry(), armMat = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.arms = [45, 135, 225, 315].map((b) => {
       const piv = new THREE.Group(); piv.position.copy(at(b, 6.1)).setY(APRON); piv.rotation.y = -b * D2R + Math.PI / 2;
@@ -601,7 +753,7 @@ export default class Sputnik {
       this.beamFrom.push(new THREE.Vector3(q.x, y + 25.4, q.z)); this.lampPts.push([q.x * 0.985, y + 25.4, q.z * 0.985, 3.2]);
     }
     // scrub bushes everywhere (camel thorn and saxaul)
-    for (let i = 0; i < 520; i++) {
+    for (let i = 0; i < 300; i++) {
       const a = r() * 6.28, d = 30 + Math.pow(r(), 0.7) * 900, x = Math.cos(a) * d, z = Math.sin(a) * d - 0;
       if (onApron(x, z) || distPoly(x, z, RAIL) < 5 || ROADS.some((R2) => distPoly(x, z, R2) < 6) || (Math.abs(x) < 30 && z < -20)) continue;
       const s = 0.4 + r() * 0.8; k.ball(s, 0, r() < 0.5 ? 0x5a5a3e : 0x6e6648, [x, H(x, z) + s * 0.35, z], [0, r() * 3, 0], [1.3, 0.6, 1.1]);
@@ -609,9 +761,23 @@ export default class Sputnik {
     // the viewing spot: a low concrete wall, a field table with telephones, a loudspeaker on a pole
     const vy = 0, vb = bearing(-VS.x, -VS.z), fx = Math.sin(vb * D2R), fz = -Math.cos(vb * D2R), rx = -fz, rz = fx;
     const V = (f, s, y = 0) => [VS.x + fx * f + rx * s, vy + y, VS.z + fz * f + rz * s];
-    k.box(14, 0.9, 0.6, 0x5e5c56, V(4.5, 0, 0.45), [0, -vb * D2R, 0]);
-    k.box(1.6, 0.06, 0.8, 0x5a4a3a, V(1.5, -3.2, 0.8), [0, -vb * D2R, 0]); for (const [a, b] of [[-0.7, -0.3], [0.7, -0.3], [-0.7, 0.3], [0.7, 0.3]]) k.box(0.05, 0.8, 0.05, 0x2a2a2a, V(1.5 + b, -3.2 + a, 0.4));
-    k.box(0.25, 0.15, 0.2, 0x1a1a1a, V(1.5, -3.5, 0.9)); k.box(0.25, 0.15, 0.2, 0x3a2a1a, V(1.6, -2.9, 0.9));
+    // a breastwork of concrete blocks in two staggered courses, sandbags along the top
+    const vr = -vb * D2R;
+    const BL = 14 / 12;
+    for (let c = 0; c < 2; c++) for (let i = 0; i <= 12; i++) {
+      const a = Math.max(-7, -7 + (i - (c ? 0.5 : 0)) * BL), b = Math.min(7, a + (c && i === 0 ? BL / 2 : BL));
+      if (b - a < 0.1) continue;
+      k.box(b - a - 0.03, 0.43, 0.6, _col.setHex(0x6e6c66).multiplyScalar(0.85 + r() * 0.25).getHex(), V(4.5, (a + b) / 2, 0.22 + c * 0.45), [0, vr, 0]);
+    }
+    for (let i = 0; i < 18; i++) k.ball(0.32, 1, _col.setHex(0x8a7a58).multiplyScalar(0.85 + r() * 0.25).getHex(), V(4.5 + (r() - 0.5) * 0.12, -6.6 + i * 0.78, 1.02), [0, vr + (r() - 0.5) * 0.3, 0], [1.25, 0.42, 0.85]);
+    // the field table behind you, with two field telephones, a map case and a thermos
+    const tb = (f, sd, y) => V(-2.6 + f, -1.2 + sd, y);
+    k.box(1.6, 0.05, 0.8, 0x5a4a3a, tb(0, 0, 0.78), [0, vr, 0]); for (const [a, b] of [[-0.7, -0.3], [0.7, -0.3], [-0.7, 0.3], [0.7, 0.3]]) k.box(0.05, 0.76, 0.05, 0x2a2a2a, tb(b, a, 0.38));
+    k.box(0.25, 0.15, 0.2, 0x1a1a1a, tb(0, -0.4, 0.88), [0, vr, 0]); k.box(0.25, 0.15, 0.2, 0x3a2a1a, tb(0.1, 0.3, 0.88), [0, vr, 0]);
+    k.box(0.5, 0.03, 0.4, 0xc8b890, tb(-0.1, -0.05, 0.82), [0, vr + 0.2, 0]); k.cyl(0.05, 0.05, 0.3, 10, 0x3a5a3a, tb(0.2, 0.6, 0.95));
+    // a field lamp on a pole at the end of the wall
+    k.cyl(0.05, 0.06, 3.2, 6, 0x3a3a3a, V(4.0, -7.6, 1.6)); k.box(0.7, 0.05, 0.05, 0x3a3a3a, V(4.0, -7.3, 3.15), [0, vr + Math.PI / 2, 0]); k.cyl(0.12, 0.2, 0.18, 10, 0x2a3a2a, V(4.0, -7.0, 3.05));
+    this.viewLampPos = new THREE.Vector3(...V(4.0, -7.0, 2.9)); this.lampPts.push([...V(4.0, -7.0, 2.92), 0.5]);
     k.cyl(0.08, 0.1, 6, 5, 0x4a3a2a, V(-3, 11, 3)); k.cyl(0.35, 0.12, 0.8, 8, 0x6a6e74, V(-3, 11, 5.8), [Math.PI / 2 - 0.2, -vb * D2R + Math.PI, 0]);
     // a jeep parked behind
     jeep(k, V(-5, 3.5), -vb * D2R + 0.6);
@@ -658,30 +824,53 @@ export default class Sputnik {
     // Korolev: waits in the bunker, then walks out to look up at his rocket
     this.korolev = add(this.site, 'korolev', DOOR.clone().setX(DOOR.x - 1.5), { height: 1.72, tunic: 0x2a2a30 });
     this.korolev.g.visible = false; this.korolev.g.rotation.y = Math.PI / 2;
-    this.tsiol = new Echo(this.G, this.site, { model: 'tsiolkovsky', tint: 0xbfd8ff, pos: new THREE.Vector3(KS.x - 1.6, 0, KS.z + 0.9), face: Math.PI - 0.5, seed: 13, look: { beard: true } });
+    // Tsiolkovsky's book, which Korolev read as a young man: it glows open beside him as he's named
+    this.book = makeBook(); this.book.position.set(KS.x - 1.1, 1.45, KS.z + 0.7); this.book.visible = false; this.site.add(this.book);
+    this.bookLab = label("Tsiolkovsky's book, 1903", 0.16); this.bookLab.position.set(0, 0.42, 0); this.bookLab.material.opacity = 0; this.book.add(this.bookLab);
     this.chiefLab = label('The Chief Designer', 0.32); this.chiefLab.material.opacity = 0; this.site.add(this.chiefLab);
-    // engineers in heavy coats working round the rocket
-    const hm = [[-4, 8, 'work', 0.5], [5, 6.5, 'work', -0.4], [-6, -4, 'hold', 0.8], [11, 11, 'hold', -1.2], [-3, 14, 'talk', 3]];
+    // engineers and soldiers of the launch crew, each dressed differently, working round the rocket
+    const crew = [
+      { kind: 'jacket', coat: 0x3a4450, hat: 'ushanka', hatCol: 0x4a3e32, height: 1.76, moustache: true },
+      { kind: 'jacket', coat: 0x5a5644, hat: 'cap', hatCol: 0x2a2a2c, height: 1.68 },
+      { kind: 'greatcoat', coat: 0x4a4a3a, hat: 'peaked', hatCol: 0x4a4a3a, height: 1.8, gloves: 0x2a2420 },
+      { kind: 'greatcoat', coat: 0x2a2a2e, hat: 'fedora', hatCol: 0x3a3632, height: 1.72, glasses: true, scarf: 0x8a7a5a },
+      { kind: 'jacket', coat: 0x22262a, hat: 'beret', hatCol: 0x1a1a1e, height: 1.71, scarf: 0x6a2a24 },
+    ];
+    const hm = [[-4, 8, 'work', 0.5], [5, 6.5, 'work', -0.4], [-7.2, -4, 'hold', 0.8], [11, 11, 'hold', -1.2], [-3, 14, 'talk', 3]];
     this.eng = hm.map(([x, z, pose, face], i) => {
-      const P = add(this.site, 'townsman', new THREE.Vector3(x, APRON, z), { height: 1.66 + (i % 3) * 0.05, tunic: [0x3a3a3a, 0x4a4436, 0x2a3240, 0x5a4a3a, 0x3a3a46][i] });
+      const P = makeFolk({ seed: 11 + i * 7, ...crew[i] }); P.g.position.set(x, APRON, z); this.site.add(P.g);
       P.home = { x, z, pose, face }; P.g.rotation.y = face;
       P.routine = i < 2 ? null : [{ x, z, pose, secs: 7 + i, face }, { x: x + (i % 2 ? 6 : -5), z: z + 4, pose: 'talk', secs: 5, face: face + 1 }, { x: 8 - i * 3, z: 18, pose: 'point', secs: 4 }];
       if (i === 2) { P.lamp = makeLamp(); holdProp(P, P.lamp, 'Right', [0, 0.06, 0.03]); }
+      if (i === 3) holdProp(P, makeClipboard(), 'Left');
       return P;
     });
-    // a worker up on the service tower's middle platform
-    this.towerMan = makePerson({ model: 'townsman', seed: 41, height: 1.7 }); this.towerMan.g.position.set(4.0 - 8.6, 12, 0.4); this.towerMan.g.rotation.y = -Math.PI / 2; this.towerMan.pose = 'work'; this.tower.add(this.towerMan.g);
-    // observers at the viewing spot (shown there for the countdown)
+    // a fitter up on the service tower's middle platform
+    this.towerMan = makeFolk({ seed: 41, kind: 'jacket', coat: 0x6a5a3a, hat: 'ushanka', hatCol: 0x6a6a66, height: 1.7, gloves: 0x5a4a32 });
+    this.towerMan.g.position.set(4.0 - 8.6, 12.06, 0.4); this.towerMan.g.rotation.y = -Math.PI / 2; this.towerMan.pose = 'work'; this.tower.add(this.towerMan.g);
+    // The viewing spot: everyone from both eras has come to watch, one of each, in a loose arc round
+    // you on both sides so you see their faces and the rocket between them
     const vb = bearing(-VS.x, -VS.z), f = new THREE.Vector3(Math.sin(vb * D2R), 0, -Math.cos(vb * D2R)), rr = new THREE.Vector3(-f.z, 0, f.x);
     this.vf = f; this.vr = rr;
-    const vpos = (fw, side) => VS.clone().addScaledVector(f, fw).addScaledVector(rr, side);
-    this.obs = [[3.2, -3.4], [3.0, 2.6], [3.4, 5.0], [1.4, -6]].map(([fw, side], i) => {
-      const P = add(this.site, 'townsman', vpos(fw, side), { height: 1.68 + (i % 2) * 0.06, tunic: [0x3a3a3a, 0x2a3240, 0x4a4436, 0x3a3a46][i] });
-      P.g.rotation.y = Math.atan2(f.x, f.z); P.g.visible = false;
-      if (i < 2) holdProp(P, makeBinoculars(), 'Right', [0, 0.05, 0.05]);
+    const slot = (deg, r) => VS.clone().addScaledVector(f, Math.cos(deg * D2R) * r).addScaledVector(rr, Math.sin(deg * D2R) * r);
+    this.korolevView = slot(-30, 3.0);
+    const who = [
+      ['tsiolkovsky', 'Tsiolkovsky', -38, 4.0], ['goddard', 'Goddard', -47, 3.4], [null, 'Wernher von Braun', -58, 4.2], ['newton', 'Newton', -67, 3.3],
+      ['galileo', 'Galileo', -78, 4.1], ['kepler', 'Kepler', -88, 3.3], ['tycho', 'Tycho', -100, 4.2], ['copernicus', 'Copernicus', -112, 3.4],
+      ['storyteller', 'The storyteller', 28, 3.4], ['builder', 'A Stonehenge builder', 38, 4.0], ['priest', 'A priest of the Nile', 50, 3.3], ['skywatcher', 'A skywatcher of Babylon', 61, 4.2],
+      ['chinese_astronomer', 'A Chinese astronomer', 72, 3.4], ['eratosthenes', 'Eratosthenes', 84, 4.2], ['aristotle', 'Aristotle', 95, 3.3], ['ptolemy', 'Ptolemy', 106, 4.2], ['diver', 'The sponge diver', 118, 3.4],
+    ];
+    this.crowd = who.map(([model, name, deg, r], i) => {
+      const P = model ? makePerson({ model, sd: true, seed: 90 + i * 5 }) : makeFolk({ seed: 77, kind: 'suit', coat: 0x1c1e26, trousers: 0x1c1e26, tie: 0x2a2a44, hair: 0x5a4028, height: 1.86, hat: 'none' });
+      const p = slot(deg, r); P.g.position.copy(p).setY(siteH(p.x, p.z)); P.g.visible = false; this.site.add(P.g);
+      P.name = model || 'vonbraun'; P.home = p.clone(); P.yawR = Math.atan2(-p.x, -p.z); P.g.rotation.y = P.yawR;
+      P.lab = label(name, 0.15); P.lab.material.opacity = 0; P.lab.visible = false; this.site.add(P.lab);
+      P.halo = glowSprite(0xffd8a0, 1.5, 0); P.halo.visible = false; this.site.add(P.halo);
+      P.k = 0; P.named = -1; P.i = i;
       return P;
     });
-    this.korolevView = vpos(2.2, -1.9);
+    // who hugs whom when it flies
+    this.hugs = [['tsiolkovsky', 'goddard'], ['galileo', 'kepler'], ['storyteller', 'builder']].map(([a, b]) => [this.crowd.find((P) => P.name === a), this.crowd.find((P) => P.name === b)]);
   }
 
   buildLights() {
@@ -692,6 +881,7 @@ export default class Sputnik {
     });
     this.flameLight = new THREE.PointLight(0xff9a40, 0, 0, 1.15); this.root.add(this.flameLight);
     this.roomLight = new THREE.PointLight(0xffd8a0, 0, 9, 1.4); this.root.add(this.roomLight);
+    this.viewLight = new THREE.PointLight(0xffd8a8, 0, 22, 1.2); this.root.add(this.viewLight);
     this.root.add(this.noseLight);
   }
 
@@ -706,7 +896,9 @@ export default class Sputnik {
     pts.forEach((p, i) => { this.cities.userData.pos.set([p.x, p.y, p.z], i * 3); });
     // the ride rocket: the core stage on its own, nose and Sputnik
     const RR = this.rideRocket = new THREE.Group(); SP.group.add(RR);
-    RR.add(new THREE.Mesh(this.coreG, this.rocketMat));
+    // in sunlight out here: the same skins, lit by the space sky
+    const sMat = (m) => { const c = m.clone(); c.envMap = this.envS; c.envMapIntensity = 1.5; return c; };
+    const rc = new THREE.Mesh(this.coreHull, sMat(this.coreSkin)); rc.add(new THREE.Mesh(this.coreG, sMat(this.rocketMat))); RR.add(rc);
     this.rideFlame = flameMesh(30, 2.2); this.rideFlame.position.y = -0.7; RR.add(this.rideFlame);
     this.rideHalves = [false, true].map((south) => { const m = new THREE.Mesh(noseGeo(south), this.noseMat); m.position.y = NOSE_Y; RR.add(m); return { m, south, v: new THREE.Vector3(), spin: 0 }; });
     this.sp2 = makeSputnik(this.envS); this.sp2.userData.open(0.05); SP.group.add(this.sp2);
@@ -724,21 +916,54 @@ export default class Sputnik {
   // The radio room: a tracking station's receivers; a glowing window opens onto it out in space
   buildRadioRoom() {
     const R = this.room = new THREE.Group(); R.visible = false; this.root.add(R);
-    const k = new Kit(), W = 3.6, Hh = 2.6, Dp = 3.2;
-    k.box(W, 0.1, Dp, 0x5a4a3a, [0, -0.05, -Dp / 2]);
-    k.box(W, Hh, 0.1, 0x7a8a7a, [0, Hh / 2, -Dp]); for (const s of [-1, 1]) k.box(0.1, Hh, Dp, 0x6a7a6a, [s * W / 2, Hh / 2, -Dp / 2]);
-    k.box(W, 0.1, Dp, 0x4a4a46, [0, Hh, -Dp / 2]);
-    k.box(W, 0.9, 0.1, 0x5a6a5a, [0, 0.45, -Dp + 0.06]);
-    // the desk and the racks of receivers
-    k.box(2.8, 0.06, 0.8, 0x6a4a2a, [0, 0.78, -2.5]); k.box(2.8, 0.74, 0.05, 0x5a3a22, [0, 0.4, -2.88]);
-    for (let i = 0; i < 4; i++) { const x = -1.2 + i * 0.8; k.box(0.7, 1.4, 0.5, 0x4a5248, [x, 1.5, -2.85]); for (let j = 0; j < 3; j++) k.cyl(0.04, 0.04, 0.04, 8, 0x1a1a1a, [x - 0.2 + j * 0.2, 1.05, -2.58], [Math.PI / 2, 0, 0]); }
-    k.box(0.5, 0.3, 0.35, 0x3a3a3a, [0.8, 0.96, -2.4]); k.cyl(0.08, 0.08, 0.06, 12, 0x6a6a6a, [0.68, 1.12, -2.4], [Math.PI / 2, 0, 0]); k.cyl(0.08, 0.08, 0.06, 12, 0x6a6a6a, [0.92, 1.12, -2.4], [Math.PI / 2, 0, 0]);   // tape recorder
-    k.box(0.04, 0.6, 0.04, 0x3a3a3a, [-1.6, 2.2, -2.6]); k.box(0.9, 0.04, 0.04, 0x3a3a3a, [-1.2, 2.5, -2.6]);
-    k.box(0.5, 0.36, 0.02, 0xece4c8, [1.4, 1.8, -3.1]);   // a calendar on the wall
+    const k = new Kit(), W = 3.6, Hh = 2.6, Dp = 3.2, r = rng(53);
+    // a wooden plank floor: boards of slightly different shades, in staggered lengths, over a dark subfloor
+    k.box(W, 0.04, Dp, 0x1e1610, [0, -0.06, -Dp / 2]);
+    for (let i = 0; i < 20; i++) {
+      const x = -W / 2 + (i + 0.5) * W / 20; let z = 0, cut = 0.6 + r() * 1.6;
+      while (z > -Dp + 0.01) { const z1 = Math.max(-Dp, z - cut), c = _col.setHex(0x7a5634).multiplyScalar(0.82 + r() * 0.3).getHex(); k.box(W / 20 - 0.007, 0.04, z - z1 - 0.006, c, [x, -0.02, (z + z1) / 2]); z = z1; cut = 1.2 + r() * 1.4; }
+    }
+    // walls: painted green-grey above a darker dado, a skirting board, a ceiling with a lamp
+    k.box(W, Hh, 0.1, 0x8a9a86, [0, Hh / 2, -Dp - 0.05]); for (const s of [-1, 1]) k.box(0.1, Hh, Dp, 0x7e8e7a, [s * (W / 2 + 0.05), Hh / 2, -Dp / 2]);
+    k.box(W, 0.9, 0.03, 0x4e5e4a, [0, 0.45, -Dp + 0.015]); for (const s of [-1, 1]) k.box(0.03, 0.9, Dp, 0x4a5a46, [s * (W / 2 - 0.015), 0.45, -Dp / 2]);
+    k.box(W, 0.04, 0.05, 0x3a2a1a, [0, 0.92, -Dp + 0.03]); for (const s of [-1, 1]) k.box(0.05, 0.04, Dp, 0x3a2a1a, [s * (W / 2 - 0.03), 0.92, -Dp / 2]);
+    k.box(W, 0.1, Dp, 0xd8d4c8, [0, Hh + 0.05, -Dp / 2]);
+    k.cyl(0.01, 0.01, 0.5, 4, 0x2a2a2a, [0, Hh - 0.25, -1.8]); k.cyl(0.04, 0.22, 0.14, 12, 0x3a5a3a, [0, Hh - 0.55, -1.8]);
+    // the desk, the racks of receivers with their knobs and meters
+    k.box(2.8, 0.05, 0.8, 0x6a4a2a, [0, 0.76, -2.5]); k.box(2.8, 0.7, 0.04, 0x5a3a22, [0, 0.38, -2.88]);
+    for (const x of [-1.37, 1.37]) k.box(0.05, 0.74, 0.76, 0x5a3a22, [x, 0.37, -2.5]);
+    k.box(0.5, 0.62, 0.7, 0x5a3a22, [-1.0, 0.38, -2.5]); for (let j = 0; j < 3; j++) { k.box(0.44, 0.17, 0.01, 0x6a4a2a, [-1.0, 0.18 + j * 0.2, -2.145]); k.box(0.08, 0.02, 0.02, 0xb8a070, [-1.0, 0.2 + j * 0.2, -2.135]); }
+    for (let i = 0; i < 4; i++) {
+      const x = -1.2 + i * 0.8; k.box(0.74, 1.42, 0.45, 0x4a5248, [x, 1.5, -2.88]); k.box(0.76, 0.04, 0.47, 0x3a4038, [x, 2.22, -2.88]);
+      for (let j = 0; j < 4; j++) { k.cyl(0.035, 0.035, 0.05, 10, 0x1a1a1a, [x - 0.25 + j * 0.17, 1.05, -2.63], [Math.PI / 2, 0, 0]); k.box(0.01, 0.03, 0.01, 0xd8d8d0, [x - 0.25 + j * 0.17, 1.07, -2.6]); }
+      for (const y of [1.25, 1.65, 2.05]) k.box(0.7, 0.012, 0.01, 0x2a302a, [x, y, -2.65]);
+      for (const sx of [-0.3, 0.3]) for (const y of [1.2, 2.1]) k.cyl(0.012, 0.012, 0.02, 6, 0x9a9a90, [x + sx, y, -2.64], [Math.PI / 2, 0, 0]);
+    }
+    // a tape recorder, a telephone, a microphone, a log book and pencils, an ashtray, a mug
+    k.box(0.5, 0.18, 0.35, 0x3a3a3a, [0.85, 0.87, -2.4]); for (const x of [0.73, 0.97]) { k.cyl(0.08, 0.08, 0.02, 14, 0x5a4a3a, [x, 0.97, -2.4]); k.cyl(0.02, 0.02, 0.03, 6, 0x9a9a9a, [x, 0.98, -2.4]); }
+    k.box(0.2, 0.08, 0.16, 0x111111, [1.25, 0.82, -2.35]); k.box(0.22, 0.04, 0.05, 0x111111, [1.25, 0.89, -2.38], [0, 0, 0]);
+    k.cyl(0.05, 0.07, 0.03, 10, 0x2a2a2a, [0.2, 0.795, -2.55]); k.cyl(0.008, 0.008, 0.25, 4, 0x8a8a8a, [0.2, 0.92, -2.55]); k.cyl(0.03, 0.025, 0.08, 8, 0x5a5a5a, [0.2, 1.06, -2.53], [0.4, 0, 0]);
+    k.box(0.32, 0.02, 0.22, 0xe8e0c8, [-0.6, 0.79, -2.35], [0, 0.2, 0]); k.box(0.3, 0.012, 0.21, 0x6a2a2a, [-0.6, 0.778, -2.35], [0, 0.2, 0]);
+    for (let i = 0; i < 3; i++) k.box(0.15, 0.01, 0.01, [0xd8a030, 0x3a6a3a, 0xa03030][i], [-0.3, 0.79, -2.25 - i * 0.03], [0, 0.4 + i * 0.3, 0]);
+    k.cyl(0.05, 0.04, 0.03, 10, 0x8a8a8a, [-1.1, 0.79, -2.25]); k.cyl(0.035, 0.035, 0.09, 10, 0xd8d0c0, [-0.85, 0.83, -2.2]);
+    // two chairs: one at the desk pushed back (he jumped up), one by the wall
+    const chair = (x, z, yaw) => {
+      const c = Math.cos(yaw), sn = Math.sin(yaw), P = (a, b) => [x + a * c + b * sn, z - a * sn + b * c];
+      k.box(0.42, 0.04, 0.42, 0x6a4a2a, [P(0, 0)[0], 0.46, P(0, 0)[1]], [0, yaw, 0]);
+      for (const [a, b] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) { const q = P(a, b); k.box(0.035, 0.46, 0.035, 0x4a3220, [q[0], 0.23, q[1]]); }
+      for (const a of [-0.18, 0.18]) { const q = P(a, 0.19); k.box(0.035, 0.48, 0.035, 0x4a3220, [q[0], 0.7, q[1]], [0, yaw, 0]); }
+      const q = P(0, 0.19); k.box(0.4, 0.14, 0.025, 0x6a4a2a, [q[0], 0.84, q[1]], [0, yaw, 0]);
+    };
+    chair(-0.35, -1.25, 0.35); chair(1.45, -1.0, -1.2);
+    // on the walls: a map of the world, a clock, a calendar for October 1957, a poster
+    k.box(1.2, 0.7, 0.02, 0xd8d0b0, [-W / 2 + 0.02, 2.0, -1.5], [0, Math.PI / 2, 0]); for (const [z, y, w, h] of [[-1.75, 2.1, 0.3, 0.25], [-1.45, 2.15, 0.2, 0.3], [-1.2, 2.0, 0.35, 0.2], [-1.4, 1.85, 0.12, 0.2]]) k.box(w, h, 0.01, 0x8a9a6a, [-W / 2 + 0.032, y, z], [0, Math.PI / 2, 0]);
+    k.cyl(0.16, 0.16, 0.04, 20, 0xf0ece0, [W / 2 - 0.03, 2.1, -1.2], [0, 0, Math.PI / 2]); k.add(new THREE.TorusGeometry(0.165, 0.015, 4, 20), 0x2a2a2a, [W / 2 - 0.035, 2.1, -1.2], [0, Math.PI / 2, 0]);
+    k.box(0.4, 0.3, 0.015, 0xece4c8, [W / 2 - 0.02, 1.5, -2.2], [0, -Math.PI / 2, 0]); k.box(0.4, 0.07, 0.012, 0xa03020, [W / 2 - 0.03, 1.62, -2.2], [0, -Math.PI / 2, 0]);
+    k.box(0.4, 0.32, 0.35, 0x3a3e3a, [-0.4, 0.95, -2.48]); k.box(0.44, 0.03, 0.38, 0x2a2e2a, [-0.4, 1.125, -2.48]);   // the oscilloscope
     R.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })));
     // glowing dials and the oscilloscope's green trace
     const dk = new Kit();
-    for (let i = 0; i < 4; i++) { dk.box(0.5, 0.18, 0.02, 0xffc860, [-1.2 + i * 0.8, 1.85, -2.59]); dk.box(0.12, 0.1, 0.02, 0x80ff90, [-1.05 + i * 0.8, 1.45, -2.59]); }
+    for (let i = 0; i < 4; i++) { dk.box(0.5, 0.18, 0.02, 0xffc860, [-1.2 + i * 0.8, 1.85, -2.648]); dk.box(0.12, 0.1, 0.02, 0x80ff90, [-1.05 + i * 0.8, 1.45, -2.648]); }
     dk.box(0.32, 0.24, 0.02, 0x60ff80, [-0.4, 1.0, -2.3]);
     R.add(dk.mesh(new THREE.MeshBasicMaterial({ vertexColors: true })));
     this.scope = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.2), new THREE.MeshBasicMaterial({ map: canvasTex(128, 96, () => {}), transparent: true }));
@@ -750,8 +975,9 @@ export default class Sputnik {
     R.add(this.frame);
     this.frameSparks = glowPoints(90, { sizeScale: 300 }); R.add(this.frameSparks);
     // the engineers: one with the headphones at the desk, one beside him
+    const looks = [{ kind: 'suit', coat: 0x5a5a5e, trousers: 0x3a3a3e, tie: 0x2a3a5a, headphones: true, hair: 0x2a1e14, height: 1.74 }, { kind: 'labcoat', coat: 0xe8e8e2, trousers: 0x3a3a3a, glasses: true, moustache: true, hair: 0x6a6a64, height: 1.68 }];
     this.radioMen = [[-0.3, -1.8, Math.PI], [0.9, -1.5, Math.PI + 0.5]].map(([x, z, f], i) => {
-      const P = makePerson({ model: 'townsman', seed: 51 + i * 4, height: 1.72 - i * 0.05, tunic: i ? 0x3a4a5a : 0x5a5a5a }); P.g.position.set(x, 0, z); P.g.rotation.y = f; R.add(P.g); P.f0 = f; return P;
+      const P = makeFolk({ seed: 51 + i * 4, ...looks[i] }); P.g.position.set(x, 0, z); P.g.rotation.y = f; R.add(P.g); P.f0 = f; return P;
     });
     this.sigLab = label('beep... beep... beep...', 0.22, { color: '#d8ffe0', glowCol: 'rgba(120,255,160,0.7)' }); this.sigLab.position.set(0, Hh + 0.45, 0); this.sigLab.material.opacity = 0; R.add(this.sigLab);
   }
@@ -763,17 +989,23 @@ export default class Sputnik {
     T.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x3a3a3c })));
     // our block: you stand on its flat roof
     const block = (x, z, w, d, h, col, roofCol = 0x4a4a4c, me = false) => {
-      k.box(w, h, d, col, [x, h / 2, z]); k.box(w, 0.2, d, roofCol, [x, h + 0.1, z]);
-      for (const [px, pz, pw, pd] of [[x, z - d / 2 + 0.15, w, 0.3], [x, z + d / 2 - 0.15, w, 0.3], [x - w / 2 + 0.15, z, 0.3, d], [x + w / 2 - 0.15, z, 0.3, d]]) k.box(pw, me ? 0.9 : 0.8, pd, col, [px, h + 0.45, pz]);
-      k.box(0.2, 0.35, 0.2, 0x5a4a3a, [x, h + 0.2, z]);
+      // the walls stop 0.2 m short; the roof (inset inside the parapets, so no faces overlap) tops out at h
+      k.box(w, h - 0.2, d, col, [x, (h - 0.2) / 2, z]);
+      if (me) for (let i = 0; i < Math.round(w - 0.6); i++) { const ww = (w - 0.6) / Math.round(w - 0.6); k.box(ww - 0.02, 0.2, d - 0.6, _col.setHex(roofCol).multiplyScalar(0.85 + r() * 0.25).getHex(), [x - (w - 0.6) / 2 + (i + 0.5) * ww, h - 0.1, z]); }
+      else k.box(w - 0.6, 0.2, d - 0.6, roofCol, [x, h - 0.1, z]);
+      if (me) k.box(w - 0.6, 0.1, d - 0.6, 0x1a1a1a, [x, h - 0.16, z]);   // tar under the roofing sheets' joints
+      for (const [px, pz, pw, pd] of [[x, z - d / 2 + 0.15, w, 0.3], [x, z + d / 2 - 0.15, w, 0.3], [x - w / 2 + 0.15, z, 0.3, d - 0.6], [x + w / 2 - 0.15, z, 0.3, d - 0.6]]) k.box(pw, (me ? 0.9 : 0.8) + 0.2, pd, col, [px, h - 0.2 + ((me ? 0.9 : 0.8) + 0.2) / 2, pz]);
+      // a coping of darker stone along the parapet tops
+      for (const [px, pz, pw, pd] of [[x, z - d / 2 + 0.15, w + 0.06, 0.38], [x, z + d / 2 - 0.15, w + 0.06, 0.38], [x - w / 2 + 0.15, z, 0.38, d - 0.68], [x + w / 2 - 0.15, z, 0.38, d - 0.68]]) k.box(pw, 0.06, pd, _col.setHex(col).multiplyScalar(0.7).getHex(), [px, h + (me ? 0.9 : 0.8) + 0.03, pz]);
+      k.box(0.2, 0.35, 0.2, 0x5a4a3a, [x, h + 0.175, z]);
       const fl = Math.floor(h / 3.2);
       for (const [fx, fz, yaw, len] of [[0, d / 2 + 0.02, 0, w], [0, -d / 2 - 0.02, Math.PI, w], [w / 2 + 0.02, 0, Math.PI / 2, d], [-w / 2 - 0.02, 0, -Math.PI / 2, d]]) {
         const n = Math.floor(len / 3.2);
         for (let f = 0; f < fl; f++) for (let i = 0; i < n; i++) { const o = -len / 2 + (i + 0.5) * len / n; wins.push({ p: new THREE.Vector3(x + fx + (yaw === 0 || yaw === Math.PI ? o : 0), 1.8 + f * 3.2, z + fz + (yaw === 0 || yaw === Math.PI ? 0 : o)), yaw }); }
       }
       // chimneys and a TV aerial (the newest thing in 1957)
-      for (let i = 0; i < 2; i++) k.box(0.7, 1.6, 0.7, 0x7a4a3a, [x + (r() - 0.5) * w * 0.7, h + 0.9, z + (r() - 0.5) * d * 0.7]);
-      if (r() < 0.6) { const ax = x + (r() - 0.5) * w * 0.5, az = z + (r() - 0.5) * d * 0.5; ant.cyl(0.03, 0.03, 3, 4, 0x9a9a9a, [ax, h + 1.6, az]); for (let j = 0; j < 4; j++) ant.box(1.4 - j * 0.2, 0.03, 0.03, 0x9a9a9a, [ax, h + 2.2 + j * 0.3, az], [0, r() * 3, 0]); }
+      for (let i = 0; i < 2; i++) { const cx = x + (r() - 0.5) * w * 0.7, cz = z + (r() - 0.5) * d * 0.7; if (me && Math.hypot(cx - x, cz - z) < 4) continue; k.box(0.7, 1.6, 0.7, 0x7a4a3a, [cx, h + 0.8, cz]); k.box(0.82, 0.1, 0.82, 0x5a3a2a, [cx, h + 1.55, cz]); for (const o of [-0.15, 0.15]) k.cyl(0.08, 0.09, 0.35, 6, 0x9a5a3a, [cx + o, h + 1.75, cz]); }
+      if (r() < 0.6) { const ax = x + (r() - 0.5) * w * 0.5, az = z + (r() - 0.5) * d * 0.5; ant.cyl(0.03, 0.03, 3, 4, 0x9a9a9a, [ax, h + 1.5, az]); for (let j = 0; j < 4; j++) ant.box(1.4 - j * 0.2, 0.03, 0.03, 0x9a9a9a, [ax, h + 2.2 + j * 0.3, az], [0, r() * 3, 0]); }
     };
     const pal = [0x8a6a58, 0x9a8a78, 0x7a7068, 0xa89880, 0x6a5a50, 0x8a7a6a];
     block(0, 0, 14, 12, ROOF, 0x8a6a58, 0x4a4a4c, true);
@@ -792,6 +1024,12 @@ export default class Sputnik {
     bar(k, new THREE.Vector3(-5.5, ROOF + 1.7, 3.8), new THREE.Vector3(5.5, ROOF + 1.7, 4.5), 0.02, 0xd8d8d8);
     for (const x of [-5.5, 5.5]) k.box(0.08, 1.7, 0.08, 0x5a4a3a, [x, ROOF + 0.85, x < 0 ? 3.8 : 4.5]);
     for (let i = 0; i < 5; i++) k.box(0.5 + r() * 0.3, 0.6 + r() * 0.4, 0.02, [0xe8e0d0, 0x8aa0c0, 0xd0a0a0, 0xe8e8e8, 0xa0c0a0][i], [-4 + i * 1.9, ROOF + 1.3, 3.95 + i * 0.14]);
+    k.box(2.2, 2.4, 2.0, 0x7a5a48, [-4.6, ROOF + 1.2, -3.6]); k.box(2.4, 0.12, 2.2, 0x3a3a3c, [-4.6, ROOF + 2.46, -3.6]);   // the stair hut
+    k.box(0.9, 2.0, 0.05, 0x4a3a2a, [-4.6, ROOF + 1.0, -2.58]); k.cyl(0.03, 0.03, 0.05, 6, 0xb8a060, [-4.25, ROOF + 1.0, -2.55], [Math.PI / 2, 0, 0]);
+    for (const s of [-1, 1]) k.box(0.08, 2.08, 0.07, 0x3a2a1e, [-4.6 + s * 0.49, ROOF + 1.04, -2.57]); k.box(1.06, 0.08, 0.07, 0x3a2a1e, [-4.6, ROOF + 2.08, -2.57]);
+    k.box(1.4, 0.05, 0.36, 0x6a4a2a, [3.8, ROOF + 0.45, -3.9]); for (const x of [3.2, 4.4]) k.box(0.06, 0.45, 0.32, 0x3a2a1a, [x, ROOF + 0.225, -3.9]);   // a bench
+    for (const [x, z] of [[5.7, -1.5], [5.7, -0.6], [-5.7, 1.0]]) { k.cyl(0.18, 0.13, 0.3, 10, 0xa05a3a, [x, ROOF + 0.15, z]); k.ball(0.2, 1, 0x3a5a2a, [x, ROOF + 0.38, z], 0, [1, 0.7, 1]); }
+    k.cyl(0.14, 0.11, 0.28, 10, 0x6a6e72, [-3.2, ROOF + 0.14, 2.6]);
     k.box(0.6, 0.5, 0.5, 0x6a4a2a, [1.6, ROOF + 0.25, -1.2]);
     k.box(0.5, 0.34, 0.28, 0x5a3a22, [1.6, ROOF + 0.67, -1.2]); k.box(0.36, 0.16, 0.02, 0xd8c8a0, [1.6, ROOF + 0.7, -1.055]);
     // street lamps (one glowing draw call)
@@ -805,7 +1043,20 @@ export default class Sputnik {
     this.townLife = new Life(T);
     this.pigeons = this.townLife.add(makeFlock({ n: 10, center: new THREE.Vector3(-20, 30, -30), r: 30, height: 6, color: 0x3a3a40, size: 0.7, seed: 7, speed: 7 }));
     // the families: ours, and neighbours on the roofs around
-    const add = (x, y, z, h, i, face) => { const P = makePerson({ model: 'townsman', seed: 71 + i * 5, height: h }); P.g.position.set(x, y, z); P.g.rotation.y = face; T.add(P.g); P.ph = i; return P; };
+    // each one dressed differently (a city at dusk in 1957: coats, hats, a headscarf, a beret)
+    const looks = [
+      { kind: 'greatcoat', coat: 0x8a7a5a, hat: 'fedora', hatCol: 0x4a3a2a, moustache: true },
+      { kind: 'dress', coat: 0x6a2a2e, hat: 'kerchief', hatCol: 0xc8b890, hair: 0x5a3a20 },
+      { kind: 'kid', coat: 0xc83a3a, girl: true, hat: 'beret', hatCol: 0x2a3a6a, trousers: 0x2a2a2a, hair: 0x8a6030 },
+      { kind: 'kid', coat: 0x3a5a7a, hat: 'cap', hatCol: 0x4a4a4a, trousers: 0x3a3a3a },
+      { kind: 'jacket', coat: 0x5a5e62, hat: 'cap', hatCol: 0x2a2a2a, scarf: 0xb8a060 },
+      { kind: 'kid', coat: 0x5a7a3a, trousers: 0x2a2a2a, hair: 0x2a1e14 },
+      { kind: 'greatcoat', coat: 0x22263a, hat: 'fedora', hatCol: 0x5a5a5a, glasses: true },
+      { kind: 'dress', coat: 0x3a6a5a, hat: 'beret', hatCol: 0x8a2a3a, hair: 0x2a1a10 },
+      { kind: 'suit', coat: 0x6a5a48, trousers: 0x4a3e30, hat: 'none', hair: 0xb0aca4, moustache: true, tie: 0x2a4a2a },
+      { kind: 'kid', girl: true, coat: 0xd8b040, hat: 'kerchief', hatCol: 0xe8e0d0 },
+    ];
+    const add = (x, y, z, h, i, face) => { const P = makeFolk({ seed: 71 + i * 5, height: h, ...looks[i] }); P.g.position.set(x, y, z); P.g.rotation.y = face; T.add(P.g); P.ph = i; return P; };
     this.family = [add(-0.6, ROOF, -1.6, 1.78, 0, 2.6), add(0.6, ROOF, -2.0, 1.64, 1, 2.9), add(-0.2, ROOF, -0.9, 1.22, 2, 2.6), add(0.9, ROOF, -1.1, 1.05, 3, 3.1)];
     this.neigh = [add(-22, 10, -10, 1.7, 4, 2.4), add(-19.5, 10, -9, 1.2, 5, 2.4), add(19, 15, -15, 1.72, 6, 2.8), add(21, 15, -13, 1.62, 7, 2.6), add(-3, 9, -27, 1.7, 8, 2.9), add(2, 9, -28, 1.3, 9, 3.1)];
     // the moving light (the rocket's core stage) and, ahead of it, faint Sputnik
@@ -906,6 +1157,11 @@ export default class Sputnik {
     await D.until(() => this.noseK < 0.02, fast ? 2 : 6);
     // 4. The countdown, from the viewing spot
     await this.move(D, 'view', yawTo(bearing(-VS.x, -VS.z)), 1);
+    // everyone who ever looked up has come to watch: they turn to greet you
+    s.phase = 'crowd'; s.meet = 1; s.guide = this.W(...this.crowd[4].home.clone().setY(2.4).toArray()).toArray();
+    await D.say('ch14_13');
+    await D.wait(fast ? 0.3 : 1.5);
+    s.meet = 2;
     s.phase = 'countdown'; s.trucks = 0;
     s.guide = at(bearing(-VS.x, -VS.z) - 14, 9, 3.3).toArray();
     await G.music.sting?.('sputnik_launch.mp3', 0.95, { duck: 0.06 });
@@ -919,7 +1175,21 @@ export default class Sputnik {
     // 5. Liftoff!
     s.num = 0; s.launch = 1; s.phase = 'liftoff'; s.guide = at(bearing(-VS.x, -VS.z) - 34, 6, 2.2).toArray();
     await D.say('ch14_05');
+    // and the crowd: each one is named, glows softly and nods
+    const l14 = D.sayAsync('ch14_14');
+    await D.cue('The storytellers'); this.name('storyteller');
+    await D.cue('the builders'); this.name('builder');
+    await D.cue('the stargazers'); this.name('priest', 'skywatcher', 'chinese_astronomer', 'aristotle', 'eratosthenes', 'ptolemy', 'diver');
+    await D.cue('Copernicus'); this.name('copernicus', 'tycho');
+    await D.cue('Galileo'); this.name('galileo', 'kepler');
+    await D.cue('Newton'); this.name('newton');
+    await D.cue('Each one stood'); this.name('tsiolkovsky', 'goddard', 'vonbraun');
+    await l14;
+    const l15 = D.sayAsync('ch14_15');
+    await D.cue('all of them'); s.allGlow = 1;
+    await l15;
     await D.until(() => this.launchT >= 27, fast ? 10 : 45);
+    s.allGlow = 0;
     // 6. Ride along to orbit
     await this.move(D, 'space', 0, 0.7);
     s.phase = 'ride'; s.ride = 1;
@@ -1036,6 +1306,8 @@ export default class Sputnik {
       L.intensity = (i ? 70 : 120) * this.beamV * (this.launchT > 2 ? 0.2 : 1);
     });
     this.lamps.visible = this.beamV > 0.5 || this.cur !== 'view';
+    for (const m of this.details) m.visible = this.cur !== 'view';
+    this.viewLight.intensity = this.cur === 'view' ? 14 * (0.45 + 0.55 * this.beamV) : 0; this.W(this.viewLampPos.x, this.viewLampPos.y, this.viewLampPos.z, this.viewLight.position);
     // trucks drive the road (and leave for the countdown)
     const CG = this.carGlow.userData; let ci = 0;
     for (const T of this.trucks) {
@@ -1266,9 +1538,18 @@ export default class Sputnik {
         K.pointAt.copy(rocketTop); K.look = rocketTop.clone();
       }
       if (K.g.visible) animatePerson(K, t, dt);
-      this.tsiol.show(!!s.echo && !view); this.tsiol.P.look = top.clone();
-      this.tsiol.P.pose = s.echo ? 'point' : 'idle'; this.tsiol.P.pointAt.copy(this.tsiol.P.look);
-      this.tsiol.update(dt, t);
+      // Tsiolkovsky's book glows open beside Korolev, its pages turning
+      this.bookV = damp(this.bookV || 0, s.echo && !view ? 1 : 0, 2, dt);
+      this.book.visible = this.bookV > 0.01;
+      if (this.book.visible) {
+        const B = this.book.userData; this.book.scale.setScalar(0.6 + 0.9 * ease(this.bookV)); this.book.position.y = 1.45 + 0.05 * Math.sin(t * 1.3);
+        this.book.lookAt(G.camera.getWorldPosition(_a)); this.book.rotateX(-0.3);
+        B.glow.material.opacity = 0.55 * this.bookV; B.page.rotation.y = -Math.PI * ease(((t * 0.4) % 1) * 1.3); B.mats.forEach((m) => { m.opacity = this.bookV; });
+        this.bookLab.material.opacity = this.bookV;
+        const SP = B.sparks.userData;
+        for (let i = 0; i < 30; i++) { const a = i * 2.4 + t * 0.6, y = ((i * 0.13 + t * 0.15) % 1); SP.pos.set([Math.cos(a) * 0.3 * (1 - y), 0.05 + y * 0.7, Math.sin(a) * 0.3 * (1 - y)], i * 3); const v = this.bookV * (1 - y) * 0.8; SP.col.set([v, v * 0.85, v * 0.55], i * 3); SP.size[i] = 0.03; }
+        SP.commit();
+      }
       this.chiefV = damp(this.chiefV || 0, s.korolev === 2 && !view ? 1 : 0, 2.5, dt);
       this.chiefLab.material.opacity = this.chiefV; this.chiefLab.position.copy(K.g.position).setY(K.g.position.y + 2.3); this.chiefLab.visible = this.chiefV > 0.01;
       // engineers
@@ -1279,18 +1560,57 @@ export default class Sputnik {
         else if (P.routine) runRoutine(P, dt, { height: siteH, speed: 1 });
         else { P.pose = P.home.pose; P.look = null; P.glance = true; }
         if (s.phase === 'rocket' && P.home && P.home.x < 0) { P.pose = 'point'; this.W(0, 24, 0, P.pointAt); P.look = P.pointAt.clone(); }
-        animatePerson(P, t, dt); P.lamp?.userData.flicker?.(t);
+        animate(P, t, dt); P.lamp?.userData.flicker?.(t);
       }
-      this.towerMan.g.visible = !s.count; if (!s.count) animatePerson(this.towerMan, t, dt);
-      for (const [i, P] of this.obs.entries()) {
-        P.g.visible = view; if (!view) continue;
-        const lt = this.launchT;
-        P.pose = lt < 0 ? (i < 2 ? 'hold' : 'idle') : lt < 5 * this.F ? 'gasp' : lt < 8 * this.F ? (i % 2 ? 'point' : 'hold') : 'cheer';
-        P.look = rocketTop.clone(); P.pointAt.copy(P.look);
-        animatePerson(P, t, dt);
-      }
+      this.towerMan.g.visible = !s.count; if (!s.count) animate(this.towerMan, t, dt);
+      this.updateCrowd(dt, t, view, rocketTop);
     }
   }
+
+  // The crowd at the viewing spot: they turn to greet you (ch14_13), watch the countdown, gasp, point
+  // and cheer at liftoff, three pairs hug, and each one glows softly and nods as they're named (ch14_14)
+  updateCrowd(dt, t, view, rocketTop) {
+    const G = this.G, s = this.s, eye = G.camera.getWorldPosition(_e).sub(this.site.position), lr = this.launchT < 0 ? -1 : this.launchT / this.F;
+    this.meetV = damp(this.meetV || 0, s.meet === 1 ? 1 : 0, 1.5, dt);
+    if (s.meet === 1 && this.meetT == null) this.meetT = G.t;
+    const hugOn = lr > 7, me = G.camera.getWorldPosition(new THREE.Vector3());
+    for (const P of this.crowd) {
+      P.g.visible = view; P.lab.visible = P.halo.visible = false;
+      if (!view) continue;
+      // which way they face: the rocket, or turned toward you while you're greeted
+      const toMe = Math.atan2(eye.x - P.g.position.x, eye.z - P.g.position.z);
+      let dy = toMe - P.yawR; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      let yaw = P.yawR + dy * 0.75 * this.meetV, want = P.home;
+      const pair = hugOn && this.hugs.find((h) => h.includes(P));
+      const other = pair && (pair[0] === P ? pair[1] : pair[0]);
+      if (pair) {
+        const mid = _a.addVectors(P.home, other.home).multiplyScalar(0.5), d = _b.subVectors(P.home, other.home).setY(0).normalize();
+        want = _c.copy(mid).addScaledVector(d, 0.27); yaw = Math.atan2(other.g.position.x - P.g.position.x, other.g.position.z - P.g.position.z);
+      }
+      const g = P.g.position; g.x = damp(g.x, want.x, 1.6, dt); g.z = damp(g.z, want.z, 1.6, dt); g.y = siteH(g.x, g.z);
+      let ry = yaw - P.g.rotation.y; ry = Math.atan2(Math.sin(ry), Math.cos(ry)); P.g.rotation.y += ry * Math.min(1, dt * 3);
+      // what they do
+      const named = P.namedT != null ? G.t - P.namedT : 99;
+      if (pair) { P.pose = 'hold'; P.look = other.g.position.clone().add(this.site.position).setY(1.6); }
+      else if (lr < 0) { P.pose = this.meetV > 0.5 && P.i % 5 === 0 ? 'wave' : 'idle'; P.look = this.meetV > 0.3 ? me.clone() : rocketTop.clone(); }
+      else { P.pose = lr < 2.5 ? 'idle' : lr < 6 ? (P.i % 3 ? 'gasp' : 'point') : P.i % 3 === 0 ? 'point' : P.i % 3 === 1 ? 'cheer' : 'wave'; P.look = rocketTop.clone(); }
+      P.pointAt.copy(rocketTop);
+      animate(P, t, dt);
+      // named: a nod and a soft warm light on them
+      const nk = named < 3.5 ? Math.min(1, named / 0.4) * clamp01((3.5 - named) / 1.2) : 0;
+      P.k = damp(P.k, Math.max(nk, s.allGlow ? 0.75 : 0), 3, dt); P.kn = damp(P.kn || 0, nk, 3, dt);
+      const nod = named < 1.6 ? Math.sin(named * 7.8) * 0.22 * (1 - named / 1.6) : 0;
+      if (P.rig?.bones.Head) P.rig.bones.Head.rotateX(nod); else P.nod = nod;
+      P.halo.visible = P.k > 0.01; P.halo.material.opacity = 0.4 * P.k; P.halo.scale.setScalar(1.6 + 0.2 * Math.sin(t * 2 + P.i));
+      P.halo.position.copy(P.g.position).add(_d.set(0, 1.15, 0)).addScaledVector(_b.subVectors(P.g.position, eye).setY(0).normalize(), 0.35);
+      // their names: one by one as you're greeted, and again as they're named
+      const lv = Math.max(this.meetV > 0.5 && G.t - this.meetT > P.i * 0.25 ? 1 : 0, P.kn);
+      P.lab.material.opacity = damp(P.lab.material.opacity, lv * 0.9, 3, dt); P.lab.visible = P.lab.material.opacity > 0.01;
+      P.lab.position.copy(P.g.position).setY(P.g.position.y + (P.H || 1) * 1.75 + 0.3 + (P.i % 2) * 0.16);
+    }
+  }
+  // ch14_14: light up the people a phrase names
+  name(...who) { for (const P of this.crowd) if (who.includes(P.name)) P.namedT = this.G.t; }
 
   // ---------- Out in space: the ride, Sputnik set free, orbit ----------
   updateSpace(dt, t) {
@@ -1343,6 +1663,7 @@ export default class Sputnik {
     this.cutV = damp(this.cutV ?? 1, s.cutoff ? 0 : 1, 3, dt);
     this.rideFlame.visible = this.cutV > 0.02; this.rideFlame.material.uniforms.amt.value = this.cutV * (0.8 + 0.2 * Math.sin(t * 37)); this.rideFlame.material.uniforms.t.value = t;
     RR.localToWorld(this.rideGlow.position.set(0, -2, 0)); this.rideGlow.material.opacity = this.cutV * 0.9; this.rideGlow.scale.setScalar(26 + 4 * Math.sin(t * 23));
+    RR.localToWorld(this.flameLight.position.set(0, -4, 0)); this.flameLight.intensity = 160 * this.cutV * (0.85 + 0.15 * Math.sin(t * 31));
     if (s.cutoff && !this.cutSound) { this.cutSound = true; G.audio.ctx && clank(G, null, 0.2); }
     // the label and the path round the Earth
     this.speedLabV = damp(this.speedLabV || 0, s.speedLab ? 1 : 0, 3, dt); this.speedLab.material.opacity = this.speedLabV;
@@ -1402,7 +1723,7 @@ export default class Sputnik {
       if (s.cheer) { P.pose = 'cheer'; P.g.rotation.y = damp(P.g.rotation.y, P.f0 - Math.PI + (i ? -0.4 : 0.2), 4, dt); P.look = G.camera.getWorldPosition(_a).clone(); }
       else if (s.signal) { P.pose = i ? 'point' : 'gasp'; P.pointAt.copy(this.scope.getWorldPosition(_a)); P.look = P.pointAt.clone(); }
       else { P.pose = i ? 'idle' : 'hold'; P.look = this.scope.getWorldPosition(_a).clone(); }
-      animatePerson(P, t, dt);
+      animate(P, t, dt);
     });
     if (s.cheer && !this.roomCheer) { this.roomCheer = true; G.audio.cheer?.(R.position); }
     this.sigLab.material.opacity = damp(this.sigLab.material.opacity, s.signal ? 1 : 0, 3, dt);
@@ -1455,9 +1776,9 @@ export default class Sputnik {
       if (s.memory) { P.pose = i === 2 ? 'point' : 'gasp'; P.look = this.memSp.position.clone(); P.pointAt.copy(P.look); }
       else if (s.lightLab || this.passT > 4) { P.pose = i === 0 || i === 3 ? 'point' : i === 2 ? 'cheer' : 'idle'; P.look = look; P.pointAt.copy(look); }
       else { P.pose = i === 1 ? 'hold' : 'idle'; P.look = this.radioPos; }
-      animatePerson(P, t, dt);
+      animate(P, t, dt);
     });
-    this.neigh.forEach((P, i) => { P.pose = this.passT > 3 + i ? (i % 2 ? 'point' : 'wave') : 'idle'; P.look = look; P.pointAt.copy(look); animatePerson(P, t, dt); });
+    this.neigh.forEach((P, i) => { P.pose = this.passT > 3 + i ? (i % 2 ? 'point' : 'wave') : 'idle'; P.look = look; P.pointAt.copy(look); animate(P, t, dt); });
     // ch14_10: Sputnik drifts by in front of you, beeping, like at the very end of Era 1
     if (s.memory) {
       if (this.memT < 0) { this.memT = 0; this.memSp.visible = true; this.memSparks.visible = true; G.camera.getWorldPosition(_a); G.camera.getWorldDirection(_b); _b.y = 0; _b.normalize(); this.memC = _a.clone(); this.memF = _b.clone(); shimmer(G, 3, 0.15); s.guide = null; }
@@ -1513,7 +1834,8 @@ export default class Sputnik {
     this.space.dispose();
     this.G.scene.remove(this.root);
     this.root.traverse((o) => { o.geometry?.dispose(); });
-    for (const E of [this.tsiol, ...this.ringEchoes]) E.dispose?.();
+    this.coreTex.dispose(); this.boostTex.dispose();
+    for (const E of this.ringEchoes) E.dispose?.();
     this.G.world.blockers = [];
   }
 }
@@ -1546,6 +1868,117 @@ function makeTruck(kind) {
   const lamps = kind === 'jeep' ? [[-0.6, 1.0, 1.82], [0.6, 1.0, 1.82]] : [[-0.75, 1.55, 3.22], [0.75, 1.55, 3.22]];
   return { g, wheels, lamps };
 }
+// ---------- People of 1957 ----------
+// Meem has no models for everyday people of the 1950s yet, so these are built here: each one dressed
+// differently (a quilted work jacket, a greatcoat, a suit, a dress) with a different hat and face, so
+// no two in a scene look alike. They pose like the game's other stand-ins (people.js): a body, two
+// arms that swing from the shoulders, and here also a head that turns to look (P.look).
+// look: { kind: 'jacket'|'greatcoat'|'suit'|'labcoat'|'dress'|'kid', hat: 'ushanka'|'cap'|'fedora'|
+//   'peaked'|'beret'|'kerchief'|'none', coat, trousers, hair, skin, height, glasses, moustache, scarf,
+//   girl, headphones, seed }
+const SKINS = [0xd8b49a, 0xc89e82, 0xe0c0a8, 0xb88a6c, 0xd0a88c];
+function makeFolk(look = {}) {
+  const R = rng(look.seed || 7), kind = look.kind || 'jacket', kid = kind === 'kid', girl = !!look.girl || kind === 'dress';
+  const H = (look.height || 1.74) / 1.74, coat = look.coat ?? 0x3a3c40, trou = look.trousers ?? 0x2a2a2c;
+  const skin = look.skin ?? SKINS[Math.floor(R() * SKINS.length)], hair = look.hair ?? [0x2a1e14, 0x4a3420, 0x6a5038, 0x1a1614, 0x8a8478][Math.floor(R() * 5)];
+  const shoe = 0x1e1a18, k = new Kit(), hk = new Kit(), long = kind === 'greatcoat' || kind === 'labcoat';
+  // shoes and legs (trousers; stockings and a skirt for women and girls)
+  for (const s of [-1, 1]) {
+    k.ball(0.1, 1, shoe, [s * 0.1, 0.05, 0.04], 0, [0.6, 0.5, 1.3]);
+    k.cyl(0.07, 0.062, 0.82, 8, girl ? 0x9a8070 : trou, [s * 0.1, 0.49, 0]);
+  }
+  // the body
+  if (girl) {
+    k.cyl(0.19, 0.29, 0.52, 14, coat, [0, 0.66, 0]);                       // skirt (dress or coat)
+    k.cyl(0.18, 0.2, 0.5, 12, coat, [0, 1.15, 0]);
+    k.cyl(0.205, 0.205, 0.05, 12, look.belt ?? 0x3a2a1e, [0, 0.95, 0]);
+    k.box(0.16, 0.2, 0.02, look.collar ?? 0xe8e0d0, [0, 1.36, 0.17], [-0.25, 0, 0]);   // a white collar
+  } else if (long) {
+    k.cyl(0.21, 0.3, 0.98, 14, coat, [0, 0.9, 0]);                          // a long coat to below the knee
+    k.cyl(0.2, 0.21, 0.24, 12, coat, [0, 1.31, 0]);
+    if (kind === 'greatcoat') { k.cyl(0.225, 0.225, 0.06, 12, look.belt ?? 0x2a1e16, [0, 1.0, 0]); for (const s of [-1, 1]) for (let i = 0; i < 3; i++) k.ball(0.014, 0, 0xb8a060, [s * 0.07, 1.06 + i * 0.12, 0.215]); }
+    else { k.box(0.02, 0.85, 0.02, 0xc8c8c0, [0, 0.95, 0.25]); k.box(0.14, 0.18, 0.02, 0x3a4a6a, [0.1, 1.12, 0.22], [0, 0.1, 0]); }   // lab coat: its front edge, a pen pocket
+  } else {
+    k.cyl(0.2, 0.215, 0.58, 12, coat, [0, 1.15, 0]);                        // jacket or suit
+    if (kind === 'jacket') for (let i = 0; i < 6; i++) k.add(new THREE.TorusGeometry(0.212 - i * 0.003, 0.008, 3, segs(14)), _col.setHex(coat).multiplyScalar(0.7).getHex(), [0, 0.92 + i * 0.09, 0], [Math.PI / 2, 0, 0]);   // the quilting of a telogreika
+    if (kind === 'suit') { k.box(0.13, 0.2, 0.02, 0xe8e4dc, [0, 1.35, 0.19], [-0.2, 0, 0]); k.box(0.04, 0.3, 0.02, look.tie ?? 0x6a2a2a, [0, 1.25, 0.205]); }
+    if (kind === 'kid') k.cyl(0.21, 0.2, 0.08, 12, look.belt ?? 0x2a2a2a, [0, 0.9, 0]);
+    for (let i = 0; i < 4; i++) k.ball(0.013, 0, 0x2a2420, [0, 0.95 + i * 0.12, 0.215]);
+  }
+  k.add(new THREE.SphereGeometry(0.21, segs(12), 6), coat, [0, 1.36, 0], 0, [1.08, 0.42, 0.78]);   // shoulders
+  k.cyl(0.1, 0.14, 0.09, 10, look.scarf ?? coat, [0, 1.45, 0]);                                   // collar or scarf
+  if (look.scarf) k.box(0.1, 0.3, 0.03, look.scarf, [0.08, 1.3, 0.2], [0, 0, 0.1]);
+  k.cyl(0.05, 0.055, 0.08, 8, skin, [0, 1.5, 0]);
+  // the head (its own piece, so it can turn): face, nose, ears, eyes, brows, hair, hat
+  const hy = 1.6, hz = 0.0;
+  hk.ball(0.112, 2, skin, [0, hy, hz], 0, [0.92, 1.1, 1.0]);
+  hk.box(0.03, 0.05, 0.04, _col.setHex(skin).multiplyScalar(0.95).getHex(), [0, hy - 0.015, 0.11], [0.2, 0, 0]);
+  for (const s of [-1, 1]) {
+    hk.ball(0.026, 0, skin, [s * 0.105, hy, 0], 0, [0.6, 1, 0.9]);
+    hk.box(0.024, 0.018, 0.01, 0x1a1412, [s * 0.04, hy + 0.025, 0.105]);
+    hk.box(0.04, 0.01, 0.012, hair, [s * 0.042, hy + 0.05, 0.104], [0, 0, s * -0.12]);
+  }
+  hk.box(0.04, 0.01, 0.01, 0x8a4a40, [0, hy - 0.06, 0.1]);
+  if (look.moustache) hk.box(0.07, 0.016, 0.016, hair, [0, hy - 0.042, 0.108]);
+  if (look.glasses) { for (const s of [-1, 1]) hk.add(new THREE.TorusGeometry(0.024, 0.005, 3, 10), 0x1a1a1a, [s * 0.042, hy + 0.025, 0.112]); hk.box(0.025, 0.006, 0.006, 0x1a1a1a, [0, hy + 0.03, 0.115]); }
+  const hat = look.hat || 'none';
+  if (hat !== 'kerchief') hk.ball(0.118, 1, hair, [0, hy + 0.04, -0.018], 0, [0.98, girl ? 0.92 : 0.8, 1.02]);
+  if (girl && hat !== 'kerchief') { hk.ball(0.06, 1, hair, [0, hy + 0.02, -0.11]); if (kid) for (const s of [-1, 1]) hk.cyl(0.025, 0.018, 0.2, 6, hair, [s * 0.1, hy - 0.12, -0.04]); }
+  const hc = look.hatCol ?? 0x3a3430;
+  if (hat === 'ushanka') { hk.ball(0.13, 1, hc, [0, hy + 0.08, -0.01], 0, [1.02, 0.62, 1.02]); hk.cyl(0.132, 0.135, 0.08, 12, _col.setHex(hc).multiplyScalar(0.8).getHex(), [0, hy + 0.06, -0.01]); for (const s of [-1, 1]) hk.box(0.035, 0.1, 0.11, _col.setHex(hc).multiplyScalar(0.8).getHex(), [s * 0.125, hy + 0.1, -0.01], [0, 0, s * 0.5]); }
+  if (hat === 'cap') { hk.cyl(0.125, 0.12, 0.06, 12, hc, [0, hy + 0.11, -0.005]); hk.ball(0.12, 1, hc, [0, hy + 0.13, 0.02], 0, [1.05, 0.35, 1.1]); hk.box(0.18, 0.014, 0.08, _col.setHex(hc).multiplyScalar(0.8).getHex(), [0, hy + 0.09, 0.13], [0.15, 0, 0]); }
+  if (hat === 'fedora') { hk.cyl(0.1, 0.115, 0.12, 12, hc, [0, hy + 0.15, -0.01]); hk.cyl(0.118, 0.118, 0.03, 12, 0x1a1a1a, [0, hy + 0.11, -0.01]); hk.cyl(0.18, 0.18, 0.012, 16, hc, [0, hy + 0.095, -0.01]); }
+  if (hat === 'peaked') { hk.cyl(0.15, 0.12, 0.05, 14, hc, [0, hy + 0.15, -0.01]); hk.cyl(0.12, 0.12, 0.05, 12, 0x8a2a2a, [0, hy + 0.11, -0.01]); hk.box(0.17, 0.012, 0.07, 0x1a1a1a, [0, hy + 0.085, 0.12], [0.25, 0, 0]); hk.ball(0.015, 0, 0xd8b040, [0, hy + 0.12, 0.122]); }
+  if (hat === 'beret') hk.ball(0.13, 1, hc, [0.02, hy + 0.11, -0.01], [0, 0, 0.15], [1.05, 0.38, 1.05]);
+  if (hat === 'kerchief') { hk.ball(0.125, 1, hc, [0, hy + 0.035, -0.035], 0, [1.02, 1.05, 0.98]); hk.box(0.06, 0.05, 0.04, hc, [0, hy - 0.13, 0.04]); }
+  if (look.headphones) { hk.add(new THREE.TorusGeometry(0.125, 0.012, 4, 14, Math.PI), 0x2a2a2a, [0, hy, 0], [0, 0, 0]); for (const s of [-1, 1]) hk.cyl(0.045, 0.045, 0.04, 10, 0x1a1a1a, [s * 0.12, hy, 0], [0, 0, Math.PI / 2]); }
+  // kids: a bigger head for their size
+  const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.userData.kind = 'characters';
+  inner.add(k.mesh(FLAT));
+  const head = new THREE.Group(); head.position.set(0, 1.5, 0); inner.add(head);
+  const hm = hk.mesh(SOFT); hm.position.set(0, -1.5, 0); head.add(hm); if (kid) head.scale.setScalar(1.16);
+  const arms = [];
+  for (const sx of [-1, 1]) {
+    const ak = new Kit(), sleeve = kind === 'labcoat' ? 0xe8e8e2 : coat;
+    ak.cyl(0.062, 0.054, 0.56, 8, sleeve, [0, -0.28, 0]); ak.cyl(0.058, 0.058, 0.05, 8, _col.setHex(sleeve).multiplyScalar(0.75).getHex(), [0, -0.55, 0]);
+    ak.ball(0.046, 1, look.gloves ?? skin, [0, -0.62, 0.01], 0, [0.8, 1.1, 0.7]);
+    const arm = new THREE.Group(); arm.add(ak.mesh(FLAT)); arm.position.set(sx * 0.235, 1.38, 0); inner.add(arm); arms.push(arm);
+  }
+  inner.scale.setScalar(H);
+  return { g, inner, arms, head, pose: 'idle', phase: R() * 6, pointAt: new THREE.Vector3(), placeholder: true, H, folk: true };
+}
+const SOFT = new THREE.MeshLambertMaterial({ vertexColors: true });
+// Move a person and, for the people above, turn the head toward P.look (within what a neck can do)
+const _hl = new THREE.Vector3();
+function animate(P, t, dt) {
+  animatePerson(P, t, dt);
+  if (!P.head) return;
+  let yaw = Math.sin(t * 0.3 + P.phase) * 0.15, pitch = 0;
+  if (P.look) { _hl.copy(P.look); P.g.worldToLocal(_hl); _hl.y -= 1.6 * P.H; yaw = clamp(Math.atan2(_hl.x, _hl.z), -1.1, 1.1); pitch = clamp(-Math.atan2(_hl.y, Math.hypot(_hl.x, _hl.z)), -0.6, 0.45); }
+  P.head.rotation.y = damp(P.head.rotation.y, yaw, 4, dt); P.head.rotation.x = damp(P.head.rotation.x, pitch + (P.nod || 0), 4, dt);
+}
+// Tsiolkovsky's book, open, glowing softly with a turning page and a few sparks rising off it
+function makeBook() {
+  const g = new THREE.Group(), mats = [];
+  const tex = canvasTex(256, 128, (c, w, h) => {
+    c.fillStyle = '#f2e8cc'; c.fillRect(0, 0, w, h); c.fillStyle = 'rgba(60,40,20,0.75)';
+    for (const x0 of [14, 142]) for (let y = 14; y < h - 10; y += 7) c.fillRect(x0, y, 90 + ((y * 7) % 13), 2);
+    c.strokeStyle = 'rgba(60,40,20,0.8)'; c.lineWidth = 2; c.beginPath(); c.moveTo(150, 100); c.quadraticCurveTo(190, 40, 236, 20); c.stroke();   // a rocket's path drawn in the margin
+    c.fillStyle = 'rgba(0,0,0,0.15)'; c.fillRect(124, 0, 8, h);
+  });
+  const pm = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, fog: false }); mats.push(pm);
+  for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.28), pm); p.position.set(s * 0.1, 0, 0); p.rotation.y = -s * 0.18; g.add(p); }
+  const cm = new THREE.MeshBasicMaterial({ color: 0x6a2a20, transparent: true, side: THREE.DoubleSide, fog: false }); mats.push(cm);
+  const cover = new THREE.Mesh(new THREE.PlaneGeometry(0.43, 0.3), cm); cover.position.z = -0.012; g.add(cover);
+  const page = new THREE.Group(), pg = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.28), pm); pg.position.x = 0.1; page.add(pg); page.position.z = 0.004; g.add(page);
+  page.rotation.order = 'YZX';
+  const glow = glowSprite(0xffe0a8, 0.9, 0); glow.position.z = -0.05; g.add(glow);
+  const sparks = glowPoints(30, { sizeScale: 200 }); sparks.rotation.x = 0.5; g.add(sparks);
+  g.userData = { glow, page, mats, sparks };
+  return g;
+}
+// A clipboard with a checklist
+function makeClipboard() { const k = new Kit(); k.box(0.23, 0.32, 0.012, 0x7a5a3a, [0, 0.12, 0]); k.box(0.2, 0.26, 0.004, 0xe8e4d8, [0, 0.11, 0.008]); k.box(0.08, 0.03, 0.02, 0x9a9a9a, [0, 0.27, 0.01]); return k.mesh(); }
 function makeBinoculars() { const k = new Kit(); for (const x of [-0.035, 0.035]) k.cyl(0.022, 0.026, 0.13, 8, 0x1a1a1a, [x, 0.04, 0], [Math.PI / 2, 0, 0]); k.box(0.05, 0.02, 0.04, 0x2a2a2a, [0, 0.04, 0]); return k.mesh(); }
 function makeLamp() {
   const g = new THREE.Group(), k = new Kit(); k.cyl(0.04, 0.035, 0.18, 8, 0x3a3a3a, [0, 0.08, 0]); k.cyl(0.06, 0.04, 0.05, 8, 0x5a5a5a, [0, 0.19, 0]); g.add(k.mesh());

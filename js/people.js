@@ -53,7 +53,7 @@ export function makePerson(look = {}) {
   const P = { g, inner, arms, pose: 'idle', phase: rnd() * 6, pointAt: new THREE.Vector3(), placeholder: true, H };
   if (new URLSearchParams(location.search).has('labels')) { const t = tag(); t.position.y = 2.05 * H; g.add(t); }
   // Meem's Tripo model, when there is one for this kind of person (look.model, e.g. 'builder')
-  if (look.model) loadModel(look.model).then((m) => {
+  if (look.model) loadModel(look.model, { sd: look.sd }).then((m) => {
     if (!m) return;
     inner.remove(body); for (const a of arms) a.visible = false;
     inner.add(m.scene); P.placeholder = false; P.model = m;
