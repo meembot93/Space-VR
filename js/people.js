@@ -50,7 +50,8 @@ export function makePerson(look = {}) {
     arm.position.set(sx * 0.24, 1.36, 0); inner.add(arm); arms.push(arm);
   }
   inner.scale.setScalar(H);
-  const P = { g, inner, arms, pose: 'idle', phase: rnd() * 6, pointAt: new THREE.Vector3(), placeholder: true, H };
+  const P = { g, inner, arms, pose: 'idle', phase: rnd() * 6, pointAt: new THREE.Vector3(), placeholder: true, H, who: look.model };
+  g.userData.person = P;   // lets tools/test/clip-test.js find everyone in the scene
   if (new URLSearchParams(location.search).has('labels')) { const t = tag(); t.position.y = 2.05 * H; g.add(t); }
   // Meem's Tripo model, when there is one for this kind of person (look.model, e.g. 'builder')
   if (look.model) loadModel(look.model).then((m) => {
