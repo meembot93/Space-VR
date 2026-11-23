@@ -199,7 +199,7 @@ export default class Kepler {
     const M = this.orbit = new THREE.Group(); M.position.copy(ORR); M.rotation.x = 1.1; M.visible = false; this.root.add(M);
     this.sun = new THREE.Group(); this.sun.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffe28a, fog: false })), glow(0xffb040, 1.3, 0.9)); M.add(this.sun);
     this.mars = new THREE.Group(); this.mars.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff6a42, fog: false })), glow(0xff6a42, 0.5, 0.8)); M.add(this.mars);
-    this.pts = glowPoints(2600, { sizeScale: 330 }); M.add(this.pts);
+    this.pts = glowPoints(2600, { sizeScale: 1000 }); M.add(this.pts);
     // Tycho's measurements: Mars's place on many nights (a little scatter, like real measuring)
     const r = rng(21); this.obs = Array.from({ length: 48 }, (_, i) => marsAt(i / 48 * Math.PI * 2 + r() * 0.05, new THREE.Vector3()));
     // the circles Kepler tried: centre (x, z) and radius
