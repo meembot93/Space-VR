@@ -27,6 +27,7 @@ import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp }
 import { makeHerd, makeFlock, makeSmoke, makeTorch, makeCloth, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
+import { moonFields } from '../moontex.js';
 import { dirFromAzEl } from '../sky.js';
 import { eqVec } from '../stars.js';
 import { glowPoints, shatter, whoosh, awe, shimmer } from '../wow/fx.js';
@@ -1144,54 +1145,9 @@ function ballMat({ map = null, color = 0xffffff } = {}) {
 // sphere is pushed out by the big shapes, and every crater's walls are shaded by the light in the
 // shader, so the line between day and night shows long shadows and bright peaks.
 function makeMoon() {
-  const W = 1024, H = 512, hr = new Float32Array(W * H), al = new Float32Array(W * H).fill(0.8), rr = rng(91), nz = noise2(97);
-  const st = new Float32Array(H), ct = new Float32Array(H), sp = new Float32Array(W), cp = new Float32Array(W);
-  for (let j = 0; j < H; j++) { const th = (1 - (j + 0.5) / H) * Math.PI; st[j] = Math.sin(th); ct[j] = Math.cos(th); }
-  for (let i = 0; i < W; i++) { const ph = (i + 0.5) / W * 2 * Math.PI; sp[i] = Math.sin(ph); cp[i] = Math.cos(ph); }
-  const dirAt = (i, j, o) => o.set(-sp[i] * st[j], ct[j], -cp[i] * st[j]);
-  const ll = (lat, lon) => new THREE.Vector3(Math.cos(lat * D2R) * Math.sin(lon * D2R), Math.sin(lat * D2R), Math.cos(lat * D2R) * Math.cos(lon * D2R));
-  const v = new THREE.Vector3();
-  // visit every pixel within angle `ang` of the unit vector c
-  const around = (c, ang, fn) => {
-    const th = Math.acos(clamp(c.y, -1, 1)), j0 = Math.max(0, Math.floor((1 - (th + ang) / Math.PI) * H)), j1 = Math.min(H - 1, Math.ceil((1 - (th - ang) / Math.PI) * H));
-    let ph = Math.atan2(-c.x, -c.z); if (ph < 0) ph += Math.PI * 2;
-    const sw = Math.sin(th) > 0.05 ? Math.min(Math.PI, ang / Math.sin(th) * 1.2) : Math.PI, i0 = Math.floor((ph - sw) / (2 * Math.PI) * W), i1 = Math.ceil((ph + sw) / (2 * Math.PI) * W);
-    const ca = Math.cos(ang);
-    for (let j = j0; j <= j1; j++) for (let ii = i0; ii <= i1; ii++) { const i = ((ii % W) + W) % W; dirAt(i, j, v); const d = v.dot(c); if (d < ca) continue; fn(j * W + i, Math.acos(Math.min(1, d)), v); }
-  };
-  // the seas (maria): low, smooth and dark
-  const MARIA = [[33, -16, 0.3], [28, 17, 0.2], [8, 31, 0.22], [17, 59, 0.15], [-8, 51, 0.17], [-15, 34, 0.14], [-21, -17, 0.2], [18, -57, 0.42], [-24, -39, 0.12], [56, 0, 0.12], [-2, -30, 0.18], [44, -20, 0.14]];
-  const mare = new Float32Array(W * H);
-  for (const [lat, lon, R] of MARIA) around(ll(lat, lon), R * 1.3, (p, a, vv) => { const e = R * (0.85 + 0.3 * nz(vv.x * 9 + 3, vv.y * 9 + vv.z * 5)); const f = clamp01((e - a) / (R * 0.18)); mare[p] = Math.max(mare[p], f); });
-  for (let p = 0; p < W * H; p++) { hr[p] -= 0.006 * mare[p]; al[p] = lerp(0.82, 0.42, mare[p]) + (nz((p % W) / 20, Math.floor(p / W) / 20) - 0.5) * 0.08; }
-  // craters: a few big ones, many middling, lots of little ones (fewer on the seas)
-  const crater = (c, R) => {
-    const dep = R * (R < 0.02 ? 0.3 : 0.16), peak = R > 0.035;
-    around(c, R * 1.7, (p, a) => {
-      const d = a / R;
-      let h = 0; if (d < 1) h -= dep * (1 - d * d) * (peak ? 0.8 : 1);
-      h += dep * 0.4 * Math.exp(-(((d - 1) / 0.17) ** 2));
-      if (d > 1) h += dep * 0.08 * Math.max(0, 1.7 - d);
-      if (peak && d < 0.2) h += dep * 0.55 * (1 - d / 0.2);
-      hr[p] += h; al[p] += 0.05 * Math.exp(-(((d - 1) / 0.25) ** 2)) - (d < 0.8 ? 0.02 : 0);
-    });
-  };
-  const randDir = () => { const z = rr() * 2 - 1, a = rr() * Math.PI * 2, q = Math.sqrt(1 - z * z); return new THREE.Vector3(q * Math.cos(a), z, q * Math.sin(a)); };
-  const mareAt = (c) => { const th = Math.acos(clamp(c.y, -1, 1)); let ph = Math.atan2(-c.x, -c.z); if (ph < 0) ph += 2 * Math.PI; return mare[Math.min(H - 1, Math.floor((1 - th / Math.PI) * H)) * W + Math.min(W - 1, Math.floor(ph / (2 * Math.PI) * W))]; };
-  for (const [n, a, b] of [[30, 0.035, 0.1], [380, 0.012, 0.035], [2600, 0.004, 0.012]]) for (let i = 0; i < n; i++) { const c = randDir(); if (c.z < -0.3) continue; if (mareAt(c) > 0.5 && rr() < 0.8) continue; crater(c, a + (b - a) * rr() ** 2); }
-  // famous ones: Tycho and Copernicus with their rays, Plato, Clavius, Albategnius (Galileo's big crater by the terminator)
-  for (const [lat, lon, R] of [[-43, -11, 0.025], [10, -20, 0.027], [51, -9, 0.028], [-58, -14, 0.07], [-11, 4, 0.04], [-10, -2, 0.045]]) crater(ll(lat, lon), R);
-  for (const [lat, lon, reach, n] of [[-43, -11, 0.9, 16], [10, -20, 0.45, 12], [8, -38, 0.3, 8]]) {
-    const c = ll(lat, lon), e1 = new THREE.Vector3().crossVectors(c, UP).normalize(), e2 = new THREE.Vector3().crossVectors(c, e1), bs = Array.from({ length: n }, () => rr() * Math.PI * 2);
-    around(c, reach, (p, a, vv) => { const pr = _a.copy(vv).addScaledVector(c, -vv.dot(c)), b = Math.atan2(pr.dot(e2), pr.dot(e1)); let ray = 0; for (const b0 of bs) { let db = Math.abs(b - b0); db = Math.min(db, Math.PI * 2 - db); ray = Math.max(ray, Math.exp(-((db / 0.03) ** 2))); } al[p] += 0.28 * ray * (1 - a / reach) + 0.15 * Math.max(0, 1 - a / (reach * 0.12)); });
-  }
-  // mountain ranges: the Apennines, the Caucasus, the Alps (rows of peaks)
-  for (const pts of [[[30, -1], [26, -4], [22, -7], [19, -10], [16, -14], [14, -18]], [[40, 8], [36, 9], [33, 9]], [[49, -4], [47, 0], [46, 4]]]) {
-    for (let i = 0; i < pts.length - 1; i++) for (let j = 0; j < 8; j++) {
-      const f = j / 8, lat = lerp(pts[i][0], pts[i + 1][0], f) + (rr() - 0.5) * 1.5, lon = lerp(pts[i][1], pts[i + 1][1], f) + (rr() - 0.5) * 1.5, R = 0.012 + rr() * 0.012, hh = 0.004 + rr() * 0.004;
-      around(ll(lat, lon), R * 2, (p, a) => { hr[p] += hh * Math.exp(-((a / R) ** 2) * 1.5); al[p] += 0.04 * Math.exp(-((a / R) ** 2)); });
-    }
-  }
+  const W = 1024, H = 512, hr = new Float32Array(W * H), al = new Float32Array(W * H);
+  // the real near side: maria, craters, rays, mountain ranges (shared with the sky's Moon, js/moontex.js)
+  { const F = moonFields('map', W, H); hr.set(F.h); al.set(F.alb); }
   const data = new Uint8Array(W * H * 4);
   for (let p = 0; p < W * H; p++) { data[p * 4] = clamp(Math.round((0.5 + hr[p] / 0.06) * 255), 0, 255); data[p * 4 + 1] = clamp(Math.round(al[p] * 255), 0, 255);
     // the slopes, so the shading is smooth (an 8-bit height alone shades in steps)
