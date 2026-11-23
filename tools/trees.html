@@ -1,0 +1,65 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Starward trees</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#8aa4c0;font-family:sans-serif}
+.lab{position:fixed;color:#fff;font:bold 15px sans-serif;text-shadow:0 1px 3px #000;padding:4px 8px}</style>
+<script type="importmap">{ "imports": { "three": "../lib/three.module.js", "three/addons/": "../lib/addons/" } }</script>
+</head><body>
+<script type="module">
+// Preview of every tree kind in js/trees.js, up close and whole. ?only=palm shows one kind big.
+// ?detail=low|mid|high|hero overrides each kind's default. ?grove=1 adds a low-detail grove behind.
+import * as THREE from 'three';
+import * as T from '../js/trees.js';
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.setPixelRatio(1); document.body.appendChild(r.domElement);
+r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.setScissorTest(true);
+const det = q.get('detail');
+const KINDS = [
+  ['appleTree', { seed: 3, windfalls: 10 }, 'appleTree (hero)'],
+  ['orchardTree', { seed: 5 }, 'orchardTree'],
+  ['deciduousTree', { seed: 7 }, 'deciduousTree (oak)'],
+  ['bareTree', { seed: 9, snow: true }, 'bareTree (snow)'],
+  ['conifer', { seed: 2 }, 'conifer spruce'],
+  ['conifer', { seed: 2, snow: true }, 'conifer spruce (snow)'],
+  ['conifer', { seed: 4, type: 'pine', height: 15 }, 'conifer pine'],
+  ['cypress', { seed: 4 }, 'cypress'],
+  ['poplar', { seed: 4 }, 'poplar'],
+  ['palm', { seed: 6, dates: true }, 'palm'],
+  ['olive', { seed: 8 }, 'olive'],
+  ['bush', { seed: 1 }, 'bush'],
+];
+const only = q.get('only'), list = only ? KINDS.filter((k) => k[2].startsWith(only)) : KINDS;
+const cols = only ? 1 : 4, rows = Math.ceil(list.length / cols), cells = [];
+const ground = (scene, c) => { const g = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.MeshLambertMaterial({ color: c })); g.rotation.x = -Math.PI / 2; g.receiveShadow = true; scene.add(g); };
+list.forEach(([kind, o, label], i) => {
+  const scene = new THREE.Scene(), snow = o.snow;
+  scene.background = new THREE.Color(snow ? 0xb8c4d4 : 0x9ab8d8); scene.fog = new THREE.Fog(scene.background, 40, 160);
+  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x4a4030, 1.3));
+  const sun = new THREE.DirectionalLight(0xfff2dc, 2.4); sun.position.set(12, 20, 9); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, far: 60 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04;
+  scene.add(sun);
+  ground(scene, snow ? 0xe6ecf4 : kind === 'palm' ? 0xb89a6a : 0x5a7a34);
+  const t0 = performance.now(), t = T[kind]({ ...o, ...(det ? { detail: det } : {}) }), ms = performance.now() - t0;
+  t.group.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  scene.add(t.group);
+  if (q.has('grove')) {
+    const spots = []; for (let k = 0; k < 12; k++) spots.push({ x: -20 + k * 3.6, y: 0, z: -18 - (k % 3) * 5, s: 0.8 + (k % 4) * 0.1 });
+    const g = T.grove(kind, spots, { ...o, detail: 'low' }); scene.add(g.group); label += ` | grove of 12 low: ${g.tris} tris`;
+  }
+  const h = t.height, cam = new THREE.PerspectiveCamera(only ? 50 : 45, 1, 0.1, 300);
+  const dist = Number(q.get('dist') || (h * 1.25 + 2)), az = Number(q.get('az') || 0.5);
+  cam.position.set(Math.sin(az) * dist, Number(q.get('camy') || Math.min(1.7, h * 0.4)), Math.cos(az) * dist);
+  cam.lookAt(0, Number(q.get('looky') || h * 0.45), 0);
+  const el = document.createElement('div'); el.className = 'lab'; el.textContent = `${label}: ${t.tris} tris`; document.body.appendChild(el);
+  cells.push({ scene, cam, el, i });
+});
+function layout() {
+  const W = innerWidth / cols, H = innerHeight / rows;
+  for (const c of cells) { c.x = (c.i % cols) * W; c.y = Math.floor(c.i / cols) * H; c.w = W; c.h = H; c.cam.aspect = W / H; c.cam.updateProjectionMatrix(); c.el.style.left = c.x + 'px'; c.el.style.top = c.y + 'px'; }
+}
+layout();
+function frame() {
+  for (const c of cells) { r.setViewport(c.x, innerHeight - c.y - c.h, c.w, c.h); r.setScissor(c.x, innerHeight - c.y - c.h, c.w, c.h); r.render(c.scene, c.cam); }
+  if (q.has('anim')) requestAnimationFrame(frame);
+}
+frame(); window.__ready = true;
+</script></body></html>
