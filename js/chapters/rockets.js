@@ -395,7 +395,7 @@ export default class Rockets {
     sk.newton = new Sketch(A, nS, { spacing: 0.08, dot: 0.3, secs: 4.5, seed: 1 }).place(at(332, 34, 9).add(eye), eye);
     sk.newton.addLabel('Newton: fast enough, and it never comes down', 0, -5.2, 0.7);
     // Jules Verne's Moon cannon (1865): a giant barrel aimed at the Moon
-    const vpos = at(318, 30, 8).add(eye), vg = new THREE.Object3D(); vg.position.copy(vpos); vg.lookAt(eye); vg.updateMatrixWorld();
+    const vpos = at(288, 30, 6).add(eye), vg = new THREE.Object3D(); vg.position.copy(vpos); vg.lookAt(eye); vg.updateMatrixWorld();
     const moonW = at(this.moonAz, 900, 900 * Math.tan(this.moonEl * D2R)).add(eye), ml = vg.worldToLocal(moonW.clone()); const dl = V3(ml.x, ml.y, 0).normalize();
     const px = -dl.y, py = dl.x, bL = 11, bw = 0.9, bx0 = 2, by0 = -3;
     const bar = (s, t) => [bx0 + dl.x * s + px * t, by0 + dl.y * s + py * t];
@@ -413,7 +413,7 @@ export default class Rockets {
     // Tsiolkovsky's rocket (1903): a long body, liquid hydrogen and oxygen tanks, the pilot up front, the nozzle behind
     const rS = [[[-0.11, 0.3], [-0.11, 1.35], [-0.06, 1.62], [0, 1.72], [0.06, 1.62], [0.11, 1.35], [0.11, 0.3]], [[-0.11, 0.3], [-0.05, 0.22], [-0.16, 0.0], [0.16, 0.0], [0.05, 0.22], [0.11, 0.3]],
       rect(-0.08, 0.95, 0.08, 1.3), rect(-0.08, 0.55, 0.08, 0.9), circ(0, 1.45, 0.04, 0, 6.29, 14), [[0, 1.37], [0, 1.31]], [[-0.03, 1.33], [0.03, 1.33]], [[0, 0.55], [0, 0.32]], [[-0.03, 0.9], [-0.03, 0.4], [0, 0.32]]];
-    sk.rocket = new Sketch(A, rS, { spacing: 0.006, dot: 0.012, secs: 3, seed: 5 }).place(V3(-1.8, 1.2, 0.5), eye.clone().setY(1.2));
+    sk.rocket = new Sketch(A, rS, { spacing: 0.006, dot: 0.012, secs: 3, seed: 5 }).place(V3(1.25, 1.2, -1.05), eye.clone().setY(1.2));
     sk.rocket.addLabel('liquid hydrogen', 0.36, 1.12, 0.075); sk.rocket.addLabel('liquid oxygen', 0.33, 0.72, 0.075);
     this.rocketHome = { pos: sk.rocket.g.position.clone(), q: sk.rocket.g.quaternion.clone() };
     this.rocketSky = at(318, 60, 40).add(eye);
@@ -624,9 +624,8 @@ export default class Rockets {
     }
     for (const [x, z] of [[-16, PAD.z + 18], [17, PAD.z + 20]]) { const y = balticHeight(x, z); k.box(0.3, 10, 0.3, 0x3a3a36, [x, y + 5, z]); k.box(1.6, 0.8, 0.6, 0x2a2a28, [x, y + 10.2, z]); }
     // your observation post: a concrete wall with sandbags, the bunker roof behind you
-    k.box(7, 1.15, 0.6, 0x7a7a74, [0, 0.58, -1.4]); for (let i = 0; i < 14; i++) k.ball(0.28, 0, 0x8a8060, [-3.2 + i * 0.5, 1.3, -1.35], 0, [1.2, 0.5, 0.8]);
+    k.box(7, 1.15, 0.6, 0x9a9a92, [0, 0.58, -1.4]); for (let i = 0; i < 14; i++) k.box(0.48, 0.16, 0.34, i % 2 ? 0xa89a74 : 0x9a8c68, [-3.2 + i * 0.5, 1.23, -1.45], [0, (i % 3 - 1) * 0.08, 0]);
     k.box(7, 2.6, 0.6, 0x6a6a64, [0, 1.3, 3.2]); k.box(7.4, 0.5, 5.4, 0x6a6a64, [0, 2.85, 0.8]); for (const s of [-1, 1]) k.box(0.6, 2.6, 5, 0x707068, [s * 3.5, 1.3, 0.8]);
-    k.box(0.1, 0.3, 0.1, 0x2a2a2a, [1.2, 1.3, -1.4]); k.cyl(0.04, 0.04, 0.5, 6, 0x3a3a3a, [1.2, 1.6, -1.4]); k.box(0.12, 0.08, 0.2, 0x2a2a2a, [1.2, 1.88, -1.45]);
     C.add(k.mesh());
     // the erector beside the rocket: a lattice tower that lowers away before launch
     const ek = new Kit(), EC = 0x4a5048;
@@ -643,8 +642,8 @@ export default class Rockets {
         float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1,0)), f.x), mix(h(i + vec2(0,1)), h(i + vec2(1,1)), f.x), f.y); }
         void main(){ vec2 q = vW.xz * 0.006 + vec2(t * 0.01, t * 0.004);
           float d = n(q) * 0.5 + n(q * 2.1 + 3.0) * 0.3 + n(q * 4.3 - 1.0) * 0.2;
-          float a = clamp(0.55 + (d - 0.45) * 1.6, 0.0, 0.97) * smoothstep(2400.0, 900.0, length(vW.xz));
-          vec3 c = mix(vec3(0.07, 0.08, 0.11), vec3(0.2, 0.22, 0.28), d);
+          float a = clamp(0.3 + (d - 0.45) * 2.4, 0.0, 0.9) * smoothstep(2400.0, 900.0, length(vW.xz));
+          vec3 c = mix(vec3(0.2, 0.19, 0.25), vec3(0.42, 0.38, 0.46), d);
           float g = glowA * exp(-length(vW - glowP) / 90.0); c += vec3(1.0, 0.55, 0.2) * g * 1.6;
           gl_FragColor = vec4(c, max(a, min(1.0, g))); }`,
     }));
@@ -695,7 +694,7 @@ export default class Rockets {
     this.spDot = glow(0xffd090, 0.8, 0); sp.earth.add(this.spDot);
     this.spArcs = glowPoints(700, { sizeScale: 300 }); sp.earth.add(this.spArcs);
     this.spPins = [PEEN, WSANDS, MOSCOW].map(() => { const s = glow(0xffe0a0, 0.9, 0); sp.earth.add(s); return s; });
-    this.spLabs = { v2: label('V-2, 1944: 176 km up', 0.9), first: label('the first thing ever made by people to reach space', 0.6), peen: label('Peenemünde', 0.7), usa: label('America', 1.1), ussr: label('Soviet Union', 1.1), race: label('the race to space', 1.0) };
+    this.spLabs = { v2: label('V-2, 1944: 176 km up', 1.4), first: label('the first thing ever made by people to reach space', 1.0), peen: label('Peenemünde', 1.8), usa: label('America', 2.8), ussr: label('Soviet Union', 2.8), race: label('the race to space', 2.4) };
     for (const l of Object.values(this.spLabs)) { l.material.opacity = 0; l.material.depthTest = false; sp.group.add(l); }
     this.spOrbit = glowPoints(260, { sizeScale: 300 }); sp.earth.add(this.spOrbit);
   }
@@ -996,7 +995,7 @@ export default class Rockets {
     else if (ph === 'tsiol') { face(Math.atan2(_c.x - T.g.position.x, _c.z - T.g.position.z)); T.pose = s.trumpet ? 'hold' : 'talk'; T.look = _c.clone(); }
     else if (ph === 'rocket') {
       if (!s.balloon) { this.balloonM.visible = s.rocket >= 1; }
-      face(Math.atan2(-1.8 - T.g.position.x, 0.5 - T.g.position.z)); T.pose = s.balloon ? (this.balloonT > 2.6 ? 'cheer' : 'gasp') : 'point'; T.pointAt.copy(this.sk.rocket.g.position); T.look = s.balloon ? this.balloonM.position.clone() : this.sk.rocket.g.position.clone();
+      face(Math.atan2(1.25 - T.g.position.x, -1.05 - T.g.position.z)); T.pose = s.balloon ? (this.balloonT > 2.6 ? 'cheer' : 'gasp') : 'point'; T.pointAt.copy(this.sk.rocket.g.position); T.look = s.balloon ? this.balloonM.position.clone() : this.sk.rocket.g.position.clone();
     }
     else if (ph === 'math') { face(Math.PI * 0.85); T.pose = s.cradle ? 'write' : 'point'; T.pointAt.copy(this.stages[1].g.position); T.look = s.cradle ? null : T.pointAt.clone(); }
     else { face(Math.PI * 1.15); T.pose = 'idle'; T.look = this.sk.station.g.position; }
@@ -1089,7 +1088,7 @@ export default class Rockets {
     // the correction, glowing
     const cv = this.corrV = damp(this.corrV || 0, s.correction ? 1 : 0, 1.5, dt);
     this.correction.visible = cv > 0.01;
-    if (this.correction.visible) { G.camera.getWorldDirection(_a).setY(0).normalize(); if (!this.corrPlaced) { this.corrPlaced = true; this.correction.position.copy(_c).addScaledVector(_a, 0.75).setY(_c.y - 0.05); } this.correction.lookAt(_c); this.correction.material.opacity = cv; this.corrGlow.material.opacity = 0.5 * cv; if (!this.corrSnd) { this.corrSnd = true; shimmer(G, 3, 0.15); } }
+    if (this.correction.visible) { G.camera.getWorldDirection(_a).setY(0).normalize(); if (!this.corrPlaced) { this.corrPlaced = true; this.correction.position.copy(_c).addScaledVector(_a, 0.85).add(_b.set(-_a.z, 0, _a.x).multiplyScalar(0.5)).setY(_c.y - 0.08); } this.correction.lookAt(_c); this.correction.material.opacity = cv; this.corrGlow.material.opacity = 0.5 * cv; if (!this.corrSnd) { this.corrSnd = true; shimmer(G, 3, 0.15); } }
     // the bubble of empty space
     const vv = this.vacV = damp(this.vacV || 0, s.vacuum ? 1 : 0, 2, dt);
     this.vac.visible = vv > 0.01;
@@ -1186,11 +1185,12 @@ export default class Rockets {
     this.spT = (this.spT || 0) + dt * fast;
     if (s.space === 2) this.mapT = (this.mapT || 0) + dt * fast;
     const mk = ease((this.mapT || 0) / 5);
+    sp.sunDir.copy(this.sunNear).lerp(this.sunFar, mk).normalize();
     E.position.lerpVectors(this.E0, this.E1, mk); E.quaternion.slerpQuaternions(this.q0, this.q1, mk); E.updateMatrixWorld(true);
     const nP = lonLat(...PEEN, _a).clone();
     // the V-2 climbing to the edge of space (its height drawn three times bigger, so you can see it)
     const climb = ease(clamp01(this.spT / 6)), h = 0.085 * R * climb, T = this.spTrail.userData;
-    for (let i = 0; i < 240; i++) { const f = i / 239 * climb, p = _b.copy(nP).multiplyScalar(R * 1.002 + 0.085 * R * ease(f)); T.pos.set([p.x, p.y, p.z], i * 3); const b = (0.3 + 0.7 * (i / 239)) * (1 - mk); T.col.set([b, b * 0.7, b * 0.35], i * 3); T.size[i] = 0.06; }
+    for (let i = 0; i < 240; i++) { const f = i / 239 * climb, p = _b.copy(nP).multiplyScalar(R * 1.002 + 0.085 * R * ease(f)); T.pos.set([p.x, p.y, p.z], i * 3); const b = (0.3 + 0.7 * (i / 239)) * (1 - mk); T.col.set([b, b * 0.7, b * 0.35], i * 3); T.size[i] = 0.12; }
     T.commit();
     this.spDot.position.copy(nP).multiplyScalar(R * 1.002 + h); this.spDot.material.opacity = (1 - mk) * (0.7 + 0.3 * Math.sin(t * 9)); this.spDot.scale.setScalar(0.8 + 0.3 * Math.sin(t * 7));
     const lab = (l, v, p, off) => { l.material.opacity = damp(l.material.opacity, v, 2.5, dt); if (p) l.position.copy(p).add(off); };
@@ -1202,7 +1202,7 @@ export default class Rockets {
     const dot = (p, r, g, b, sz) => { if (n >= 700) return; A.pos.set([p.x, p.y, p.z], n * 3); A.col.set([r, g, b], n * 3); A.size[n] = sz; n++; };
     const arc = (to, k0, col) => {
       const k = clamp01(((this.mapT || 0) - k0) / 4), m = lonLat(...to, _d).clone(), N = 300;
-      for (let i = 0; i < N; i++) { const f = i / N; if (f > k) break; const p = _b.copy(nP).lerp(m, f).normalize().multiplyScalar(R * (1.01 + 0.18 * Math.sin(Math.PI * f))); const head = k < 1 && f > k - 0.03; dot(p, col[0] * (head ? 2 : 1), col[1] * (head ? 2 : 1), col[2] * (head ? 2 : 1), head ? 0.3 : 0.1); }
+      for (let i = 0; i < N; i++) { const f = i / N; if (f > k) break; const p = _b.copy(nP).lerp(m, f).normalize().multiplyScalar(R * (1.01 + 0.18 * Math.sin(Math.PI * f))); const head = k < 1 && f > k - 0.03; dot(p, col[0] * (head ? 2 : 1), col[1] * (head ? 2 : 1), col[2] * (head ? 2 : 1), head ? 0.5 : 0.22); }
       return k;
     };
     const kU = s.space === 2 ? arc(WSANDS, 3, [1, 0.75, 0.4]) : 0, kS = s.space === 2 ? arc(MOSCOW, 4.5, [1, 0.45, 0.35]) : 0;
@@ -1211,7 +1211,7 @@ export default class Rockets {
       this.raceT = (this.raceT || 0) + dt * fast;
       for (const [o, ph, col] of [[WSANDS, 0, [1, 0.8, 0.5]], [MOSCOW, 0.5, [1, 0.5, 0.4]]]) {
         const st = lonLat(...o, _b).clone(), ax = _d.copy(st).cross(UP).normalize();
-        for (let i = 0; i < 40; i++) { const a = this.raceT * 0.9 - i * 0.02 + ph * 0; const rr = R * (1.02 + Math.min(0.12, this.raceT * 0.05)); const p = st.clone().applyAxisAngle(ax, a).multiplyScalar(rr); dot(p, col[0] * (1 - i / 40), col[1] * (1 - i / 40), col[2] * (1 - i / 40), 0.14); }
+        for (let i = 0; i < 40; i++) { const a = this.raceT * 0.9 - i * 0.02 + ph * 0; const rr = R * (1.02 + Math.min(0.12, this.raceT * 0.05)); const p = st.clone().applyAxisAngle(ax, a).multiplyScalar(rr); dot(p, col[0] * (1 - i / 40), col[1] * (1 - i / 40), col[2] * (1 - i / 40), 0.28); }
       }
       if (this.raceT > 4 && !this.beeped) { this.beeped = true; beeps(G, 5, 0.12); }
     }
@@ -1237,8 +1237,9 @@ export default class Rockets {
     const th = 0.36, n0 = UP.clone().multiplyScalar(Math.cos(th)).addScaledVector(f, Math.sin(th));
     this.E0 = cam.clone().addScaledVector(UP, -1.18 * R); this.q0 = frame(PEEN, n0, f);
     // far: the whole Earth ahead of you, the Atlantic in the middle
-    this.E1 = cam.clone().addScaledVector(f, 2.9 * R).addScaledVector(UP, -0.12 * R); this.q1 = frame([46, -38], f.clone().negate(), UP);
-    sp.sunDir.copy(UP).multiplyScalar(0.7).addScaledVector(f, -0.35).addScaledVector(right, 0.6).normalize();
+    this.E1 = cam.clone().addScaledVector(f, 2.9 * R).addScaledVector(UP, -0.12 * R); this.q1 = frame([45, -50], f.clone().negate(), UP);
+    this.sunNear = UP.clone().multiplyScalar(0.7).addScaledVector(f, -0.35).addScaledVector(right, 0.6).normalize(); this.sunFar = f.clone().multiplyScalar(-0.8).addScaledVector(UP, 0.35).addScaledVector(right, 0.45).normalize();
+    sp.sunDir.copy(this.sunNear);
     sp.earth.position.copy(this.E0); sp.earth.quaternion.copy(this.q0);
     sp.enter(this.root);
     if (G.audio.ctx) { awe(G, 16, 0.08, 98); shimmer(G, 4, 0.15); }

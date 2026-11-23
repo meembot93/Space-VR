@@ -175,7 +175,7 @@ export class Atmosphere {
     if (n === 13) {
       // fog lying in the pines at Peenemünde; the kerosene lamp and the stove in Tsiolkovsky's study
       const m = makeMist(scatter(45, () => { const a = Math.random() * 6.28, r = 20 + Math.random() * 260; return [Math.cos(a) * r, -55 + Math.sin(a) * r]; }, () => 0, [0.3, 2.5], [35, 70]), 0xb8c0cc);
-      this.root.add(m); this.mists.push({ m, amt: 0.9, on: (c) => c.cur === 'baltic' });
+      this.root.add(m); this.mists.push({ m, amt: 0.9, on: (c) => c.cur === 'baltic' && !c.space?.on });
       this.fires = fireLights(ch, ['lamp', 'stoveLight']);
     }
     if (n === 7) {
