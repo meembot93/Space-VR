@@ -30,13 +30,16 @@ const ASKS = /\b(walk|touch|click|point|turn|pull|grab|ring|hold|press|look|foll
       G.ui.showHint = (t, s) => { if (t) __hints.push(t); return sh(t, s); };
       window.__skip = setInterval(() => G.narration.skip(), 200);
       window.__ended = false; G.events.on('chapterEnd', () => { window.__ended = true; });
+      window.__music = []; const mo = G.music.moment.bind(G.music);
+      G.music.moment = (name, v) => { __music.push(`${name} during ${G.narration.cur?.id || G.director.chapter?.s?.phase}`); return mo(name, v); };
     });
     const kids = await page.evaluate(() => G.kids);
     const ok = await page.waitForFunction(() => window.__ended, null, { timeout: 1200000, polling: 250 }).then(() => true, () => false);
-    const r = await page.evaluate(() => ({ hints: __hints, phase: G.director.chapter?.s?.phase }));
+    const r = await page.evaluate(() => ({ hints: __hints, phase: G.director.chapter?.s?.phase, music: __music }));
     const asks = r.hints.filter((h) => ASKS.test(h));
     check(kids && ok, `Chapter ${n} plays to the end by itself in Kids mode (${Math.round((Date.now() - t0) / 1000)} s${ok ? '' : ', stuck at ' + r.phase})`);
     check(asks.length === 0, `Chapter ${n} never asks the player to do anything${asks.length ? ': ' + asks.join(' | ') : ''}`);
+    check(r.music.length === 1, `Chapter ${n}: music plays once, at its moment (${r.music.join(', ') || 'never'})`);
     check(errors.length === 0, `Chapter ${n}: no errors in the page${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
     await page.close();
   }
