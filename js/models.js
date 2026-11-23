@@ -20,8 +20,10 @@ export function modelList() {
 export async function loadModel(name) {
   const info = (await modelList())[name];
   if (!info) return null;
-  if (!cache.has(name)) cache.set(name, loader.loadAsync(DIR + info.file).catch((e) => { console.warn('Model failed', name, e); return null; }));
-  const gltf = await cache.get(name);
+  // High graphics (js/graphics.js) uses the full-texture version when there is one (info.hd)
+  const file = (globalThis.G?.gfx?.hd && info.hd) || info.file;
+  if (!cache.has(file)) cache.set(file, loader.loadAsync(DIR + file).catch((e) => { console.warn('Model failed', name, e); return null; }));
+  const gltf = await cache.get(file);
   if (!gltf) return null;
   const scene = cloneSkinned(gltf.scene); // keeps each copy's skeleton its own
   // Size it: stand on the ground (y = 0) and be `height` metres tall, centred on x/z

@@ -27,7 +27,8 @@ darken and turn copper-red right on time.
 
 Address-bar options for testing: `?fast` (placeholder lines and timelines run quickly),
 `?debug` (shows which narration clips are still missing; N skips a line on desktop),
-`?chapter=2`, `?labels` (tags every stand-in model "PLACEHOLDER"), `?autostart` (desktop).
+`?chapter=2`, `?labels` (tags every stand-in model "PLACEHOLDER"), `?autostart` (desktop),
+`?gfx=standard` or `?gfx=high` (graphics level), `?sharp=1.6` (pixels per eye in VR).
 
 ## Controls
 
@@ -53,6 +54,11 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
 ## How it's built
 
 - Plain ES modules, no build step. `index.html` loads `js/main.js`. three.js is vendored in `lib/`.
+- `js/graphics.js`: the Graphics setting on the title screen. Standard is the original look (Quest 2).
+  High (default on Quest 3, Quest Pro and PCs) draws more pixels per eye, adds real shadows from the
+  Sun or Moon and from big fires, sharper textures, the full 2048-pixel character textures
+  (`models/hd/`, listed as `"hd"` in `models/index.json`) and more Milky Way star dust. Chapters don't
+  need to do anything; mark a mesh `userData.noShadow = true` if it shouldn't cast a shadow.
 - `js/sky.js`: one sky for every chapter (stars, Milky Way, dawn colours, Sun, Moon), driven by the Sun's position.
 - `js/chapters.js`: the chapter list and the director. Each chapter (`js/chapters/*.js`) builds its
   place and tells its story top to bottom: `await D.say('ch2_03')`, `await D.until(...)`.

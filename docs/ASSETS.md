@@ -7,6 +7,10 @@ doc, "Characters to make in Tripo"), auto-rigged as **Humanoid with the Mixamo s
 To add one: shrink its textures (`npx @gltf-transform/cli resize in.glb out.glb --width 1024 --height 1024`),
 put it in `models/`, and list it in `models/index.json` under the name the code asks for:
 
+High graphics (Quest 3) uses the untouched Tripo export instead: copy the original 2048-pixel file to
+`models/hd/` with the same name and add `"hd": "hd/<file>.glb"` to its entry. Without it, High just
+uses the 1024 version.
+
 | Name in index.json | File | Used for | Status |
 |---|---|---|---|
 | `star_guide` | star_guide.glb | the guide, every chapter | in |

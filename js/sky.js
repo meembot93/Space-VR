@@ -187,7 +187,7 @@ export class Sky {
 
   // Spend what's left of the triangle budget on the Milky Way's star dust: the chapter's own
   // triangles (what's showing, re-checked twice a second) plus the stars come to about BUDGET.
-  budget(scene, BUDGET = 520000) {
+  budget(scene, BUDGET = this.maxTris || 520000) {   // maxTris: set by js/graphics.js (more on Quest 3)
     let tris = 0;
     scene.traverseVisible((o) => {
       if (o === this.group || !o.isMesh || !o.geometry) return;
