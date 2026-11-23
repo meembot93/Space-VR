@@ -23,6 +23,7 @@ import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2, roughStone } from '../shapes.js';
 import { glowPoints } from '../wow/fx.js';
+import { grove, deciduousTree, bareTree, conifer } from '../trees.js';
 import { D2R, ease, clamp01, at, sunAt, house, windows, steppedGable, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 54.36, YEAR = 1540, SUNLON = 215;     // Frombork, early November
@@ -219,9 +220,8 @@ export default class Copernicus {
     this.glitter = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ map: this.glitTex, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.glitter.rotation.x = -Math.PI / 2; this.glitter.position.y = WATER + 0.05; this.root.add(this.glitter);
     // the Vistula Spit on the far side: a long low line of dark pine forest and dunes
-    const k = new Kit(), r = rng(31);
+    const k = new Kit();
     k.box(9000, 3, 60, 0x6a6650, [0, WATER + 1, -2100]);
-    for (let i = 0; i < 260; i++) { const x = -4000 + i * 31 + r() * 20, h = 10 + r() * 8; k.cyl(0.1, 4 + r() * 3, h, 5, 0x1a2a20, [x, WATER + 2 + h / 2, -2100 + (r() - 0.5) * 40]); }
     this.root.add(k.mesh());
   }
 
@@ -628,26 +628,40 @@ export default class Copernicus {
     this.pageN = 20; this.pages.geometry.setDrawRange(0, 20 * 36);
   }
 
+  // Trees from the shared library (js/trees.js), each kind as one grove (2 draw calls). Early
+  // November: the oaks and limes on the hillside are gold and russet, some already bare; dark pines
+  // and spruces on the far hills and along the Vistula Spit across the lagoon.
   buildTrees() {
-    const k = new Kit(), r = rng(44);
-    // autumn trees on the hillside and round the close: oaks and limes going gold and brown
-    const COLS = [0x8a6a2a, 0x7a5a24, 0x6a6a2a, 0x9a6a2a, 0x4a5a2a];
-    for (let i = 0; i < 150; i++) {
+    const r = rng(44), near = [[], [], [], []];   // gold, russet, still green-brown, bare
+    for (let i = 0; i < 170 && near.flat().length < 75; i++) {
       const x = -200 + r() * 420, z = -150 + r() * 330;
-      if (x > -8 && x < 116 && z > -6 && z < 60) continue;            // not in the close
-      if (z < -55 && z > -150 && x > -130 && x < 60 && r() < 0.8) continue; // few in the town
-      if (Math.hypot(x, z) < 12) continue;
-      const y = groundHeight(x, z), s = 0.7 + r() * 0.8, c = COLS[Math.floor(r() * COLS.length)];
-      k.cyl(0.15 * s, 0.25 * s, 4 * s, 6, 0x3a2a1c, [x, y + 2 * s, z]);
-      k.ball(2.4 * s, 1, c, [x, y + 5 * s, z], [r(), r(), 0], [1, 0.85, 1]);
-      k.ball(1.7 * s, 1, c, [x + 1.2 * s, y + 4.2 * s, z + 0.6 * s], [r(), r(), 0]);
+      if (x > -11 && x < 119 && z > -9 && z < 63) continue;                 // not in the close, nor against its walls
+      if (z < -52 && z > -153 && x > -135 && x < 62) continue;               // not in the town's lanes
+      if (x > 20 && x < 100 && z > 60 && z < 82) continue;                   // nor on the canons' houses outside the gate
+      if (Math.hypot(x, z) < 14) continue;
+      const k = r(), list = near[k < 0.38 ? 0 : k < 0.66 ? 1 : k < 0.8 ? 2 : 3];
+      list.push({ x, y: groundHeight(x, z) - 0.1, z, s: 0.65 + r() * 0.6, yaw: r() * 6.283 });
     }
-    // dark forest on the far hills to the south and east
-    for (let i = 0; i < 220; i++) {
-      const a = 60 + r() * 160, d = 420 + r() * 500, p = at(a, d); const y = groundHeight(p.x, p.z), h = 12 + r() * 10;
-      k.cyl(0.1, 3 + r() * 2, h, 5, 0x1e2a1c, [p.x, y + h / 2, p.z]);
+    const tint = (g, k) => { const c = g.leaves?.geometry.getAttribute('color'); if (!c) return; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * k[0], c.getY(i) * k[1], c.getZ(i) * k[2]); c.needsUpdate = true; };
+    const autumn = [[3.0, 1.25, 0.45], [3.2, 0.95, 0.4], [2.2, 1.12, 0.5]];   // the green leaf texture turned gold, russet, brown
+    this.treeTris = 0;
+    near.forEach((spots, i) => {
+      if (!spots.length) return;
+      const g = i < 3 ? grove(deciduousTree, spots, { detail: 'low', height: 10, shape: i === 1 ? 'elm' : 'oak', variants: 3, seed: 3 + i }) : grove(bareTree, spots, { detail: 'low', height: 10, variants: 3, seed: 9 });
+      if (i < 3) tint(g, autumn[i]);
+      this.root.add(g.group); this.treeTris += g.tris;
+    });
+    // dark forest on the far hills to the south and east: spruce and pine
+    const far = [[], []];
+    for (let i = 0; i < 80; i++) {
+      const a = 60 + r() * 160, d = 420 + r() * 500, p = at(a, d);
+      far[i % 2].push({ x: p.x, y: groundHeight(p.x, p.z) - 0.2, z: p.z, s: 1 + r() * 0.5, yaw: r() * 6.283 });
     }
-    this.root.add(k.mesh());
+    far.forEach((spots, i) => { const g = grove(conifer, spots, { detail: 'low', height: 15, type: i ? 'pine' : 'spruce', variants: 3, seed: 21 + i }); this.root.add(g.group); this.treeTris += g.tris; });
+    // the pines of the Vistula Spit, two kilometres off across the water
+    const spit = [];
+    for (let i = 0; i < 50; i++) spit.push({ x: -2400 + i * 96 + r() * 50, y: WATER + 2.4, z: -2100 + (r() - 0.5) * 40, s: 1.4 + r() * 0.6, yaw: r() * 6.283 });
+    const sg = grove(conifer, spit, { detail: 'low', height: 14, type: 'pine', variants: 3, seed: 31 }); this.root.add(sg.group); this.treeTris += sg.tris;
   }
 
   buildPeople() {
