@@ -30,7 +30,6 @@ import { rng, noise2 } from '../shapes.js';
 import { dirFromAzEl } from '../sky.js';
 import { eqVec } from '../stars.js';
 import { glowPoints, shatter, whoosh, awe, shimmer } from '../wow/fx.js';
-import { Echo } from '../wow/echo.js';
 import { D2R, ease, clamp01, at, sunAt, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 45.42;
@@ -142,7 +141,7 @@ export default class Galileo {
       G.sky.setPlace({ lat: LAT, year: 1609, sunLon: SUNA });
     } else {
       G.world.height = (x, z) => (Math.abs(x) < 2.1 && Math.abs(z) < 2.1 ? TOPB : paduaHeight(x, z));
-      G.world.bounds = 1.85; G.world.blockers = [{ x: -1.45, z: 1.3, r: 0.4 }];
+      G.world.bounds = 1.85; G.world.blockers = [{ x: -1.45, z: 1.3, r: 0.4 }, { x: -1.225, z: -1.4, r: 0.45 }];
       G.sky.fogFar = 22000; G.sky.mist = 0;
       G.sky.setPlace({ lat: LAT, year: 1610, sunLon: SUNB });
     }
@@ -279,27 +278,86 @@ export default class Galileo {
   // the brick shaft below, the attic and the green pyramid spire above
   buildBelfry() {
     const k = new Kit(), B = 0xa85a40, M = 0xf0ece4, Y = TOPA;
-    k.box(12, Y, 12, B, [0, Y / 2, 0]);
-    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) { k.box(0.8, Y - 2, 0.4, 0x9a4a32, [-4.5 + i * 3, Y / 2, s * 6.05]); k.box(0.4, Y - 2, 0.8, 0x9a4a32, [s * 6.05, Y / 2, -4.5 + i * 3]); }
-    k.box(12.6, 0.6, 12.6, M, [0, Y - 0.3, 0]);
-    for (let i = 0; i < 12; i++) k.box(0.5, 0.06, 11, i % 2 ? 0x8a7a68 : 0x7a6a58, [-5.25 + i * 0.95, Y + 0.03, 0]);   // the floor boards
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(1.3, 6.4, 1.3, 0xcfc8b8, [sx * 5.35, Y + 3.2, sz * 5.35]);
+    // the brick shaft, its pilaster strips joined at the top by round arches (as on the real tower)
+    k.box(12, Y - 0.6, 12, B, [0, (Y - 0.6) / 2, 0]);
+    const ST = [-4.5, -1.5, 1.5, 4.5];
+    for (const s of [-1, 1]) for (const x of ST) { k.box(0.8, Y - 3.2, 0.4, 0x9a4a32, [x, (Y - 3.2) / 2, s * 6.2]); k.box(0.4, Y - 3.2, 0.8, 0x9a4a32, [s * 6.2, (Y - 3.2) / 2, x]); }
     for (let side = 0; side < 4; side++) {
       const yaw = side * Math.PI / 2, c = Math.cos(yaw), s = Math.sin(yaw);
       const P = (lx, ly, lz) => [lx * c + lz * s, ly, -lx * s + lz * c];
-      for (const x of [-2.1, 0, 2.1]) { k.cyl(0.24, 0.28, 4.4, 10, M, P(x, Y + 2.2, 5.6)); k.box(0.62, 0.3, 0.62, M, P(x, Y + 4.5, 5.6)); }
-      for (const x0 of [-3.15, -1.05, 1.05, 3.15]) k.add(new THREE.TorusGeometry(0.98, 0.17, 6, 14, Math.PI), M, P(x0, Y + 4.65, 5.6), [0, yaw, 0], [1, 0.95, 2]);
-      k.box(8.4, 0.18, 0.5, M, P(0, Y + 1.0, 5.6), [0, yaw, 0]); k.box(8.4, 0.14, 0.4, M, P(0, Y + 0.08, 5.6), [0, yaw, 0]);
-      for (let i = 0; i < 22; i++) { const x = -4 + i * 0.38; if (Math.abs(Math.abs(x) - 2.1) < 0.3 || Math.abs(x) < 0.3) continue; k.cyl(0.06, 0.08, 0.85, 6, M, P(x, Y + 0.5, 5.6)); }
-      k.box(12.4, 1.2, 0.8, M, P(0, Y + 6.1, 5.8), [0, yaw, 0]);
-      k.box(11, 6.5, 0.6, 0xc87a5a, P(0, Y + 9.9, 5.4), [0, yaw, 0]);
+      for (let i = 0; i < 3; i++) k.add(new THREE.TorusGeometry(1.1, 0.2, 4, 12, Math.PI), 0x9a4a32, P((ST[i] + ST[i + 1]) / 2, Y - 3.2, 6.2), [0, yaw, 0], [1, 1, 1]);
+      k.box(12.2, 0.5, 0.3, 0x9a4a32, P(0, Y - 1.35, 6.15), [0, yaw, 0]);            // a brick band under the cornice
+      for (let i = 0; i < 30; i++) k.box(0.16, 0.16, 0.2, 0xe8e0d0, P(-5.8 + i * 0.4, Y - 0.95, 6.3), [0, yaw, 0]);   // dentils
     }
+    // the white stone cornice the belfry stands on (its top a few cm under the floor: nothing flickers)
+    k.box(12.6, 0.5, 12.6, M, [0, Y - 0.35, 0]);
+    k.box(12.9, 0.12, 12.9, M, [0, Y - 0.16, 0]);
+    // ONE wooden plank floor: boards of slightly different shades, staggered butt joints, thin dark
+    // seams between them over a dark underlay; every board's top is at the floor, nothing overlaps
+    k.box(11.6, 0.03, 11.6, 0x2a1e14, [0, Y - 0.065, 0]);
+    { const fr = rng(31), PW = 0.235, GAP = 0.012, X0 = -5.8, X1 = 5.8;
+      for (let z = -5.8; z < 5.8 - 0.05; z += PW) {
+        const w = Math.min(PW - GAP, 5.8 - z - GAP); let x = X0 + fr() * 0.2;
+        if (x > X0) { const L0 = x - X0 - GAP; if (L0 > 0.05) k.box(L0, 0.05, w, 0x7a5a3a, [X0 + L0 / 2, Y - 0.025, z + w / 2 + GAP / 2]); }
+        while (x < X1 - 0.05) {
+          const L = Math.min(1.6 + fr() * 2.4, X1 - x), sh = 0.82 + fr() * 0.3, tone = [0x8a6a48, 0x7e6040, 0x947250, 0x86664a][Math.floor(fr() * 4)];
+          k.add(new THREE.BoxGeometry(L - GAP, 0.05, w), tone, [x + L / 2, Y - 0.025, z + w / 2 + GAP / 2], 0, 1, sh);
+          x += L;
+        }
+      }
+    }
+    // the corner piers: stone, with a moulded base and an impost where the arches spring
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      k.box(1.3, 6.4, 1.3, 0xcfc8b8, [sx * 5.35, Y + 3.2, sz * 5.35]);
+      k.box(1.5, 0.3, 1.5, 0xe0dace, [sx * 5.35, Y + 0.15, sz * 5.35]); k.box(1.42, 0.1, 1.42, M, [sx * 5.35, Y + 0.35, sz * 5.35]);
+      k.box(1.46, 0.14, 1.46, M, [sx * 5.35, Y + 4.58, sz * 5.35]); k.box(1.38, 0.08, 1.38, 0xe0dace, [sx * 5.35, Y + 4.47, sz * 5.35]);
+    }
+    // a baluster: a turned stone vase (a lathe shape)
+    const balG = new THREE.LatheGeometry([[0, 0], [0.085, 0], [0.085, 0.06], [0.06, 0.1], [0.1, 0.3], [0.09, 0.42], [0.05, 0.58], [0.045, 0.62], [0.075, 0.66], [0.075, 0.72], [0, 0.72]].map(([x, y]) => new THREE.Vector2(x, y)), 7);
+    const COLX = [-2.475, 0, 2.475], ARCX = [-3.5875, -1.2375, 1.2375, 3.5875];
+    for (let side = 0; side < 4; side++) {
+      const yaw = side * Math.PI / 2, c = Math.cos(yaw), s = Math.sin(yaw);
+      const P = (lx, ly, lz) => [lx * c + lz * s, ly, -lx * s + lz * c];
+      // columns with a moulded base and a capital
+      for (const x of COLX) {
+        k.cyl(0.23, 0.27, 4.1, 12, M, P(x, Y + 2.25, 5.6));
+        k.box(0.62, 0.14, 0.62, 0xe0dace, P(x, Y + 0.07, 5.6), [0, yaw, 0]); k.cyl(0.3, 0.33, 0.12, 12, M, P(x, Y + 0.2, 5.6)); k.cyl(0.27, 0.3, 0.06, 12, M, P(x, Y + 0.29, 5.6));
+        k.cyl(0.34, 0.24, 0.24, 12, M, P(x, Y + 4.24, 5.6)); k.cyl(0.26, 0.26, 0.05, 12, 0xe0dace, P(x, Y + 4.1, 5.6));
+        k.box(0.66, 0.18, 0.66, M, P(x, Y + 4.45, 5.6), [0, yaw, 0]); k.box(0.72, 0.06, 0.72, 0xe0dace, P(x, Y + 4.57, 5.6), [0, yaw, 0]);
+      }
+      // the arches, and the stone between them (spandrels) filled in up to the cornice
+      for (const x0 of ARCX) { k.add(new THREE.TorusGeometry(0.98, 0.17, 6, 14, Math.PI), M, P(x0, Y + 4.65, 5.6), [0, yaw, 0], [1, 0.95, 2]); k.box(0.22, 0.3, 0.42, 0xe0dace, P(x0, Y + 5.62, 5.6), [0, yaw, 0]); }
+      const sp = new THREE.Shape(), R0 = 0.86; sp.moveTo(-4.72, 0);
+      for (const x0 of ARCX) { sp.lineTo(x0 - R0, 0); sp.absarc(x0, 0, R0, Math.PI, 0, true); }
+      sp.lineTo(4.72, 0); sp.lineTo(4.72, 0.95); sp.lineTo(-4.72, 0.95); sp.closePath();
+      const sg = new THREE.ExtrudeGeometry(sp, { depth: 0.3, bevelEnabled: false, curveSegments: 8 }); sg.translate(0, 0, -0.15);
+      k.add(sg, 0xe6e0d4, P(0, Y + 4.65, 5.6), [0, yaw, 0]);
+      // the balustrade: a plinth, turned balusters, a moulded handrail, between the columns
+      k.box(9.4, 0.12, 0.42, 0xe0dace, P(0, Y + 0.06, 5.6), [0, yaw, 0]);
+      k.box(9.4, 0.12, 0.5, M, P(0, Y + 0.97, 5.6), [0, yaw, 0]); k.box(9.4, 0.07, 0.4, 0xe0dace, P(0, Y + 0.88, 5.6), [0, yaw, 0]);
+      for (let x = -4.5; x <= 4.51; x += 0.3) { if (COLX.some((cx) => Math.abs(x - cx) < 0.36)) continue; k.add(balG.clone(), M, P(x, Y + 0.12, 5.6)); }
+      k.box(side % 2 ? 10.8 : 12.4, 1.2, 0.8, M, P(0, Y + 6.1, 5.8), [0, yaw, 0]);
+      k.box(side % 2 ? 10.8 : 12.4, 0.16, 0.95, 0xe0dace, P(0, Y + 5.55, 5.8), [0, yaw, 0]);
+      k.box(11, 6.5, 0.6, 0xc87a5a, P(0, Y + 9.9, 5.4), [0, yaw, 0]);
+      // the attic: a stone frame, a round window, pilasters at the corners
+      k.box(5.2, 0.3, 0.2, M, P(0, Y + 12.1, 5.75), [0, yaw, 0]); k.box(5.2, 0.3, 0.2, M, P(0, Y + 7.6, 5.75), [0, yaw, 0]);
+      for (const sx of [-1, 1]) k.box(0.3, 4.8, 0.2, M, P(sx * 2.45, Y + 9.85, 5.75), [0, yaw, 0]);
+      k.add(new THREE.TorusGeometry(0.75, 0.13, 6, 16), M, P(0, Y + 9.85, 5.8), [0, yaw, 0]);
+      k.cyl(0.7, 0.7, 0.1, 16, 0x2a2420, P(0, Y + 9.85, 5.72), [Math.PI / 2, yaw, 0]);
+      for (const sx of [-1, 1]) k.box(0.7, 6.5, 0.2, 0xb86a4a, P(sx * 5.2, Y + 9.9, 5.75), [0, yaw, 0]);
+    }
+    // the ceiling: joists under the attic floor
     k.box(11.6, 0.3, 11.6, 0x5a4232, [0, Y + 5.8, 0]);
-    k.box(12.4, 1, 12.4, M, [0, Y + 13.4, 0]);
+    for (let i = 0; i < 9; i++) k.box(0.2, 0.26, 11.4, 0x4a3426, [-4.8 + i * 1.2, Y + 5.52, 0]);
+    k.box(12.4, 1, 12.4, M, [0, Y + 13.4, 0]); k.box(12.8, 0.25, 12.8, 0xe0dace, [0, Y + 13.95, 0]);
     k.cyl(0.001, 8.4, 24, 4, 0x6a9a84, [0, Y + 25.9, 0], [0, Math.PI / 4, 0]);
-    k.box(1.2, 2.4, 1.2, 0xe0b040, [0, Y + 39, 0]);
-    // the bells and their frame
+    // the golden angel on the tip: a robe, wings, a head
+    k.cyl(0.25, 0.6, 1.8, 6, 0xe0b040, [0, Y + 38.8, 0]); k.ball(0.28, 0, 0xe0b040, [0, Y + 40, 0]);
+    for (const sx of [-1, 1]) k.box(0.1, 1.6, 0.7, 0xe8c050, [sx * 0.45, Y + 39.6, -0.2], [0.3, 0, sx * 0.35]);
+    // the bells' oak frame: two beams hung from the ceiling joists by iron straps, so nothing stands
+    // in the way of the view through the arches
     k.box(9, 0.5, 0.5, 0x4a3422, [0, Y + 4.8, -1.2]); k.box(9, 0.5, 0.5, 0x4a3422, [0, Y + 4.8, 1.2]);
+    for (let i = 0; i < 9; i++) for (const sz of [-1, 1]) { const x = -4.8 + i * 1.2; if (Math.abs(x) > 4.5) continue; k.box(0.22, 0.36, 0.56, 0x2a2a2e, [x, Y + 5.2, sz * 1.2]); }
     this.A.add(k.mesh());
     const prof = [[0.02, 0], [0.32, 0], [0.42, -0.15], [0.48, -0.6], [0.62, -1.05], [0.78, -1.2], [0.8, -1.28], [0.02, -1.28]].map(([x, y]) => new THREE.Vector2(x, y));
     const bellGeo = new THREE.LatheGeometry(prof, 20), bellMat = new THREE.MeshStandardMaterial({ color: 0x9a7a40, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide });
@@ -307,6 +365,9 @@ export default class Galileo {
     for (const [x, z, s] of [[-2.6, -1.2, 1.15], [0.2, -1.2, 1.0], [2.8, -1.2, 0.85], [-1.6, 1.2, 0.75], [1.4, 1.2, 0.65]]) {
       const b = new THREE.Group(); b.position.set(x, Y + 4.55, z); const m = new THREE.Mesh(bellGeo, bellMat); m.scale.setScalar(s); b.add(m);
       const cl = new THREE.Mesh(new THREE.SphereGeometry(0.1 * s, 8, 6), bellMat); cl.position.y = -1.15 * s; b.add(cl);
+      // its wooden headstock (yoke) with iron straps, up to the frame
+      const yk = new Kit(); yk.box(0.6 * s + 0.3, 0.26, 0.36, 0x3e2c1c, [0, 0.12, 0]); for (const sx of [-1, 1]) yk.box(0.06, 0.32, 0.4, 0x2a2a2e, [sx * 0.2 * s, 0.06, 0]);
+      b.add(yk.mesh());
       this.A.add(b); this.bells.push({ g: b, s, a: 0, v: 0 });
     }
     // the floating lens demo (ch11_01): two lenses come together in a tube
@@ -346,7 +407,7 @@ export default class Galileo {
       const w = 7 + r() * 5;
       if (side < 0 && x + w > -9 && x < 9) { x = 9; continue; }
       const zz = side < 0 ? 1 - 4.5 : 22 + 5;
-      house(k, { x: x + w / 2, y: 0, z: zz, w, d: 9, h: 8 + r() * 5, yaw: side < 0 ? 0 : Math.PI, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], portico: side > 0, shut: true }, wins, r, true);
+      house(k, { x: x + w / 2, y: 0, z: zz, w, d: 9, h: 8 + r() * 5, yaw: side < 0 ? 0 : Math.PI, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], portico: side > 0, shut: true, tiles: true }, wins, r, true);
       x += w + 0.2;
     }
     for (let gx = -900; gx <= 900; gx += 15) for (let gz = -900; gz <= 900; gz += 15) {
@@ -357,7 +418,7 @@ export default class Galileo {
       if (Math.abs(gx % 60) < 2 || Math.abs(gz % 75) < 2 || r() < 0.1) continue;
       const near = d < 280; if (!near && r() < 0.6) continue;
       const x = gx + (r() - 0.5) * 2, z = gz + (r() - 0.5) * 2;
-      house(near ? k : far, { x, y: 0, z, shut: d < 150, w: 10 + r() * 4, d: 10 + r() * 3, h: 7 + r() * 8, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)] }, wins, r, near);
+      house(near ? k : far, { x, y: 0, z, shut: d < 150, tiles: d < 70, w: 10 + r() * 4, d: 10 + r() * 3, h: 7 + r() * 8, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)] }, wins, r, near);
     }
     // the Basilica of St Anthony (Il Santo): a brick church crowned with domes, a cone and minarets
     const sx = 262, sz = 183, B = 0x9a5a40;
@@ -401,26 +462,54 @@ export default class Galileo {
     // the house: three floors, a low tiled roof just under the altana
     k.box(14, Y - 2.6, 11, 0xd8b890, [0, (Y - 2.6) / 2, 0]);
     k.add(gableRoof(14, 11, 2.0, 0.4), 0x8a3a28, [0, Y - 2.6, 0]);
+    coppi(k, (x, y, z) => [x, Y - 2.6 + y, z], 14, 11, 2.0, 0.4, 0, 0x8a3a28, 0.32);
+    // the house front: a stone cornice under the eaves, a string course, the door in a stone frame, shutters
+    k.box(14.3, 0.3, 11.3, 0xe8dcc0, [0, Y - 2.75, 0]); for (const f of [1, 2]) k.box(14.1, 0.12, 11.1, 0xe0d0b0, [0, f * 3 + 0.25, 0]);
+    k.box(1.8, 3.0, 0.12, 0xd8ccb0, [-3, 1.5, 5.52]); k.box(2.0, 0.25, 0.2, 0xe0d4b8, [-3, 3.1, 5.56]);
+    for (let f = 0; f < 3; f++) for (let i = 0; i < 5; i++) for (const sz of [-1, 1]) { if (f === 0 && i === 1 && sz > 0) continue; for (const sx of [-1, 1]) k.box(0.36, 1.15, 0.05, 0x3a5a40, [-5.6 + i * 2.8 + sx * 0.56, 1.8 + f * 3, sz * 5.56]); k.box(0.9, 0.08, 0.14, 0xe0d4b8, [-5.6 + i * 2.8, 1.8 + f * 3 - 0.62, sz * 5.55]); }
     for (const sx of [-1, 1]) k.add(gableWall(11, 2.0, 0.2), 0xd8b890, [sx * 6.9, Y - 2.6, 0], [0, Math.PI / 2, 0]);
     for (let f = 0; f < 3; f++) for (let i = 0; i < 5; i++) { wins.push({ p: new THREE.Vector3(-5.6 + i * 2.8, 1.8 + f * 3, 5.53), yaw: 0 }); wins.push({ p: new THREE.Vector3(-5.6 + i * 2.8, 1.8 + f * 3, -5.53), yaw: Math.PI }); }
     k.box(1.4, 2.6, 0.1, 0x3a2416, [-3, 1.3, 5.55]);
     for (const [x, z] of [[4, 3], [-5, -3]]) { k.cyl(0.25, 0.25, 3, 6, 0xb09080, [x, Y, z]); k.cyl(0.6, 0.22, 0.8, 8, 0x8a5a48, [x, Y + 1.8, z]); }
-    // the altana: posts down to the roof, a plank floor, a railing
+    // the altana: posts and joists down to the roof, ONE plank floor (with a real opening for the
+    // stair hatch), a fascia round the edge, a turned railing with corner posts and finials
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(0.16, 2.6, 0.16, DARK, [sx * 2.05, Y - 1.3, sz * 2.05]);
-    for (let i = 0; i < 9; i++) k.box(0.46, 0.07, 4.3, i % 2 ? 0x7a5a3a : 0x6e5034, [-1.95 + i * 0.49, Y - 0.035, 0]);
+    for (const x of [-1.2, 0, 1.2]) k.box(0.12, 0.16, 4.2, DARK, [x, Y - 0.16, 0]);
+    for (const sz of [-1, 1]) { k.box(4.42, 0.16, 0.05, 0x5a3e28, [0, Y - 0.1, sz * 2.19]); k.box(0.05, 0.16, 4.42, 0x5a3e28, [sz * 2.19, Y - 0.1, 0]); }
+    { const fr = rng(41); const HZ0 = -1.9, HZ1 = -0.9;
+      for (let i = 0; i < 9; i++) {
+        const x = -1.96 + i * 0.49, tone = [0x7a5a3a, 0x6e5034, 0x765638, 0x6a4c30][Math.floor(fr() * 4)];
+        // two boards end to end in each row (a butt joint somewhere along), or around the hatch opening
+        const segs = (i === 1 || i === 2) ? [[-2.16, HZ0], [HZ1, 2.16]] : (() => { const j = -1.2 + fr() * 2.4; return [[-2.16, j - 0.006], [j + 0.006, 2.16]]; })();
+        for (const [z0, z1] of segs) k.add(new THREE.BoxGeometry(0.46, 0.06, z1 - z0), tone, [x, Y - 0.03, (z0 + z1) / 2], 0, 1, 0.9 + fr() * 0.2);
+        for (const [z0, z1] of segs) for (const zz of [z0 + 0.1, z1 - 0.1]) for (const sx of [-1, 1]) k.box(0.018, 0.006, 0.018, 0x1a1a1a, [x + sx * 0.15, Y + 0.002, zz]);   // nail heads
+      }
+    }
+    // the stairwell under the hatch: a trimmed opening, two steps going down into the dark
+    k.box(1.05, 0.03, 0.06, 0x4a3220, [-1.225, Y + 0.015, -1.93]); k.box(1.05, 0.03, 0.06, 0x4a3220, [-1.225, Y + 0.015, -0.87]);
+    for (const sx of [-1, 1]) k.box(0.06, 0.03, 1.0, 0x4a3220, [-1.225 + sx * 0.5, Y + 0.015, -1.4]);
+    for (const sx of [-1, 1]) k.box(0.02, 0.5, 1.0, 0x1a120c, [-1.225 + sx * 0.475, Y - 0.25, -1.4]);
+    k.box(0.95, 0.5, 0.02, 0x1a120c, [-1.225, Y - 0.25, -1.89]); k.box(0.95, 0.5, 0.02, 0x1a120c, [-1.225, Y - 0.25, -0.91]);
+    k.box(0.9, 0.04, 0.26, 0x4a3422, [-1.225, Y - 0.2, -1.03]); k.box(0.9, 0.04, 0.26, 0x3a2818, [-1.225, Y - 0.4, -1.27]);
+    k.box(0.95, 0.02, 1.0, 0x050403, [-1.225, Y - 0.48, -1.4]);
+    // railing: handrail, mid rail, square balusters, stout corner posts with ball finials
     for (const [ax, az, bx, bz] of [[-2.1, -2.1, 2.1, -2.1], [2.1, -2.1, 2.1, 2.1], [2.1, 2.1, -2.1, 2.1], [-2.1, 2.1, -2.1, -2.1]]) {
       const len = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(-(bz - az), bx - ax);
-      k.box(len + 0.1, 0.08, 0.1, WOOD, [(ax + bx) / 2, Y + 1.0, (az + bz) / 2], [0, yaw, 0]);
-      k.box(len + 0.1, 0.05, 0.06, WOOD, [(ax + bx) / 2, Y + 0.5, (az + bz) / 2], [0, yaw, 0]);
-      for (let d = 0; d <= len; d += 0.42) k.box(0.05, 1.0, 0.05, DARK, [ax + (bx - ax) * d / len, Y + 0.5, az + (bz - az) * d / len]);
+      k.box(len - 0.12, 0.06, 0.12, WOOD, [(ax + bx) / 2, Y + 1.0, (az + bz) / 2], [0, yaw, 0]);
+      k.box(len - 0.12, 0.03, 0.08, 0x5a3e28, [(ax + bx) / 2, Y + 0.955, (az + bz) / 2], [0, yaw, 0]);
+      k.box(len - 0.12, 0.05, 0.06, WOOD, [(ax + bx) / 2, Y + 0.12, (az + bz) / 2], [0, yaw, 0]);
+      for (let d = 0.3; d < len - 0.2; d += 0.3) k.box(0.045, 0.82, 0.045, DARK, [ax + (bx - ax) * d / len, Y + 0.55, az + (bz - az) * d / len], [0, yaw, 0]);
+      k.box(0.13, 1.12, 0.13, DARK, [ax, Y + 0.56, az]); k.box(0.17, 0.04, 0.17, WOOD, [ax, Y + 1.13, az]); k.ball(0.06, 0, WOOD, [ax, Y + 1.19, az]);
     }
-    // the stair hatch (its lid is separate: it closes later)
-    k.box(0.9, 0.02, 0.9, 0x0a0806, [-1.2, Y + 0.01, -1.4]);
     // a little table with his notebook, ink, a candle lantern; a stool
     k.box(0.7, 0.05, 0.5, WOOD, [-1.45, Y + 0.78, 1.3]); for (const [ox, oz] of [[-0.3, -0.2], [0.3, -0.2], [-0.3, 0.2], [0.3, 0.2]]) k.box(0.05, 0.78, 0.05, DARK, [-1.45 + ox, Y + 0.39, 1.3 + oz]);
     k.box(0.3, 0.02, 0.22, 0xece0c0, [-1.4, Y + 0.815, 1.32], [0, 0.2, 0]); k.box(0.3, 0.025, 0.22, 0x5a3a22, [-1.62, Y + 0.815, 1.2], [0, -0.3, 0]);
     k.cyl(0.03, 0.035, 0.05, 8, 0x1a1a1a, [-1.25, Y + 0.83, 1.15]); k.box(0.004, 0.2, 0.015, 0xf0f0e8, [-1.24, Y + 0.92, 1.14], [0.2, 0, 0.35]);
     k.box(0.4, 0.04, 0.4, WOOD, [-1.0, Y + 0.45, 1.75]); for (const [ox, oz] of [[-0.15, -0.15], [0.15, -0.15], [-0.15, 0.15], [0.15, 0.15]]) k.box(0.04, 0.45, 0.04, DARK, [-1.0 + ox, Y + 0.22, 1.75 + oz]);
+    // more of his things: a box of lenses, a spare tube, a sheet of Moon drawings, a quill in the ink
+    k.box(0.14, 0.05, 0.1, 0x5a3a22, [-1.7, Y + 0.83, 1.45]); for (let i = 0; i < 3; i++) k.cyl(0.018, 0.018, 0.006, 8, 0xbfe0ff, [-1.74 + i * 0.04, Y + 0.858, 1.45]);
+    k.cyl(0.022, 0.026, 0.5, 8, 0x7a2a1a, [-1.42, Y + 0.83, 1.5], [0, 0.4, Math.PI / 2]);
+    k.box(0.21, 0.004, 0.28, 0xe8dcc0, [-1.25, Y + 0.807, 1.38], [0, -0.3, 0]); k.cyl(0.035, 0.035, 0.002, 10, 0x6a5a48, [-1.26, Y + 0.81, 1.34]);
     // the garden behind: walls, a vine pergola, lemon trees in pots, fruit trees, a well, the workshop
     for (const [ax, az, bx, bz] of [[-15, -6, -15, -44], [15, -6, 15, -44], [-15, -44, 15, -44]]) { const len = Math.hypot(bx - ax, bz - az); k.box(len, 2.4, 0.4, 0xb8a080, [(ax + bx) / 2, 1.2, (az + bz) / 2], [0, Math.atan2(-(bz - az), bx - ax), 0]); }
     for (let i = 0; i < 7; i++) { for (const sx of [-1, 1]) k.box(0.12, 2.4, 0.12, DARK, [sx * 1.4, 1.2, -9 - i * 3]); k.box(3, 0.08, 0.1, DARK, [0, 2.4, -9 - i * 3]); k.ball(0.9, 1, 0x2a3a1e, [(i % 2 - 0.5) * 1.6, 2.6, -9 - i * 3], 0, [1.4, 0.5, 1.6]); }
@@ -432,11 +521,22 @@ export default class Galileo {
     k.box(8, 4, 6, 0xc8a880, [-9, 2, -36]); k.add(gableRoof(8, 6, 1.6, 0.3), 0x8a3a28, [-9, 4, -36]);
     k.box(1.6, 2.4, 0.1, 0xffa860, [-9, 1.2, -32.95]); wins.push({ p: new THREE.Vector3(-6.5, 2.2, -32.95), yaw: 0, on: true });
     k.box(1.2, 0.9, 0.6, 0x5a3a22, [-10.5, 0.45, -31.6]);
+    // ...a lean-to over the workbench: posts, a tiled slope, the lens-grinding wheel, tube staves, a lamp
+    for (const x of [-12.6, -5.4]) k.box(0.14, 2.6, 0.14, 0x3a2818, [x, 1.3, -31.2]);
+    k.box(7.6, 0.08, 2.2, 0x8a3a28, [-9, 2.75, -32.0], [0.35, 0, 0]); k.box(7.6, 0.14, 0.14, 0x3a2818, [-9, 2.55, -31.2]);
+    k.box(2.4, 0.08, 0.7, 0x6a4a30, [-7.2, 0.9, -31.9]); for (const x of [-8.3, -6.1]) for (const z of [-31.6, -32.2]) k.box(0.08, 0.9, 0.08, 0x3a2818, [x, 0.45, z]);
+    k.cyl(0.35, 0.35, 0.08, 14, 0x8a8478, [-6.6, 1.3, -31.9], [0, 0, Math.PI / 2]); k.box(0.06, 0.5, 0.06, 0x3a2818, [-6.6, 1.05, -31.9]);
+    for (let i = 0; i < 5; i++) k.cyl(0.03, 0.04, 1.0, 6, 0x7a2a1a, [-7.9 + i * 0.12, 0.98, -32.0], [0, 0, Math.PI / 2]);
+    k.cyl(0.25, 0.3, 0.6, 8, 0x6a4a30, [-11.8, 0.3, -31.7]); k.box(0.9, 0.5, 0.5, 0x5a3a22, [-12.0, 0.25, -32.6]);
     Bg.add(k.mesh());
     Bg.add(panes(wins, { lit: 0.6, seed: 2 }));
     this.workLight = new THREE.PointLight(0xffa050, 2.5, 14, 1.6); this.workLight.position.set(-9, 2, -31.5); Bg.add(this.workLight);
     // the hatch lid
-    const hk = new Kit(); hk.box(0.9, 0.06, 0.9, WOOD, [0, 0, 0.45]); this.hatch = hk.mesh(); this.hatch.position.set(-1.2, Y + 0.03, -1.85); this.hatch.rotation.x = -1.4; Bg.add(this.hatch);
+    // (boards, two battens, an iron ring; hinged at its north edge, it swings down over the opening)
+    const hk = new Kit(); for (let i = 0; i < 4; i++) hk.box(0.255, 0.04, 1.06, i % 2 ? 0x6e5034 : 0x765638, [-0.39 + i * 0.26, 0.02, 0.53]);
+    for (const z of [0.2, 0.86]) hk.box(0.98, 0.03, 0.08, 0x4a3220, [0, -0.015, z]);
+    hk.add(new THREE.TorusGeometry(0.05, 0.008, 4, 10), 0x2a2a2a, [0, 0.045, 0.85], [Math.PI / 2, 0, 0]);
+    this.hatch = hk.mesh(); this.hatch.position.set(-1.225, Y + 0.03, -1.96); this.hatch.rotation.x = -1.4; Bg.add(this.hatch);
     // the candle lantern on the table and its light
     this.candle = new THREE.PointLight(0xffa860, 2.6, 8, 1.6); this.candle.position.set(-1.55, Y + 1.1, 1.45); Bg.add(this.candle);
     const lk = new Kit(); lk.box(0.14, 0.2, 0.14, 0x2a2018, [0, 0.1, 0]); lk.cyl(0.001, 0.1, 0.08, 4, 0x2a2018, [0, 0.24, 0], [0, Math.PI / 4, 0]);
@@ -444,8 +544,10 @@ export default class Galileo {
     this.flame = glow(0xffb050, 0.12); this.flame.position.set(-1.6, Y + 0.92, 1.45); Bg.add(this.flame);
     // the telescope on its stand: a leather-covered tube on a wooden pole with a fork
     this.TP = new THREE.Vector3(0.55, Y + 1.38, 0.15);
-    const sk = new Kit(); sk.cyl(0.03, 0.04, 1.3, 8, DARK, [0, -0.68, 0]); for (const a of [0, 2.1, 4.2]) sk.box(0.04, 0.04, 0.7, DARK, [Math.sin(a) * 0.3, -1.3, Math.cos(a) * 0.3], [0.5, a, 0]);
-    sk.box(0.16, 0.04, 0.04, DARK, [0, 0, 0]); for (const s of [-1, 1]) sk.box(0.025, 0.14, 0.04, DARK, [s * 0.07, 0.05, 0]);
+    // (a turned pole on three splayed legs that stand on the planks, an iron collar, a brass fork)
+    const sk = new Kit(); sk.cyl(0.028, 0.038, 0.85, 8, DARK, [0, -0.45, 0]); sk.cyl(0.05, 0.05, 0.06, 8, 0x2a2a2a, [0, -0.86, 0]);
+    for (const a of [0.4, 2.5, 4.6]) { beam(sk, [0, -0.86, 0], [Math.sin(a) * 0.42, -1.38, Math.cos(a) * 0.42], 0.035, DARK); sk.box(0.07, 0.02, 0.07, 0x2a2a2a, [Math.sin(a) * 0.42, -1.37, Math.cos(a) * 0.42], [0, a, 0]); }
+    sk.box(0.16, 0.04, 0.04, 0xb08a40, [0, 0, 0]); for (const s of [-1, 1]) sk.box(0.025, 0.14, 0.04, 0xb08a40, [s * 0.07, 0.05, 0]);
     const stand = sk.mesh(); stand.position.copy(this.TP); Bg.add(stand);
     this.tube = new THREE.Group(); this.tube.position.copy(this.TP); Bg.add(this.tube);
     const tk = new Kit(); tk.cyl(0.032, 0.042, 1.0, 14, 0x7a2a1a, [0, 0.12, 0]); for (const y of [-0.38, 0.0, 0.4]) tk.cyl(0.046, 0.046, 0.03, 14, 0xd0a050, [0, y + 0.12, 0]); tk.cyl(0.05, 0.05, 0.05, 14, 0xd0a050, [0, 0.64, 0]); tk.cyl(0.025, 0.03, 0.08, 10, 0x3a2418, [0, -0.42, 0]);
@@ -462,20 +564,21 @@ export default class Galileo {
     const tk = new Kit(); tk.cyl(0.03, 0.04, 0.9, 12, 0x7a2a1a, [0, 0.45, 0]); tk.cyl(0.045, 0.045, 0.03, 12, 0xd0a050, [0, 0.88, 0]); tk.cyl(0.036, 0.036, 0.03, 12, 0xd0a050, [0, 0.02, 0]);
     this.spyTube = tk.mesh(); this.spyglass = new THREE.Group(); this.spyglass.add(this.spyTube); this.spyLen = 0.55; this.spyTube.scale.set(1, this.spyLen, 1);
     holdProp(this.galA, this.spyglass, 'Right', [0, 0.05, 0.03]);
-    this.senators = [[3.3, 3.0, 2.3], [2.0, -2.3, 1.2], [4.1, -2.0, 1.4], [-2.6, 3.4, 2.4]].map(([x, z, yaw], i) => { const P = add(this.A, i === 3 ? 'townsman' : 'canon', new THREE.Vector3(x, TOPA, z), { tunic: 0x8a1a1a, hair: 0x5a5a5a, height: 1.7 + i * 0.03 }); P.g.rotation.y = yaw; P.glance = true; return P; });
+    // (every senator a different person: one model each, none of them Galileo's own face)
+    const SEN = ['canon', 'ptolemy', 'instrument_maker', 'aristotle'];
+    this.senators = [[3.3, 3.0, 2.3], [2.0, -2.3, 1.2], [4.1, -2.0, 1.4], [-2.6, 3.4, 2.4]].map(([x, z, yaw], i) => { const P = add(this.A, SEN[i], new THREE.Vector3(x, TOPA, z), { tunic: 0x8a1a1a, hair: 0x5a5a5a, height: 1.7 + i * 0.03 }); P.g.rotation.y = yaw; P.glance = true; return P; });
     // Padua: Galileo at his telescope; two craftsmen in the garden workshop; people in the street
     this.galB = add(this.B, 'galileo', new THREE.Vector3(1.35, TOPB, -0.55), { tunic: 0x1a1a1a, hair: 0x6a3a1a, beard: true, height: 1.7 });
     this.galB.g.rotation.y = 2.3;
-    this.workers = [[-9.6, -31.8, Math.PI], [-7.8, -32.4, -2.4]].map(([x, z, yaw], i) => { const P = add(this.B, 'townsman', new THREE.Vector3(x, 0, z), { height: 1.65 }); P.g.rotation.y = yaw; P.pose = 'work'; P.phase = i * 2; return P; });
+    this.workers = [[-9.6, -31.8, Math.PI], [-7.3, -31.25, Math.PI]].map(([x, z, yaw], i) => { const P = add(this.B, i ? 'builder' : 'instrument_maker', new THREE.Vector3(x, 0, z), { height: 1.65 }); P.g.rotation.y = yaw; P.pose = 'work'; P.phase = i * 2; return P; });
     this.walkers = [];
     for (let i = 0; i < 5; i++) {
-      const x = -50 + i * 22, z = 12 + (i % 2) * 3, P = add(this.B, i < 2 ? 'townsman' : null, new THREE.Vector3(x, 0, z), { tunic: [0x3a2a2a, 0x2a2a3a, 0x4a3a2a, 0x1a1a1a, 0x5a2a2a][i], hair: 0x2a1a10, height: 1.62 + (i % 3) * 0.06 });
+      const x = -50 + i * 22, z = 12 + (i % 2) * 3, P = add(this.B, ['rheticus', 'eratosthenes'][i] ?? null, new THREE.Vector3(x, 0, z), { tunic: [0x3a2a2a, 0x2a2a3a, 0x4a3a2a, 0x1a1a1a, 0x5a2a2a][i], hair: 0x2a1a10, height: 1.62 + (i % 3) * 0.06 });
       P.routine = [{ x: x + 30, z: 12 + (i % 2) * 3, pose: 'idle', secs: 3 + i }, { x: x - 20, z: 13, pose: i % 2 ? 'talk' : 'idle', secs: 4 }];
       if (i % 2 === 0) { const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; }
       this.walkers.push(P);
     }
     // ch11_10: an echo of Galileo, warm and golden, back by his telescope
-    this.galEcho = new Echo(this.G, this.B, { model: 'galileo', tint: 0xffd080, pos: new THREE.Vector3(1.4, TOPB, -0.6), face: 2.4, seed: 9 });
   }
 
   // ======================= The telescope view =======================
@@ -820,7 +923,7 @@ export default class Galileo {
     let want = [1.35, -0.55];
     if (s.gal === 'scope') want = [this.TP.x - 0.45, this.TP.z - 0.35];
     if (s.gal === 'desk') want = [-1.25, 0.75];
-    if (s.gal === 'leave' || this.galGone) want = [-1.2, -1.4];
+    if (s.gal === 'leave' || this.galGone) want = [-1.225, -0.86];   // the top of the stairs
     if (!this.galGone && Gl.g.visible) {
       const arrived = walkToward(Gl, want[0], want[1], dt, { speed: 0.7, height: () => TOPB, stop: 0.08 });
       if (arrived) {
@@ -834,7 +937,12 @@ export default class Galileo {
       animatePerson(Gl, t, dt);
     }
     // down the stairs; the hatch closes
-    if (this.galGone && Gl.g.visible) { Gl.pose = 'walk'; Gl.stride = (Gl.stride || 0) + dt * 5; Gl.g.position.y -= dt * 1.1 * fast; animatePerson(Gl, t, dt); if (Gl.g.position.y < TOPB - 2.2) Gl.g.visible = false; }
+    if (this.galGone && Gl.g.visible) {
+      // down the steep stairs: facing north, a step down for every step forward, into the dark stairwell
+      Gl.g.rotation.y = Math.PI; Gl.pose = 'walk'; Gl.stride = (Gl.stride || 0) + dt * 5;
+      const v = dt * 0.75 * fast; Gl.g.position.y -= v; Gl.g.position.z = Math.max(-1.7, Gl.g.position.z - v * 1.2);
+      animatePerson(Gl, t, dt); if (Gl.g.position.y < TOPB - 2.2) Gl.g.visible = false;
+    }
     if (!Gl.g.visible && this.galGone) { this.hatch.rotation.x = Math.min(0, this.hatch.rotation.x + dt * 1.2 * fast); if (this.hatch.rotation.x >= 0 && !s.hatch) { if (G.isHost) s.hatch = 1; G.audio.ctx && G.audio.boom?.(this.hatch.position); } }
     // the book in his hands
     if (s.book && !this.bookHeld) { this.bookHeld = true; this.book.visible = true; holdProp(Gl, this.book, 'Right', [0, 0.06, 0.06]); }
@@ -855,7 +963,6 @@ export default class Galileo {
     // the craftsmen, the street, the echo
     this.workers.forEach((P, i) => { const up = s.open && this.wowT < 6; P.pose = up ? (i ? 'point' : 'gasp') : s.gloom ? 'idle' : 'work'; P.pointAt.copy(_a.copy(cam).addScaledVector(this.dirs.jup, 40)); P.look = up ? P.pointAt.clone() : null; animatePerson(P, t, dt); });
     for (const P of this.walkers) { runRoutine(P, dt, { height: paduaHeight, speed: 0.9 }); if (s.open && this.wowT < 8) { P.pose = 'point'; P.pointAt.copy(cam).addScaledVector(this.dirs.jup, 60); P.look = P.pointAt.clone(); } animatePerson(P, t, dt); P.lamp?.userData.flicker(t); }
-    this.galEcho.show(!!s.right && !s.journal); this.galEcho.P.pose = s.craft ? 'point' : 'cheer'; this.galEcho.P.pointAt.copy(cam).addScaledVector(this.dirs.jup, 40); this.galEcho.update(dt, t);
     if (s.right && !this.rightSnd) { this.rightSnd = true; G.audio.ctx && (awe(G, 10, 0.08, 110), shimmer(G, 4, 0.15)); }
   }
 
@@ -1073,6 +1180,23 @@ export default class Galileo {
 }
 
 // ======================= Helpers =======================
+// Italian roof tiles (coppi): rounded ridges running down both slopes of a gableRoof(w, d, rh, over)
+// placed at P(0, 0, 0) with yaw, plus a ridge cap. P maps the roof's own coordinates to the world.
+function coppi(k, P, w, d, rh, over, yaw, col, step = 0.42) {
+  const D = d / 2 + over, yb = -over * rh / (d / 2), L = Math.hypot(D, rh - yb), a = Math.atan2(rh, d / 2);
+  const dark = new THREE.Color(col).multiplyScalar(0.8).getHex();
+  for (const sz of [-1, 1]) for (let x = -w / 2 - over + step / 2; x < w / 2 + over; x += step) {
+    const g = new THREE.CylinderGeometry(0.07, 0.07, L, 4, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI / 2).rotateX(sz * a);
+    k.add(g, (Math.round(x / step) % 3) ? col : dark, P(x, (rh + yb) / 2 + 0.02, sz * D / 2), [0, yaw, 0]);
+  }
+  k.add(new THREE.CylinderGeometry(0.11, 0.11, w + 2 * over, 5).rotateZ(Math.PI / 2), dark, P(0, rh + 0.02, 0), [0, yaw, 0]);
+}
+// A square beam of thickness t from point a to point b (legs, braces)
+function beam(k, a, b, t, col) {
+  const A = new THREE.Vector3(...a), d = new THREE.Vector3(...b).sub(A), L = d.length();
+  const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, d.normalize()));
+  k.box(t, L, t, col, A.addScaledVector(d, L / 2).toArray(), [e.x, e.y, e.z]);
+}
 // An Italian town house: stucco walls, a low tiled roof, a funnel chimney, green shutters;
 // pushes its windows into `wins`. Far houses are just a block and a roof.
 function house(k, o, wins, r, near = true) {
@@ -1082,6 +1206,7 @@ function house(k, o, wins, r, near = true) {
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.add(gableRoof(w, d, rh, 0.35), roofCol, P(0, h, 0), [0, yaw, 0]);
   if (!near) return;
+  if (o.tiles) coppi(k, P, w, d, rh, 0.35, yaw, roofCol, 0.5);
   for (const sx of [-1, 1]) k.add(gableWall(d, rh, 0.2), wall, P(sx * (w / 2 - 0.1), h, 0), [0, yaw + Math.PI / 2, 0]);
   k.box(w + 0.3, 0.28, d + 0.3, 0xd8d0c0, P(0, h - 0.14, 0), [0, yaw, 0]);
   if (r() < 0.75) { const cx = (r() - 0.5) * w * 0.6, cz = (r() - 0.5) * d * 0.4; k.cyl(0.24, 0.24, rh + 1.6, 6, 0xb09080, P(cx, h + (rh + 1.6) / 2, cz)); k.cyl(0.6, 0.22, 0.8, 8, 0x8a5a48, P(cx, h + rh + 1.9, cz)); }
