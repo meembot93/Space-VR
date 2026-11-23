@@ -163,7 +163,7 @@ export class Atmosphere {
       // river mist along the Vltava; dust in the candlelight of the study
       const m = makeMist(scatter(30, () => [-330 + (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 1400], () => -3, [0.3, 1.4], [40, 80]), 0xb8c4dc);
       this.root.add(m); this.mists.push({ m, amt: 0.7 });
-      this.motes = makeSpecks(120, 4, 0xfff0c8, 0.02); this.motes.material.opacity = 0.35; this.root.add(this.motes);
+      this.motes = makeSpecks(120, 4, 0xfff0c8, 0.02); this.motes.material.opacity = 0.35; this.root.add(this.motes); R.motesOn = () => true;
       this.fires = fireLights(ch, ['candle', 'stove']);
     }
     if (n === 9) {
