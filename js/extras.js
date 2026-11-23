@@ -27,6 +27,7 @@ const MODULES = {
   11: () => import('./wow/ch11.js'),
   12: () => import('./wow/ch12.js'),
   14: () => import('./wow/ch14.js'),
+  13: () => import('./wow/ch13.js'),
 };
 
 export class Extras {
