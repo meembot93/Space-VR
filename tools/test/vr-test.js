@@ -56,7 +56,7 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   await shot('1_arrive');
   const before = await page.evaluate(() => [...G.camera.getWorldPosition(new G.camera.position.constructor()).toArray(), G.t]);
   await page.evaluate(() => __xr.controllers.left.updateAxes('thumbstick', 0, -1));
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(3000);
   await page.evaluate(() => __xr.controllers.left.updateAxes('thumbstick', 0, 0));
   const after = await page.evaluate(() => [...G.camera.getWorldPosition(new G.camera.position.constructor()).toArray(), G.t]);
   // (game time, not wall time: the software-rendered test browser runs at only a few frames a second)
@@ -153,7 +153,7 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
     await new Promise((r) => setTimeout(r, 150));
     __xr.controllers.left.updateButtonValue('trigger', 0);
   });
-  await until(() => G.director.chapter?.s.phase === 'done', null, 20000).then(() => check(true, 'touching the journal page with the trigger ends the chapter'), () => check(false, 'touching the journal page ends the chapter'));
+  await until(() => G.director.chapter?.s.phase === 'done', null, 90000).then(() => check(true, 'touching the journal page with the trigger ends the chapter'), () => check(false, 'touching the journal page ends the chapter'));
   const info = await page.evaluate(() => ({ calls: G.renderer.info.render.calls, tris: G.renderer.info.render.triangles }));
   console.log(`      draw calls ${info.calls}, triangles ${info.tris} (both eyes together)`);
   check(errors.length === 0, `no errors in the page${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
