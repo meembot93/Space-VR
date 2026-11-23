@@ -379,15 +379,15 @@ export default class Tycho {
     this.parW = [-1, 1].map((sd) => { const a = sd * 0.62, w = new THREE.Vector2(Math.sin(a) * 0.26, PE + Math.cos(a) * 0.26), d = new THREE.Vector2(0, PM).sub(w).normalize(); return { w, d, hit: skyHit(w, d) }; });
     const [h1, h2] = this.parW.map((q) => q.hit);
     this.parLabs = {
-      w1: L('Watcher 1', 0.06, this.parW[0].w.x - 0.2, this.parW[0].w.y - 0.02, '#a8ccff'),
-      w2: L('Watcher 2', 0.06, this.parW[1].w.x + 0.2, this.parW[1].w.y - 0.02, '#ffc090'),
-      moon: L('the Moon', 0.055, 0.14, PM, '#e8ecf8'),
-      h1: L('Watcher 1 sees the Moon here', 0.055, h1.x, h1.y + 0.1, '#a8ccff'),
-      h2: L('Watcher 2 sees it here', 0.055, h2.x, h2.y + 0.1, '#ffc090'),
-      jump: L('The Moon jumps!', 0.085, 0, Math.max(h1.y, h2.y) + 0.32),
-      star: L('The new star: the SAME spot for both', 0.07, NS.x, NS.y + 0.16),
-      cap1: L('So the new star is far, far beyond the Moon, out among the stars.', 0.075, 0, PE - 0.42),
-      cap2: L('The heavens CAN change. Aristotle was wrong!', 0.085, 0, PE - 0.55, '#ffe0a0'),
+      w1: L('Watcher 1', 0.1, this.parW[0].w.x - 0.32, this.parW[0].w.y - 0.02, '#a8ccff'),
+      w2: L('Watcher 2', 0.1, this.parW[1].w.x + 0.32, this.parW[1].w.y - 0.02, '#ffc090'),
+      moon: L('the Moon', 0.09, 0.2, PM, '#e8ecf8'),
+      h1: L('Watcher 1 sees the Moon here', 0.09, h1.x, h1.y + 0.1, '#a8ccff'),
+      h2: L('Watcher 2 sees it here', 0.09, h2.x, h2.y + 0.1, '#ffc090'),
+      jump: L('The Moon jumps!', 0.14, 0, Math.max(h1.y, h2.y) + 0.32),
+      star: L('The new star: the SAME spot for both', 0.11, NS.x, NS.y + 0.16),
+      cap1: L('So the new star is far, far beyond the Moon, out among the stars.', 0.1, 0, PE - 0.42),
+      cap2: L('The heavens CAN change. Aristotle was wrong!', 0.12, 0, PE - 0.6, '#ffe0a0'),
     };
     const ST = this.parStars = []; const r = rng(4); for (let i = 0; i < 70; i++) { const a = (r() - 0.5) * 2.2; ST.push([Math.sin(a) * SKY_R, PE + Math.cos(a) * SKY_R]); }
   }
@@ -614,9 +614,11 @@ export default class Tycho {
     if (s.parallax && !this.parOn) {   // each showing: float it up in front of you, facing you, and start over
       this.parOn = true; this.parT = 0;
       G.camera.getWorldPosition(_a); G.camera.getWorldDirection(_b); _b.y = 0; _b.normalize();
-      M.position.copy(_a).addScaledVector(_b, 3.2).add(_c.set(0, 0.05, 0)); M.lookAt(_a.x, M.position.y, _a.z); M.scale.setScalar(1.7);
+      M.position.copy(_a).addScaledVector(_b, 4).add(_c.set(0, 0.15, 0)); M.lookAt(_a.x, M.position.y, _a.z); M.scale.setScalar(1.8);
+      _c.set(-_b.z, 0, _b.x);   // Astra waits off to the side, out of the way
+      s.guide = M.position.clone().addScaledVector(_c, -2.6).add(_d.set(0, 0.6, 0)).toArray(); this.parGuide = true;
     }
-    if (!s.parallax) this.parOn = false;
+    if (!s.parallax) { this.parOn = false; if (this.parGuide) { this.parGuide = false; s.guide = null; } }
     this.parV = damp(this.parV || 0, s.parallax ? 1 : 0, 2, dt); M.visible = this.parV > 0.01;
     if (!M.visible) return;
     const T = this.parT = (this.parT || 0) + dt * fast, V = this.parV;
@@ -627,22 +629,22 @@ export default class Tycho {
     op(Lb.w1, k1); op(Lb.w2, k2); op(Lb.moon, k1); op(Lb.h1, k1); op(Lb.h2, k2); op(Lb.jump, k2 * (1 - k3 * 0.5)); op(Lb.star, k3); op(Lb.cap1, k4); op(Lb.cap2, s.parallax === 2 ? k5 : 0);
     const P = this.parPts.userData; let n = 0;
     const dot = (x, y, r, g, b, sz) => { if (n >= 900) return; P.pos.set([x, y, 0], n * 3); P.col.set([r * V, g * V, b * V], n * 3); P.size[n] = sz; n++; };
-    for (const [x, y] of this.parStars) dot(x, y, 0.6, 0.65, 0.8, 0.014);
+    for (const [x, y] of this.parStars) dot(x, y, 0.6, 0.65, 0.8, 0.025);
     const cols = [[0.5, 0.75, 1], [1, 0.62, 0.3]];
     this.parW.forEach((q, i) => {
       const k = i ? k2 : k1; if (k <= 0) return; const [r, g, b] = cols[i];
-      dot(q.w.x, q.w.y, r * k, g * k, b * k, 0.05);   // the watcher
+      dot(q.w.x, q.w.y, r * k, g * k, b * k, 0.08);   // the watcher
       // the line through the Moon, drawn out to the sky (it grows), and where it lands
       const len = q.w.distanceTo(q.hit), grow = clamp01((i ? T - 3 : T) / 1.5);
-      for (let j = 0; j < 150; j++) { const f = j / 149 * grow; dot(q.w.x + q.d.x * len * f, q.w.y + q.d.y * len * f, r * k, g * k, b * k, 0.009); }
-      if (grow >= 1) { const pulse = 1 + 0.3 * Math.sin(t * 5 + i); dot(q.hit.x, q.hit.y, r, g, b, 0.07 * pulse); }
+      for (let j = 0; j < 150; j++) { const f = j / 149 * grow; dot(q.w.x + q.d.x * len * f, q.w.y + q.d.y * len * f, r * k, g * k, b * k, 0.022); }
+      if (grow >= 1) { const pulse = 1 + 0.3 * Math.sin(t * 5 + i); dot(q.hit.x, q.hit.y, r, g, b, 0.12 * pulse); }
       // the line to the new star
-      if (k3 > 0) { const gs = clamp01((T - 7 - i * 0.6) / 1.5); for (let j = 0; j < 110; j++) { const f = j / 109 * gs; dot(q.w.x + (NS.x - q.w.x) * f, q.w.y + (NS.y - q.w.y) * f, r * k3, g * k3, b * k3, 0.009); } }
+      if (k3 > 0) { const gs = clamp01((T - 7 - i * 0.6) / 1.5); for (let j = 0; j < 110; j++) { const f = j / 109 * gs; dot(q.w.x + (NS.x - q.w.x) * f, q.w.y + (NS.y - q.w.y) * f, r * k3, g * k3, b * k3, 0.022); } }
     });
     // the jump: a dotted arc between the two places the Moon lands
-    if (k2 > 0) { const [a, b] = this.parW.map((q) => q.hit); for (let j = 0; j < 30; j++) { const f = j / 29, on = ((f * 5 - t) % 1 + 1) % 1 < 0.5; if (on) dot(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f + Math.sin(f * Math.PI) * 0.18, k2, k2, k2 * 0.9, 0.02); } }
+    if (k2 > 0) { const [a, b] = this.parW.map((q) => q.hit); for (let j = 0; j < 30; j++) { const f = j / 29, on = ((f * 5 - t) % 1 + 1) % 1 < 0.5; if (on) dot(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f + Math.sin(f * Math.PI) * 0.18, k2, k2, k2 * 0.9, 0.04); } }
     // the new star, steady and bright
-    dot(NS.x, NS.y, 1, 1, 0.85, 0.09 * (k3 > 0 ? 1 + 0.15 * Math.sin(t * 3) : 0.8));
+    dot(NS.x, NS.y, 1, 1, 0.85, 0.16 * (k3 > 0 ? 1 + 0.15 * Math.sin(t * 3) : 0.8));
     while (n < 900) dot(0, 0, 0, 0, 0, 0);
     P.commit();
   }
