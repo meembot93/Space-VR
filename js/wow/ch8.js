@@ -40,8 +40,8 @@ export default class Ch8Extras {
   // in gold: the Sun in the middle, the Earth's circle round it, the stars far outside. The Earth
   // is a separate glowing dot that goes round while you watch.
   makeAristarchus(root) {
-    const g = new THREE.Group(); g.position.set(-0.9, TOP + 1.75, -2.2); g.visible = false; root.add(g);
-    const W = 0.9, H = 0.9 * 640 / 1024, cx = 0.5, cy = 0.56, R = 0.2;   // drawing centre, Earth circle (fractions of the width)
+    const g = new THREE.Group(); g.position.set(-0.7, TOP + 1.8, -1.7); g.visible = false; root.add(g);
+    const W = 1.5, H = 1.5 * 640 / 1024, cx = 0.5, cy = 0.56, R = 0.2;   // drawing centre, Earth circle (fractions of the width)
     const tex = canvasTex(1024, 640, (c, w, h) => {
       c.textAlign = 'center'; c.textBaseline = 'middle'; c.shadowColor = 'rgba(255,190,90,0.9)'; c.shadowBlur = 16;
       c.fillStyle = '#ffe6b0'; c.font = 'italic 54px Georgia, serif'; c.fillText('Aristarchus of Samos', w / 2, 58);
@@ -57,7 +57,7 @@ export default class Ch8Extras {
     });
     const page = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
     g.add(page); this.ariPage = page;
-    this.ariEarth = glowSprite(0x7ab8ff, 0.07, 0); g.add(this.ariEarth);
+    this.ariEarth = glowSprite(0x7ab8ff, 0.11, 0); g.add(this.ariEarth);
     this.ariOrbit = { x: (cx - 0.5) * W, y: (0.5 - (cy + 40 / 640)) * H, rx: R * W, ry: R * W * 0.45 };
     return g;
   }
@@ -70,7 +70,7 @@ export default class Ch8Extras {
     this.ari.visible = this.ariK > 0.01;
     if (this.ari.visible) {
       G.camera.getWorldPosition(_a); this.ari.lookAt(_a.x, this.ari.position.y, _a.z);
-      this.ari.position.y = TOP + 1.75 + Math.sin(t * 0.9) * 0.02;
+      this.ari.position.y = TOP + 1.8 + Math.sin(t * 0.9) * 0.02;
       this.ariPage.material.opacity = this.ariK;
       const O = this.ariOrbit, a = t * 0.8; this.ariEarth.position.set(O.x + Math.cos(a) * O.rx, O.y - Math.sin(a) * O.ry, 0.01);
       this.ariEarth.material.opacity = this.ariK;
