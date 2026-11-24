@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, walkToward, runRoutine, holdProp } from '../people.js';
+import { dress } from '../dress.js';
 import { makeHerd, makeFlock, makeTorch, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
@@ -177,15 +178,18 @@ function doricTemple({ L = 31.8, W = 13.7, nL = 13, nW = 6, colH = 5.7, colD = 1
   for (const z of [-cw / 6, cw / 6]) column(cx1, z);
   // the entablature: architrave, the frieze of triglyphs and metopes, the projecting cornice
   const archH = colH * 0.15, frzH = colH * 0.16, corH = 0.42, deep = colD * 1.3;
-  const ring = (y, h, out, color) => {
-    k.box(L - 2 * inset + deep + 2 * out, h, deep + out, color, [0, y + h / 2, -W / 2 + inset + (-out) / 2]);
-    k.box(L - 2 * inset + deep + 2 * out, h, deep + out, color, [0, y + h / 2, W / 2 - inset + out / 2]);
-    k.box(deep + out, h, W - 2 * inset, color, [-L / 2 + inset - out / 2, y + h / 2, 0]);
-    k.box(deep + out, h, W - 2 * inset, color, [L / 2 - inset + out / 2, y + h / 2, 0]);
+  // trim: pull the inner face back (m), for a band laid over another ring, so their inner faces don't
+  // share a plane and flicker
+  const ring = (y, h, out, color, trim = 0) => {
+    const d = deep + out - trim, o = out + trim;
+    k.box(L - 2 * inset + deep + 2 * out, h, d, color, [0, y + h / 2, -W / 2 + inset + (-o) / 2]);
+    k.box(L - 2 * inset + deep + 2 * out, h, d, color, [0, y + h / 2, W / 2 - inset + o / 2]);
+    k.box(d, h, W - 2 * inset - 2 * trim, color, [-L / 2 + inset - o / 2, y + h / 2, 0]);
+    k.box(d, h, W - 2 * inset - 2 * trim, color, [L / 2 - inset + o / 2, y + h / 2, 0]);
   };
   const yA = top;
   ring(yA, archH, 0, MARBLE);
-  ring(yA + archH - 0.1, 0.1, 0.06, PAINT_RED);                                    // the painted band (taenia)
+  ring(yA + archH - 0.1, 0.1, 0.06, PAINT_RED, 0.03);                                    // the painted band (taenia)
   const yF = yA + archH;
   ring(yF, frzH, -0.08, 0xd8ccb0);                                                 // metopes, set back a little
   // triglyphs: one over every column and one between, painted blue, with their grooves
@@ -393,31 +397,35 @@ export default class Greece {
     for (const [k, v] of Object.entries(this.local)) if (v) { this.local[k] = null; }
   }
   // ---------- Life in each place: citizens of Athens, villagers at the well in Syene, people and
-  // gulls in Alexandria, a court scribe in China ----------
+  // gulls in Alexandria ----------
   buildLife() {
     this.torches = [];
-    const extra = (S, model, pos, faceTo, tint, look = {}) => {
-      const P = this.person(S, model, pos, faceTo, look); P.tint = tint; P.extra = true; P.glance = true; return P;
+    // Background people: every one a different person (one of Meem's models, in clothes of the place)
+    const extra = (S, model, pos, faceTo, clothes = {}, look = {}) => {
+      const P = this.person(S, model, pos, faceTo, look); P.extra = true; P.glance = true; dress(P, clothes); return P;
     };
-    const TINTS = [[0.95, 0.85, 0.75], [0.8, 0.9, 1.05], [1.05, 0.95, 0.8], [0.85, 0.8, 0.95], [1, 1, 1], [0.9, 1, 0.85]];
     // Athens: citizens gathered by the temple: voting with raised hands, and thinkers arguing in pairs
     const A = this.sets.grove;
     const spk = new THREE.Vector3(-13, 0, -12.5);
-    this.orator = extra(A, 'eratosthenes', spk, new THREE.Vector3(-6, 0, -6), TINTS[4]);
+    this.orator = extra(A, 'eratosthenes', spk, new THREE.Vector3(-6, 0, -6), { hue: 0.9, sat: 0.7, val: 0.9, hair: 0x4a3a2a });
     this.voters = [];
-    for (let i = 0; i < 6; i++) {
-      const a = -0.9 + i * 0.36, p = new THREE.Vector3(spk.x + Math.sin(a) * 3.2 + 2.2, 0, spk.z + Math.cos(a) * 3.2 + 1.2);
-      const P = extra(A, i % 2 ? 'aristotle' : 'eratosthenes', p, spk, TINTS[i % 6]); P.voter = true; this.voters.push(P);
+    const VOTERS = [['instrument_maker', { mul: 0xe8e0d0 }], ['sailor', { hue: 0.95, sat: 0.6, val: 0.85 }], ['builder', { hue: 0.1, sat: 0.5, val: 1.2 }], ['skywatcher', { mul: 0xe0d8c8, sat: 0.5, hair: 0x5a5048 }]];
+    for (let i = 0; i < 4; i++) {
+      const a = -0.75 + i * 0.5, p = new THREE.Vector3(spk.x + Math.sin(a) * 3.2 + 2.2, 0, spk.z + Math.cos(a) * 3.2 + 1.2);
+      const P = extra(A, VOTERS[i][0], p, spk, VOTERS[i][1]); P.voter = true; this.voters.push(P);
       if (i % 3 === 0) { const tc = makeTorch(); holdProp(P, tc, 'Left', [0, 0.04, 0.03]); this.torches.push(tc); }
     }
-    this.thinkers = [[-6.5, -7.2], [-7.6, -6.4], [4.5, -9], [5.6, -8.2]].map(([x, z], i) => {
-      const other = i % 2 ? [[-6.5, -7.2], [-7.6, -6.4], [4.5, -9], [5.6, -8.2]][i - 1] : [[-6.5, -7.2], [-7.6, -6.4], [4.5, -9], [5.6, -8.2]][i + 1];
-      const P = extra(A, i % 2 ? 'aristotle' : 'eratosthenes', new THREE.Vector3(x, 0, z), new THREE.Vector3(other[0], 0, other[1]), TINTS[(i + 2) % 6]); P.thinker = true; return P;
+    // two pairs arguing: a visiting Egyptian priest with an old woman, and two young students
+    const SPOTS = [[-6.5, -7.2], [-7.6, -6.4], [4.5, -9], [5.6, -8.2]];
+    const THINKERS = [['priest', { mul: 0xf0ece0 }], ['storyteller', { mul: 0xc8b8a0, sat: 0.5 }], ['architect', { mul: 0xe0d8c8, sat: 0.6 }], ['villager', { mul: 0xb8b0c8 }]];
+    this.thinkers = SPOTS.map(([x, z], i) => {
+      const other = SPOTS[i % 2 ? i - 1 : i + 1];
+      const P = extra(A, THINKERS[i][0], new THREE.Vector3(x, 0, z), new THREE.Vector3(other[0], 0, other[1]), THINKERS[i][1]); P.thinker = true; return P;
     });
     { const tc = makeTorch(); holdProp(this.thinkers[2], tc, 'Left', [0, 0.04, 0.03]); this.torches.push(tc); }
     // Syene: a villager drawing water at the well, donkeys and goats, kites circling high in the heat
     const Sy = this.sets.syene, W = this.wellPos;
-    this.drawer = extra(Sy, 'eratosthenes', new THREE.Vector3(W.x - 1.6, 0, W.z - 0.15), W, [0.85, 0.75, 0.6]);
+    this.drawer = extra(Sy, 'villager', new THREE.Vector3(W.x - 1.6, 0, W.z - 0.15), W);
     this.sLife = new Life(Sy.g);
     this.sLife.add(makeHerd('donkey', { n: 2, area: { x: W.x - 8, z: W.z - 6, r: 4 }, height: Sy.height, seed: 51 }));
     this.sLife.add(makeHerd('goat', { n: 5, area: { x: W.x + 7, z: W.z - 9, r: 5 }, height: Sy.height, seed: 52 }));
@@ -425,15 +433,13 @@ export default class Greece {
     // Alexandria: people crossing the square, gulls overhead
     const Al = this.sets.alex;
     this.strollers = [[-8, -10], [7, -12], [-5, 6], [9, 4]].map(([x, z], i) => {
-      const P = extra(Al, i % 2 ? 'aristotle' : 'eratosthenes', new THREE.Vector3(x, 0, z), new THREE.Vector3(0, 0, 0), TINTS[(i + 1) % 6]);
+      const P = extra(Al, ['priest', 'sailor', 'architect', 'instrument_maker'][i], new THREE.Vector3(x, 0, z), new THREE.Vector3(0, 0, 0), [{}, { hue: 0.5, sat: 0.6 }, { mul: 0xd8d0c0 }, { mul: 0xc0b098, sat: 0.7 }][i]);
       P.routine = [{ x, z, pose: i % 2 ? 'talk' : 'idle', secs: 3 + i }, { x: -x * 0.9, z: z + (i % 2 ? 5 : -5), pose: 'idle', secs: 2 + i }]; P.ri = i % 2;
       return P;
     });
     this.aLife = new Life(Al.g);
     this.aLife.add(makeFlock({ n: 10, center: new THREE.Vector3(0, 22, -15), r: 22, height: 6, color: 0xeeeeee, size: 1.1, speed: 6, seed: 54 }));
-    // China: a scribe beside the astronomer, writing down the comet
-    const Ch = this.sets.china;
-    this.scribe = extra(Ch, 'chinese_astronomer', new THREE.Vector3(1.2, 0, -1.9), new THREE.Vector3(0, 0, -1.3), [0.75, 0.85, 1.0]);
+    // (China: the astronomer writes the comet down himself, at his table with the inkstone and brush)
   }
 
   // What the background people are doing right now
@@ -443,7 +449,6 @@ export default class Greece {
     else if (P === this.orator) P.pose = s.vote || s.phase === 'arrive' ? 'talk' : 'idle';
     else if (P.thinker) P.pose = s.think || P.phase % 2 < 1 ? 'talk' : 'idle';
     else if (P === this.drawer) P.pose = 'work';
-    else if (P === this.scribe) P.pose = 'write';
     else if (P.routine) runRoutine(P, dt, { height: S.height, speed: 0.9 });
     if (s.cheer && !P.routine) P.pose = 'cheer';
     if (s.phase === 'eclipse' && this.cur === 'grove') { P.pose = P.phase % 3 < 1 ? 'point' : 'idle'; dirFromAzEl(MOON_AZ, MOON_EL, P.pointAt).multiplyScalar(50).add(P.g.position); P.look = P.pointAt.clone(); }
@@ -918,9 +923,8 @@ export default class Greece {
       s.userData.home = [Math.sin(a) * 0.85, 1.35 + (i % 2) * 0.18, -0.3 - Math.cos(a) * 0.85 + 0.2, 0, 0, 0, 1];
       S.g.add(s); return s;
     });
-    // Hipparchus: Aristotle's model in different colours
-    this.hipparchus = this.person(S, 'aristotle', new THREE.Vector3(2.4, 0, -1.5), new THREE.Vector3(0, 0, 0));
-    this.hipparchus.tint = [0.7, 0.85, 1.1];
+    // Hipparchus: the old instrument maker's model (he built his own sighting instruments), in a blue cloak
+    this.hipparchus = dress(this.person(S, 'instrument_maker', new THREE.Vector3(2.4, 0, -1.5), new THREE.Vector3(0, 0, 0)), { mul: 0xb8c4d8, sat: 0.8 });
     S.start = { pos: new THREE.Vector3(0, 0, 0.6), look: new THREE.Vector3(0, 0, -3) };
   }
 
@@ -1238,10 +1242,6 @@ export default class Greece {
       if (P === this.eratosthenes && s.eraGo && !s.plantA) { if (walkToward(P, this.ringA[0] - 0.55, this.ringA[1] + 0.25, dt, { height: S.height, speed: 1 })) P.pose = 'work'; }
       if (P === this.eratosthenes && s.prot === 2 && s.measure < 1) P.pose = 'hold';
       if (P.extra) this.lifePose(P, dt, t);
-      if (P.tint && P.model && !P.tinted) {
-        P.tinted = true;
-        P.model.scene.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color?.setRGB(...P.tint); } });
-      }
       animatePerson(P, t, dt);
     }
     for (const tc of this.torches) tc.userData.flicker(t);

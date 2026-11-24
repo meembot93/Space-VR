@@ -20,7 +20,8 @@
 // south end. The cosmos is centred on the same spot, shown instead of the hall.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
-import { makePerson, animatePerson, runRoutine } from '../people.js';
+import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
+import { dress } from '../dress.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 
 const D2R = Math.PI / 180;
@@ -457,56 +458,45 @@ export default class Ptolemy {
     this.people = [];
     const add = (pos, face, look, role) => {
       const P = makePerson({ seed: 70 + this.people.length * 11, ...look });
-      P.g.position.copy(pos); P.g.rotation.y = face; P.role = role; P.tintHex = look.tint;
+      P.g.position.copy(pos); P.g.rotation.y = face; P.role = role; if (look.dress) dress(P, look.dress);
       this.hall.add(P.g); this.people.push(P); P.blk = { x: pos.x, z: pos.z, r: 0.3 }; this.G.world.blockers.push(P.blk);
       return P;
     };
     // Ptolemy himself, behind his table, facing you as you come up the hall
     this.ptolemy = add(new THREE.Vector3(0.35, 0, TABLE.z - 0.95), 0, { model: 'ptolemy', tunic: 0xe8e0d0, hair: 0xd8d4cc, beard: true, height: 1.74 }, 'ptolemy');
     // Other scholars: reading at the side tables, and one looking up at the model
+    // Every scholar a different person: Alexandria drew them from all over (Meem's models, in the
+    // linen and wool of the library)
     const looks = [
-      { model: 'aristotle', tunic: 0xd8c8a8, hair: 0x5a4030, beard: true, tint: 0xc8d8ff },
-      { model: 'aristotle', tunic: 0xb89a78, hair: 0x2a2018, beard: true, tint: 0xffd8b0 },
-      { model: 'ptolemy', tunic: 0xa8b8c8, hair: 0x3a2a20, beard: true, tint: 0xd0ffd0 },
+      { model: 'skywatcher', dress: { hue: 0.55, sat: 0.5, val: 0.9, hair: 0x5a5048 } },   // a visiting Babylonian
+      { model: 'priest', dress: { mul: 0xf0e8d8 } },                                         // an Egyptian priest-scholar
+      { model: 'aristotle', dress: { mul: 0xc8d0c0, sat: 0.7, hair: 0x3a2a20 } },
+      { model: 'instrument_maker', dress: { mul: 0xd8c8a8 } },                               // the instrument maker
+      { model: 'sailor', dress: { mul: 0xe8e0cc, sat: 0.4 } },
+      { model: 'architect', dress: { mul: 0xd0c4a8, sat: 0.8 } },                            // a young student
     ];
     this.desks.slice(0, 3).forEach((d, i) => {
       const P = add(new THREE.Vector3(d.seat[0], 0, d.seat[2]), Math.atan2(d.x - d.seat[0], d.z - d.seat[2]), looks[i], 'read');
       P.g.position.y = 0; // (they stand at their desks to read, as people often did)
     });
-    const w = add(new THREE.Vector3(ARMILLARY.x + 2.1, 0, ARMILLARY.z + 0.8), Math.atan2(-2.1, -0.8), looks[1], 'gaze'); w.pointAt.copy(ARMILLARY).setY(2.9);
+    const w = add(new THREE.Vector3(ARMILLARY.x + 2.1, 0, ARMILLARY.z + 0.8), Math.atan2(-2.1, -0.8), looks[3], 'gaze'); w.pointAt.copy(ARMILLARY).setY(2.9);
     // Two scholars arguing as they walk up and down the hall (ch7_01: "reading, writing and arguing")
     [[1.6, 6.5], [2.3, 7.1]].forEach(([x, z], i) => {
-      const P = add(new THREE.Vector3(x, 0, z), Math.PI, looks[(i + 1) % 3], 'argue');
+      const P = add(new THREE.Vector3(x, 0, z), Math.PI, looks[4 + i], 'argue');
       P.routine = [{ x, z: z - 4, pose: 'talk', secs: 5, face: i ? -2.2 : 0.9 }, { x, z, pose: 'talk', secs: 4, face: i ? -2.2 : 0.9 }]; P.ri = 0;
     });
-    // Aristarchus: in the dark cosmos, standing in the shadows on the curve of the little Earth
-    const ap = new THREE.Vector3(-0.9, 0, -1.9), apr = Math.hypot(ap.x, ap.z);
-    ap.y = Math.sqrt(GLOBE_R * GLOBE_R - apr * apr) - GLOBE_R;
-    const A = makePerson({ model: 'aristotle', seed: 5, tunic: 0x8090a8, hair: 0x9a9a9a, beard: true });
-    A.g.position.copy(ap);
-    // lean with the ground, facing you
-    A.g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _a.set(ap.x, ap.y + GLOBE_R, ap.z).normalize());
-    A.g.rotateY(Math.atan2(-ap.x, -ap.z));
-    A.dark = true; this.aristarchus = A; this.cosmos.add(A.g);
-    this.aGlow = new THREE.Sprite(glowMat('rgba(150,180,255,1)')); this.aGlow.position.copy(ap).add(_a.set(0, 1.1, 0)); this.aGlow.scale.set(2.6, 3.4, 1); this.aGlow.material.opacity = 0;
-    this.aGlow.renderOrder = -1; this.cosmos.add(this.aGlow);
-    this.tinted = new Set();
-  }
-
-  // Give a model its own colours once it has loaded: scholars a different shade, Aristarchus in shadow
-  tintModels() {
-    for (const P of [...this.people, this.aristarchus]) {
-      if (!P.model || this.tinted.has(P)) continue;
-      this.tinted.add(P);
-      const look = P === this.aristarchus ? 0x8a9ac8 : P.tintHex;
-      if (!look && P !== this.aristarchus) continue;
-      P.model.scene.traverse((o) => {
-        if (!o.isMesh) return;
-        o.material = o.material.clone();
-        o.material.color?.multiply(new THREE.Color(look));
-        if (P === this.aristarchus) { o.material.transparent = true; o.material.opacity = 0; P.mats = (P.mats || []).concat(o.material); if (o.material.emissive) o.material.emissive.setHex(0x1a2440); }
-      });
-    }
+    // Aristarchus: in the dark cosmos he walks up over the curve of the little Earth, an oil lamp in his
+    // hand, and stops in front of you to say his idea (a real man with a real lamp: no ghostly glow)
+    const ap = new THREE.Vector3(-0.9, 0, -1.9);
+    const A = dress(makePerson({ model: 'aristotle', seed: 5, tunic: 0x8090a8, hair: 0x9a9a9a, beard: true }), { mul: 0x9aa8c0, sat: 0.7, val: 0.9, hair: 0xb8b4ac });
+    A.dir = new THREE.Vector2(ap.x, ap.z).normalize(); A.stop = Math.hypot(ap.x, ap.z); A.far = 5.75; A.r = A.far;
+    A.g.visible = false; this.aristarchus = A; this.cosmos.add(A.g);
+    const lk = new Kit();
+    lk.add(new THREE.LatheGeometry([[0, 0], [0.05, 0.006], [0.055, 0.03], [0.02, 0.042], [0, 0.042]].map(([a, b]) => new THREE.Vector2(a, b)), 10), 0xa0603a);
+    lk.box(0.05, 0.012, 0.02, 0xa0603a, [0.06, 0.03, 0]);
+    this.aLamp = new THREE.Group(); this.aLamp.add(lk.mesh(FLAT));
+    this.aGlow = new THREE.Sprite(glowMat('rgba(255,190,110,1)')); this.aGlow.position.set(0.08, 0.06, 0); this.aGlow.scale.setScalar(0.5); this.aGlow.material.opacity = 0;
+    this.aLamp.add(this.aGlow); holdProp(A, this.aLamp, 'Left', [0, 0.06, 0.05]);
   }
 
   // ---------- The cosmos ----------
@@ -839,7 +829,6 @@ export default class Ptolemy {
       if (s.phase === 'epicycle') s.et = Math.min(T1, s.et + dt * 0.075 * fast);
     }
     if ((s.where === 'hall') !== this.hall.visible) this.useHall(s.where === 'hall');
-    this.tintModels();
     if (s.where === 'hall') this.updateHall(dt, t); else this.updateCosmos(dt, t);
 
     // Astra: hover where the story wants it, or out in front of you
@@ -912,7 +901,6 @@ export default class Ptolemy {
     this.focusV = damp(this.focusV ?? 0, s.focus, 2, dt);
     this.sunV = damp(this.sunV ?? 0, s.sun, 1.5, dt);
     this.epiV = damp(this.epiV ?? 0, s.epi, 2, dt);
-    this.aristV = damp(this.aristV ?? 0, s.arist, 1.2, dt);
     // The crystal spheres turn, each at its own speed, carrying its body along the road
     for (const S of this.spheres) {
       const b = S.b, mars = b.k === 'mars', dim = mars ? 1 : 1 - 0.75 * this.focusV;
@@ -970,12 +958,21 @@ export default class Ptolemy {
     }
     // Clockwork: a tick each time the spheres move on a notch
     if (s.spin > 0.5) { const notch = Math.floor(s.turn * 24); if (notch !== this.prevNotch) { this.prevNotch = notch; G.audio.tick(null); } }
-    // Aristarchus in the shadows: fades in, a cool light behind him, glowing softly while he speaks
+    // Aristarchus walks up over the curve with his lamp (it flares a little while he speaks), and away again
     const A = this.aristarchus;
-    A.g.visible = this.aristV > 0.01;
-    if (A.mats) for (const m of A.mats) m.opacity = this.aristV;
-    this.aGlow.material.opacity = this.aristV * (0.35 + 0.5 * (G.narration.otherLevel || 0));
-    A.pose = 'idle'; animatePerson(A, t, dt);
+    const want = s.arist ? A.stop : A.far, step = Math.min(Math.abs(want - A.r), dt * 0.85);
+    A.r += Math.sign(want - A.r) * step;
+    A.g.visible = A.r < A.far - 0.02;
+    if (A.g.visible) {
+      // stand on the little Earth wherever he is on it, upright to its curve, facing you (or away, leaving)
+      const y = Math.sqrt(GLOBE_R * GLOBE_R - A.r * A.r) - GLOBE_R;
+      A.g.position.set(A.dir.x * A.r, y, A.dir.y * A.r);
+      A.g.quaternion.setFromUnitVectors(_a.set(0, 1, 0), _b.set(A.g.position.x, y + GLOBE_R, A.g.position.z).normalize());
+      A.g.rotateY(Math.atan2(-A.dir.x, -A.dir.y) + (s.arist ? 0 : Math.PI));
+      A.pose = step > 1e-4 ? 'walk' : 'idle'; A.stride = (A.stride || 0) + step / 0.62 * Math.PI;
+      this.aGlow.material.opacity = 0.7 + 0.25 * (G.narration.otherLevel || 0) + 0.05 * Math.sin(t * 9);
+      animatePerson(A, t, dt);
+    }
     // The little Earth turns very, very slowly under you (you can't feel it... can you?)
     this.globe.rotation.y += dt * 0.004;
   }

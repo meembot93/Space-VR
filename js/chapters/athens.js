@@ -201,7 +201,7 @@ export function buildAthens({ H, temple, colonnade, avoid }) {
   {
     const sx = -6, sz = -56, y = H(sx, sz);
     const sk = new Kit();
-    sk.box(60, 7, 13, 0xd8ccb0, [0, -3.5, -4.5]);                         // terrace it stands on
+    sk.box(60, 7, 12.9, 0xd8ccb0, [0, -3.52, -4.55]);                    // terrace it stands on (just under and behind the stoa's floor, so they never flicker)
     for (let i = 0; i < 3; i++) sk.box(60 - i * 0.6, 0.3, 1, 0xe0d4ba, [0, -0.15 - i * 0.3, 2.3 + i * 0.6]);
     colonnade(sk, 0, 1.5, 0, 22, 2.6, 6.4, 0.45, 0xece4d0, TILE, 9.5, 0, true);
     for (let i = 0; i < 10; i++) column(sk, -24 + i * 5.3, 0, -3, 6.0, 0.4);  // the inner row

@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { Kit } from '../kit.js';
 import { makePerson, animatePerson } from '../people.js';
+import { dress } from '../dress.js';
 import { makeFlock, makeDolphins, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp, angleWrap } from '../util.js';
 
@@ -438,9 +439,17 @@ export default class Antikythera {
     }
     hull.setAttribute('color', new THREE.BufferAttribute(hc, 3));
     T.add(new THREE.Mesh(hull, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-    const deck = new Kit(); deck.add(deckGeo(L, B, DECK), 0xb08a5a);
-    // deck planks (thin dark lines), mast, yard with the sail furled, bowsprit, rigging posts
-    for (let x = -1.6; x <= 1.6; x += 0.2) deck.box(0.012, 0.004, 9.5 * Math.pow(1 - Math.abs(x) / 1.9, 0.5), 0x7a5a36, [x, DECK + 0.002, 0]);
+    const deck = new Kit(); deck.add(deckGeo(L, B, DECK), 0x4e3824);   // (dark: it shows only in the seams)
+    // deck planks: each its own board, a little apart, in slightly different browns (one clean layer,
+    // 1.5 cm proud of the deck, so nothing flickers), then the mast, yard with the sail furled, bowsprit
+    const rp = rng(31);
+    for (let x = -1.6; x <= 1.61; x += 0.2) {
+      const len = 9.5 * Math.pow(1 - Math.abs(x) / 1.9, 0.5);
+      for (let z = -len / 2, j = 0; z < len / 2 - 0.05; j++) {                                   // boards butt-jointed along the length
+        const l = Math.min(len / 2 - z, 1.6 + rp() * 1.4) - 0.01, c = new THREE.Color(0xb08a5a).multiplyScalar(0.88 + rp() * 0.2);
+        deck.box(0.188, 0.015, l, c.getHex(), [x, DECK + 0.0075, z + l / 2]); z += l + 0.01;
+      }
+    }
     deck.cyl(0.07, 0.09, 7.4, 8, 0x7a5a36, [0, DECK + 3.7, -2.2]);
     deck.cyl(0.04, 0.05, 8.5, 6, 0x6a4a2a, [0.2, DECK + 4.6, -2.0], [0.15, 0, 1.15]);
     deck.cyl(0.16, 0.16, 7.2, 8, 0xe6dcc0, [0.28, DECK + 4.5, -2.0], [0.15, 0, 1.15]);
@@ -483,11 +492,12 @@ export default class Antikythera {
 
     // The diver (Meem's sponge diver), and two of the crew at the pump
     this.diverTop = makePerson({ model: 'diver', seed: 3 });
-    this.diverTop.g.position.set(1.0, DECK, 0.35); T.add(this.diverTop.g);
+    this.diverTop.g.position.set(1.0, DECK + 0.015, 0.35); T.add(this.diverTop.g);
     this.crew = [];
     for (const [x, face] of [[-1.25, Math.PI / 2], [0.05, -Math.PI / 2]]) {
-      const P = makePerson({ model: 'sailor', seed: 50 + this.crew.length * 9, tunic: [0x5a6a8a, 0x8a7a5a][this.crew.length], beard: true, hair: 0x2a2018 });
-      P.g.position.set(x, DECK, 2.3); P.g.rotation.y = face; P.pose = 'pull'; T.add(P.g); this.crew.push(P);
+      const P = makePerson({ model: ['sailor', 'instrument_maker'][this.crew.length], seed: 50 + this.crew.length * 9, tunic: [0x5a6a8a, 0x8a7a5a][this.crew.length], beard: true, hair: 0x2a2018 });
+      if (this.crew.length) dress(P, { mul: 0x6a7488, sat: 0.6, hair: 0x3a3430 });   // the old hand at the pump, in a faded blue smock
+      P.g.position.set(x, DECK + 0.015, 2.3); P.g.rotation.y = face; P.pose = 'pull'; T.add(P.g); this.crew.push(P);
     }
     // Bubbles coming up where the diver went down
     this.surfaceBubbles = makeSpecks({ n: 40, size: 0.05, color: 0xffffff, box: [1, 1.2, 1], rise: 0.5, uTime: uT, opacity: 0 });
@@ -677,12 +687,12 @@ export default class Antikythera {
     S.add(this.ghost);
   }
 
-  // Statues lying in the sand: one bronze, two marble (Meem's builder model, turned to stone)
+  // Statues lying in the sand: one bronze, two marble (three of Meem's models, turned to bronze and stone)
   buildStatues() {
     this.statues = [];
     const add = (pos, yaw, rot, y, kind, pose) => {
       const holder = new THREE.Group(); holder.position.set(pos.x, seabedHeight(pos.x, pos.z) + y, pos.z); holder.rotation.y = yaw;
-      const P = makePerson({ model: 'builder', seed: 70 + this.statues.length * 5, tunic: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, skin: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, hair: kind === 'bronze' ? 0x3d5a3a : 0xcfc8ba });
+      const P = makePerson({ model: ['architect', 'aristotle', 'eratosthenes'][this.statues.length], seed: 70 + this.statues.length * 5, tunic: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, skin: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, hair: kind === 'bronze' ? 0x3d5a3a : 0xcfc8ba });
       P.g.rotation.set(...rot); P.pose = pose; P.kind = kind; holder.add(P.g); this.sea.add(holder);
       P.g.updateMatrixWorld(true);
       P.pointAt.copy(holder.localToWorld(new THREE.Vector3(-0.6, 0.9, -2.2)));
@@ -1104,10 +1114,10 @@ export default class Antikythera {
     const G = this.G, s = this.s;
     // The diver: faces you, then turns to the ladder and climbs down into the sea
     const D = this.diverTop, k = s.dive;
-    if (k <= 0) { D.g.position.set(1.0, DECK, 0.35); D.g.rotation.y = turnToward(D.g.position, START_TOP); D.pose = 'idle'; }
+    if (k <= 0) { D.g.position.set(1.0, DECK + 0.015, 0.35); D.g.rotation.y = turnToward(D.g.position, START_TOP); D.pose = 'idle'; }
     else {
       const step = ease(clamp(k / 0.25, 0, 1)), down = ease(clamp((k - 0.25) / 0.75, 0, 1));
-      D.g.position.set(lerp(1.0, 1.55, step) + down * 0.3, lerp(DECK, -2.6, down), lerp(0.35, 0.25, step));
+      D.g.position.set(lerp(1.0, 1.55, step) + down * 0.3, lerp(DECK + 0.015, -2.6, down), lerp(0.35, 0.25, step));
       D.g.rotation.y = lerp(turnToward(_a.set(1, 0, 0.35), START_TOP), -Math.PI / 2, step); // back to the sea, climbing down the ladder facing the boat
       D.pose = down > 0 ? 'pull' : 'idle';
     }
