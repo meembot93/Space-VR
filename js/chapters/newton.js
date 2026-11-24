@@ -21,6 +21,7 @@
 // World axes: -Z north, +X east, +Y up. You start at the origin looking east (az 95).
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
+import { appleTree, orchardTree, deciduousTree, conifer, grove, makeApple } from '../trees.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp } from '../people.js';
 import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
@@ -363,25 +364,40 @@ export default class Newton {
   buildOrchard() {
     const k = new Kit(), ak = new Kit(), r = rng(29);
     this.trees = [];
-    const tree = (x, z, s, hero = false) => {
-      const y = groundHeight(x, z), lean = [(r() - 0.5) * 0.16, 0, (r() - 0.5) * 0.16];
-      k.cyl(0.1 * s, 0.16 * s, 1.5 * s, 7, 0x4a3a2a, [x, y + 0.75 * s, z], lean);
-      for (let b = 0; b < 4; b++) { const a = b / 4 * 6.28 + r(); k.cyl(0.04 * s, 0.07 * s, 1.2 * s, 5, 0x4a3a2a, [x + Math.cos(a) * 0.35 * s, y + 1.8 * s, z + Math.sin(a) * 0.35 * s], [Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7]); }
-      const greens = [0x46642a, 0x547430, 0x3c5a24, 0x5a7a34];
-      const blobs = [[0, 2.65, 0, 1.15]];
-      for (let b = 0; b < 5; b++) { const a = b / 5 * 6.28 + r(); blobs.push([Math.cos(a) * 0.85, 2.3 + r() * 0.6, Math.sin(a) * 0.85, 0.75 + r() * 0.3]); }
-      for (const [bx, by, bz, br] of blobs) k.ball(br * s, 1, greens[Math.floor(r() * greens.length)], [x + bx * s, y + by * s, z + bz * s], [r(), r(), r()], [1, 0.8, 1]);
-      // apples on the outside of the crown, and a few windfalls in the grass
-      const n = hero ? 34 : 18;
-      for (let i = 0; i < n; i++) {
-        const [bx, by, bz, br] = blobs[1 + Math.floor(r() * 5)], a = r() * 6.28, e = (r() - 0.6) * 1.6;
-        ak.ball(0.045 * (hero ? 1.1 : 1), 0, r() < 0.8 ? 0xc0281c : 0x9aa030, [x + (bx + Math.cos(a) * Math.cos(e) * br * 0.95) * s, y + (by + Math.sin(e) * br * 0.75) * s, z + (bz + Math.sin(a) * Math.cos(e) * br * 0.95) * s]);
+    // the hero: Newton's apple tree (full detail). One apple near the ideal spot over the grass by
+    // him is left off the tree: that is the one that falls (it hangs from a real twig).
+    // (seed 14 turned so no low limb reaches over Newton and the shallow side of the root flare
+    // is under him; the apple that falls hangs about 1.85 m up, just past his knees, to his right)
+    const ty = groundHeight(TREE.x, TREE.z), UPV = new THREE.Vector3(0, 1, 0);
+    const yaw = Math.atan2(-TOWARD.z, TOWARD.x) + 270 * D2R;
+    const toWorld = (v) => v.clone().applyAxisAngle(UPV, yaw);
+    const want = new THREE.Vector3().addScaledVector(TOWARD, 0.7).addScaledVector(SIDE, -0.45).setY(1.9).applyAxisAngle(UPV, -yaw);
+    this.heroTree = appleTree({ seed: 14, height: 5.4, apples: 30, windfalls: 9, reserveApples: 1, reserveNear: want,
+      ground: (x, z) => { const w = toWorld(new THREE.Vector3(x, 0, z)); return groundHeight(TREE.x + w.x, TREE.z + w.z) - ty; } });
+    this.heroTree.group.position.set(TREE.x, ty, TREE.z); this.heroTree.group.rotation.y = yaw; this.root.add(this.heroTree.group);
+    const ra = this.heroTree.reserved[0];
+    if (ra) APPLE0.copy(toWorld(ra.pos)).add(TREE).setY(ty + ra.pos.y);
+    // seat Newton just clear of the real trunk (its bark between hip and shoulder height, toward him)
+    {
+      const pos = this.heroTree.bark.geometry.attributes.position, w = new THREE.Vector3(); let rmax = 0.15;
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i); if (y < 0.15 || y > 0.9) continue;
+        w.set(pos.getX(i), 0, pos.getZ(i)).applyAxisAngle(UPV, yaw);
+        const along = w.x * TOWARD.x + w.z * TOWARD.z, side = Math.abs(w.x * SIDE.x + w.z * SIDE.z);
+        if (along > 0 && side < 0.25 && Math.hypot(w.x, w.z) < 0.6) rmax = Math.max(rmax, along);
       }
-      for (let i = 0; i < 4; i++) { const a = r() * 6.28, d = 0.5 + r() * 1.6; ak.ball(0.042, 0, 0xa02818, [x + Math.cos(a) * d, groundHeight(x + Math.cos(a) * d, z + Math.sin(a) * d) + 0.035, z + Math.sin(a) * d]); }
+      SIT.copy(TREE).addScaledVector(TOWARD, rmax + 0.2); this.trunkR = rmax;
+    }
+    this.trees.push(new THREE.Vector3(TREE.x, ty, TREE.z));
+    this.G.world.blockers.push({ x: TREE.x, z: TREE.z, r: 0.35 });
+    // the rest of the orchard: fruit trees in rows, nearer ones in more detail
+    const near = [], far = [];
+    const tree = (x, z, sc) => {
+      const y = groundHeight(x, z), spot = { x, y: y - 0.03, z, s: sc, yaw: r() * 6.28 };
+      (Math.hypot(x, z) < 10 ? near : far).push(spot);
       this.trees.push(new THREE.Vector3(x, y, z));
-      this.G.world.blockers.push({ x, z, r: 0.3 * s });
+      this.G.world.blockers.push({ x, z, r: 0.3 * sc });
     };
-    tree(TREE.x, TREE.z, 1.2, true);
     for (let gx = -24; gx <= 28; gx += 6.5) for (let gz = -16; gz <= 22; gz += 6.5) {
       const x = gx + (r() - 0.5) * 1.6, z = gz + (r() - 0.5) * 1.6, d = Math.hypot(x, z), az = (Math.atan2(x, -z) / D2R + 360) % 360;
       if (d < 3.2 || (d < 7 && az > 30 && az < 175) || Math.hypot(x - TREE.x, z - TREE.z) < 4.5) continue;
@@ -390,6 +406,7 @@ export default class Newton {
       if (Math.hypot(x - KEPSPOT.x, z - KEPSPOT.z) < 2.5 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 2.5) continue;
       tree(x, z, 0.8 + r() * 0.35);
     }
+    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6 }); this.root.add(g.group); }
     // a wooden ladder against one tree and a basket of picked apples beside it
     const lt = this.trees[3] || TREE;
     k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z - 0.25], [0, 0, 0.3]); k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z + 0.25], [0, 0, 0.3]);
@@ -418,22 +435,25 @@ export default class Newton {
   // Beyond the walls: hedgerows and oaks along the fields, woods on the far hills, and across the
   // valley Colsterworth: its church tower with pinnacles, cottages with lit windows.
   buildCountry() {
-    const k = new Kit(), r = rng(37), wins = [];
+    const k = new Kit(), r = rng(37), wins = [], oaks = [];
     const hedge = (ax, az, bx, bz) => {
       const len = Math.hypot(bx - ax, bz - az);
       for (let d = 0; d < len; d += 3.2) {
         const f = d / len, x = ax + (bx - ax) * f + (r() - 0.5), z = az + (bz - az) * f + (r() - 0.5), y = groundHeight(x, z);
         k.ball(1.6 + r() * 0.6, 0, [0x2e4422, 0x36502a, 0x283c1e][Math.floor(r() * 3)], [x, y + 1.2, z], [r(), r(), 0], [1, 0.85, 1]);
-        if (r() < 0.07 && !(Math.abs((Math.atan2(x, -z) / D2R + 360) % 360 - 117) < 22)) { const h = 7 + r() * 5; k.cyl(0.3, 0.45, h * 0.5, 6, 0x3a2e22, [x, y + h * 0.25, z]); k.ball(h * 0.42, 1, 0x2a401e, [x, y + h * 0.75, z], [r(), r(), 0], [1, 0.8, 1]); }
+        if (r() < 0.04 && !(Math.abs((Math.atan2(x, -z) / D2R + 360) % 360 - 117) < 22)) oaks.push({ x, y: y - 0.1, z, s: 0.6 + r() * 0.4 });   // a hedgerow oak
       }
     };
     for (const [ax, az, bx, bz] of [[-260, 32, 120, 32], [120, -200, 120, 260], [-60, 120, 300, 120], [-260, -60, -40, -60], [-40, -260, -40, -40], [40, -120, 300, -120], [-200, 200, 120, 200], [200, -300, 200, 300], [-160, -260, -160, 120]]) hedge(ax, az, bx, bz);
     // woods on the hills all round
-    for (let i = 0; i < 260; i++) {
-      const a = r() * 360, d = 380 + r() * 700, p = at(a, d), y = groundHeight(p.x, p.z), h = 10 + r() * 8;
+    const woods = [];
+    for (let i = 0; i < 70; i++) {
+      const a = r() * 360, d = 380 + r() * 700, p = at(a, d), y = groundHeight(p.x, p.z), h = 13 + r() * 8;
       if (a > 92 && a < 140 && d < 800) continue;
-      k.ball(h * 0.55, 0, [0x24361c, 0x2a3e20, 0x30462a][Math.floor(r() * 3)], [p.x, y + h * 0.6, p.z], [r(), r(), 0], [1, 0.8, 1]);
+      woods.push({ x: p.x, y: y - 0.3, z: p.z, s: h / 12 * 1.3 });
     }
+    // the hedgerow oaks, and the trees of the woods (far off: the simplest level of detail)
+    for (const [list, shape, seed] of [[oaks, 'oak', 3], [woods, 'oak', 7]]) if (list.length) { const g = grove(deciduousTree, list, { detail: 'low', variants: 4, seed, shape }); this.root.add(g.group); }
     // Colsterworth across the valley
     const cy = groundHeight(CHURCH.x, CHURCH.z);
     k.box(30, 12, 12, 0xb8ab8a, [CHURCH.x + 18, cy + 6, CHURCH.z]); k.add(gableRoof(30, 12, 6, 0.3), 0x5a5448, [CHURCH.x + 18, cy + 12, CHURCH.z]);
@@ -501,8 +521,7 @@ export default class Newton {
 
   // ---------- The apple and the arrows ----------
   buildApple() {
-    const k = new Kit(); k.ball(0.055, 1, 0xc8281a, [0, 0, 0]); k.cyl(0.004, 0.004, 0.04, 4, 0x3a2a1a, [0, 0.06, 0]); k.box(0.04, 0.005, 0.02, 0x4a7a2a, [0.02, 0.07, 0], [0, 0, 0.4]);
-    this.apple = k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x000000 }));
+    this.apple = makeApple(this.heroTree.reserved[0]?.r ?? 0.045, 0xb8261a);   // the same apple as the ones on the tree
     this.apple.position.copy(APPLE0); this.root.add(this.apple);
     this.appleGlow = glow(0xffd890, 0.45, 0); this.apple.add(this.appleGlow);
     this.appleTrail = glowPoints(40, { sizeScale: 260 }); this.root.add(this.appleTrail); this.trailPts = [];
@@ -593,6 +612,7 @@ export default class Newton {
     const G = this.G, sp = this.space = new Space(G, { earthR: ER });
     // everything in the plane of the orbits: x along the cannon's aim, y up through the mountain
     const C = this.cg = new THREE.Group(); sp.group.add(C);
+    const mtnNoise = (ux, uz, f) => ((Math.abs(N2(ux * 1.7 + 3, uz * 1.7 + f * 1.3) - 0.5) * 2 - 0.45) * 0.42 + (N1(ux * 5 + f * 4, uz * 5 - f * 3) - 0.5) * 0.16) * (1 - f * 0.5) * clamp01((0.965 - f) * 12);
     // the impossibly tall mountain (over England): concave flanks cut by ridges and gullies, green
     // foothills, bare rock, snow fields above, and a small flat summit for the cannon
     const mg = new THREE.CylinderGeometry(0.2, 0.8, 1.45, 44, 18).toNonIndexed(), mp = mg.attributes.position, mc = new Float32Array(mp.count * 3), col = new THREE.Color();
@@ -602,7 +622,7 @@ export default class Newton {
       const ux = rr > 1e-4 ? x / rr : 0, uz = rr > 1e-4 ? z / rr : 0;
       // the profile (wide foothills, steepening to the summit), then ridges and gullies
       const r0 = 0.8 - 0.6 * f, R = 0.15 + 0.73 * Math.pow(1 - f, 1.25);
-      const ridge = Math.abs(N2(ux * 1.7 + 3, uz * 1.7 + f * 1.3) - 0.5) * 2, n = ((ridge - 0.45) * 0.42 + (N1(ux * 5 + f * 4, uz * 5 - f * 3) - 0.5) * 0.16) * (1 - f * 0.5) * clamp01((0.965 - f) * 12);
+      const n = mtnNoise(ux, uz, f);
       const k = rr > 1e-4 ? (R / r0) * (1 + n) : 1; mp.setX(i, x * k); mp.setZ(i, z * k);
       const snowLine = 0.6 + (N2(ux * 3 + 9, uz * 3) - 0.5) * 0.25 - n * 0.6;
       if (f < 0.2 + (N1(ux * 3, uz * 3) - 0.5) * 0.1) col.copy(GRASS).lerp(GRASS2, N1(ux * 6, uz * 6 + f * 8));
@@ -613,6 +633,10 @@ export default class Newton {
     mg.setAttribute('color', new THREE.BufferAttribute(mc, 3)); mg.computeVertexNormals();
     this.mountain = new THREE.Mesh(mg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, fog: false }));
     this.mountain.position.y = ER - 0.4 + 0.725; C.add(this.mountain);
+    // dark pine forests on its lower slopes (they grow with it)
+    { const rr = rng(77), spots = [];
+      for (let i = 0; i < 40; i++) { const f = 0.03 + rr() * 0.3, a = rr() * 6.283, R = (0.15 + 0.73 * Math.pow(1 - f, 1.25)) * (1 + mtnNoise(Math.cos(a), Math.sin(a), f)) - 0.012; spots.push({ x: Math.cos(a) * R, y: -0.725 + f * 1.45 - 0.01, z: Math.sin(a) * R, s: 0.008 + rr() * 0.006 }); }
+      const g = grove(conifer, spots, { detail: 'low', variants: 3, seed: 5, type: 'pine' }); this.mountain.add(g.group); }
     // the cannon: a long iron barrel on a wooden carriage, aimed level along +x
     const ck = new Kit(), top = ER + MT;
     // (an iron barrel with reinforcing rings, a muzzle swell and a knob at the breech, on an oak
