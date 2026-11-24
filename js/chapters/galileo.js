@@ -81,7 +81,7 @@ function canalAt(x, z) { for (const R of RII) if (segD(x, z, R) < 4.5) return tr
 const LIDO = (z) => 3000 + z * 0.2;
 
 // ---------- Padua ----------
-function paduaHeight(x, z) { return (N2(x / 9, z / 9) - 0.5) * 0.15; }
+function paduaHeight(x, z) { const f = clamp((Math.hypot(x, z) - 160) / 80, 0, 1); return f ? (N2(x / 9, z / 9) - 0.5) * 0.15 * f : 0; }   // flat near Galileo's house
 
 export default class Galileo {
   constructor(G) {
@@ -137,7 +137,7 @@ export default class Galileo {
     this.A.visible = name === 'venice'; this.B.visible = name === 'padua';
     for (const it of this.life.items) if (it.scene) it.group.visible = it.scene === name;
     if (name === 'venice') {
-      G.world.height = (x, z) => (Math.abs(x) < 5.4 && Math.abs(z) < 5.4 ? TOPA : 1.2);
+      G.world.height = (x, z) => (Math.abs(x) < 5.4 && Math.abs(z) < 5.4 ? TOPA : veniceLand(x, z) ? 1.2 : 0);   // water is at 0
       G.world.bounds = 4.4; G.world.blockers = [];
       G.sky.fogFar = 6000; G.sky.mist = 0;
       G.sky.setPlace({ lat: LAT, year: 1609, sunLon: SUNA });
@@ -177,8 +177,8 @@ export default class Galileo {
     // the canals (rii) through the city
     for (const [[ax, az], [bx, bz]] of RII) { const L = Math.hypot(bx - ax, bz - az); k.box(9, 0.05, L, canal.getHex(), [(ax + bx) / 2, 1.23, (az + bz) / 2], [0, Math.atan2(bx - ax, bz - az), 0]); }
     // the Piazza's white stone stripes
-    for (let x = -170; x < 25; x += 12) k.box(0.4, 0.04, 80, 0xe8e0d0, [x, 1.23, -15]);
-    for (let z = -40; z < 14; z += 12) k.box(195, 0.04, 0.4, 0xe8e0d0, [-72, 1.23, z]);
+    for (let x = -170; x < 25; x += 12) k.box(0.4, 0.012, 80, 0xe8e0d0, [x, 1.206, -15]);
+    for (let z = -40; z < 14; z += 12) k.box(195, 0.012, 0.4, 0xe8e0d0, [-72, 1.206, z]);
     // the Lido: a long low sandbar with pines, the open Adriatic beyond
     for (let z = -4000; z < 5000; z += 250) { k.box(380, 3, 255, 0x8a8a62, [LIDO(z) + 190, 0.5, z], [0, 0.2, 0]); for (let j = 0; j < 4; j++) { const tz = z + r() * 250, tx = LIDO(tz) + 60 + r() * 260, h = 8 + r() * 6; r(); if (j < 2) lido.push({ x: tx, y: 2, z: tz, s: h / 11 }); } }
     { const g = grove(conifer, lido, { type: 'pine', height: 11, detail: 'low', variants: 3, seed: 5 }); A.add(g.group); }   // the Lido's umbrella pines
@@ -255,8 +255,9 @@ export default class Galileo {
     for (let i = 0; i < 9; i++) {
       const gk = new Kit(); gk.box(1.3, 0.45, 10, 0x0a0a0c, [0, 0.35, 0]); gk.box(1.0, 0.5, 2, 0x0a0a0c, [0, 0.75, 4.8], [-0.5, 0, 0]); gk.box(1.0, 0.5, 2, 0x0a0a0c, [0, 0.7, -4.8], [0.4, 0, 0]); gk.box(0.08, 0.7, 0.5, 0xd8d8d8, [0, 1.2, 5.6]);
       gk.box(0.9, 0.5, 1.4, 0x6a1a1a, [0, 0.75, 0.5]);   // a little cabin seat
-      const gm = gk.mesh(); const P = makePerson({ seed: 40 + i, tunic: [0x1a1a1a, 0xe8e0d0, 0x2a3a5a][i % 3], hair: 0x2a1a10 }); P.g.position.set(0, 0.55, -3.6); P.pose = 'pull'; gm.add(P.g); gm.userData.P = P;
-      const path = i < 5 ? { cx: 120 + i * 90, cz: 180, rx: 160 + i * 30, rz: 60 + i * 15 } : { cx: -260 - (i - 5) * 30, cz: 40 - (i - 5) * 80, rx: 30, rz: 70 };
+      gk.box(1.0, 0.03, 1.3, 0x1a1410, [0, 0.585, -3.6]);   // the gondolier's little stern deck
+      const gm = gk.mesh(); const P = makePerson({ seed: 40 + i, tunic: [0x1a1a1a, 0xe8e0d0, 0x2a3a5a][i % 3], hair: 0x2a1a10 }); P.g.position.set(0, 0.6, -3.6); P.pose = 'pull'; gm.add(P.g); gm.userData.P = P;
+      const path = i < 5 ? { cx: 120 + i * 90, cz: 180, rx: 160 + i * 30, rz: 60 + i * 15 } : { cx: -110 + (i - 5) * 40, cz: 150 + (i - 5) * 25, rx: 35, rz: 18 };
       gm.userData.path = path; gm.userData.a = r() * 6.28; gm.userData.v = (0.02 + r() * 0.02) * (i % 2 ? 1 : -1);
       A.add(gm); this.gondolas.push(gm);
     }
@@ -478,7 +479,7 @@ export default class Galileo {
     // the altana: posts and joists down to the roof, ONE plank floor (with a real opening for the
     // stair hatch), a fascia round the edge, a turned railing with corner posts and finials
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(0.16, 2.6, 0.16, DARK, [sx * 2.05, Y - 1.3, sz * 2.05]);
-    for (const x of [-1.2, 0, 1.2]) k.box(0.12, 0.16, 4.2, DARK, [x, Y - 0.16, 0]);
+    for (const x of [-1.85, 0, 1.2]) k.box(0.12, 0.16, 4.2, DARK, [x, Y - 0.16, 0]);   // (none under the stair opening)
     for (const sz of [-1, 1]) { k.box(4.42, 0.16, 0.05, 0x5a3e28, [0, Y - 0.1, sz * 2.19]); k.box(0.05, 0.16, 4.42, 0x5a3e28, [sz * 2.19, Y - 0.1, 0]); }
     { const fr = rng(41); const HZ0 = -1.9, HZ1 = -0.9;
       for (let i = 0; i < 9; i++) {
@@ -580,8 +581,9 @@ export default class Galileo {
     this.senators = [[3.3, 3.0, 2.3], [2.0, -2.3, 1.2], [4.1, -2.0, 1.4], [-2.6, 3.4, 2.4]].map(([x, z, yaw], i) => { const P = add(this.A, SEN[i], new THREE.Vector3(x, TOPA, z), { tunic: 0x8a1a1a, hair: 0x5a5a5a, height: 1.7 + i * 0.03 }); P.g.rotation.y = yaw; P.glance = true; return P; });
     // Padua: Galileo at his telescope; two craftsmen in the garden workshop; people in the street
     this.galB = add(this.B, 'galileo', new THREE.Vector3(1.35, TOPB, -0.55), { tunic: 0x1a1a1a, hair: 0x6a3a1a, beard: true, height: 1.7 });
+    { const [x, z] = this.scopeStance(dirFromAzEl(MOON.az, MOON.el - 3, new THREE.Vector3())); this.galB.g.position.set(x, TOPB, z); }   // ready at his telescope
     this.galB.g.rotation.y = 2.3;
-    this.workers = [[-9.6, -31.8, Math.PI], [-7.3, -31.25, Math.PI]].map(([x, z, yaw], i) => { const P = add(this.B, i ? 'builder' : 'instrument_maker', new THREE.Vector3(x, 0, z), { height: 1.65 }); P.g.rotation.y = yaw; P.pose = 'work'; P.phase = i * 2; return P; });
+    this.workers = [[-9.6, -31.8, Math.PI], [-7.3, -30.95, Math.PI]].map(([x, z, yaw], i) => { const P = add(this.B, i ? 'builder' : 'instrument_maker', new THREE.Vector3(x, 0, z), { height: 1.65 }); P.g.rotation.y = yaw; P.pose = 'work'; P.phase = i * 2; return P; });
     this.walkers = [];
     for (let i = 0; i < 5; i++) {
       const x = -50 + i * 22, z = 12 + (i % 2) * 3, P = add(this.B, ['rheticus', 'eratosthenes'][i] ?? null, new THREE.Vector3(x, 0, z), { tunic: [0x3a2a2a, 0x2a2a3a, 0x4a3a2a, 0x1a1a1a, 0x5a2a2a][i], hair: 0x2a1a10, height: 1.62 + (i % 3) * 0.06 });
@@ -721,6 +723,11 @@ export default class Galileo {
   act(a) {
     if (a.type === 'look' && this.s.look === 1) { this.s.look = 2; this.G.events.emit('sfx', { k: 'swell' }); return true; }
     return this.journal.act(a);
+  }
+  // Where Galileo stands to look through the telescope: behind the eyepiece, along the tube's line
+  scopeStance(dir = this.tubeDir) {
+    const hx = dir.x, hz = dir.z, h = Math.hypot(hx, hz) || 1, back = 0.5 * h + 0.42;
+    return [this.TP.x - hx / h * back, this.TP.z - hz / h * back];
   }
   getState() { return this.s; }
   setState(st) { const was = this.s.scene; Object.assign(this.s, st); if (st.scene && st.scene !== was) this.setScene(st.scene); }
@@ -875,7 +882,7 @@ export default class Galileo {
     gl.material.opacity = 0.55 * clamp01((G.sky.sunEl + 2) / 6); this.glitTex.offset.y = -t * 0.02;
     for (const b of this.boats) { b.position.y = Math.sin(t * 0.8 + b.userData.ph) * 0.12; b.rotation.z = Math.sin(t * 0.6 + b.userData.ph) * 0.03; }
     for (const g of this.gondolas) { const u = g.userData, P = u.path; u.a += u.v * dt; g.position.set(P.cx + Math.cos(u.a) * P.rx, 0.1 + Math.sin(t + u.a) * 0.04, P.cz + Math.sin(u.a) * P.rz); g.rotation.y = Math.atan2(-Math.sin(u.a) * P.rx * Math.sign(u.v), Math.cos(u.a) * P.rz * Math.sign(u.v)); animatePerson(u.P, t, dt); }
-    for (const P of this.crowd) { runRoutine(P, dt, { height: () => 1.2, speed: 0.9 }); animatePerson(P, t, dt); }
+    for (const P of this.crowd) { runRoutine(P, dt, { height: () => 1.212, speed: 0.9 }); animatePerson(P, t, dt); }
     // the lens demo
     const L = this.lensDemo; this.lensV = damp(this.lensV || 0, s.lens && s.lens < 3 ? 1 : 0, 2.5, dt);
     L.visible = this.lensV > 0.01 || (s.lens === 3 && this.flyK < 1);
@@ -932,8 +939,12 @@ export default class Galileo {
     const Gl = this.galB, cam = G.camera.getWorldPosition(_d).clone();
     const sky = (d) => _b.copy(Gl.g.position).setY(TOPB + 1.6).addScaledVector(d, 30).clone();
     let want = [1.35, -0.55];
-    if (s.gal === 'scope') want = [this.TP.x - 0.45, this.TP.z - 0.35];
-    if (s.gal === 'desk') want = [-1.25, 0.75];
+    if (s.gal === 'scope') want = this.scopeStance();
+    if (s.gal === 'desk' || s.gal === 'sad') {
+      want = [-1.25, 0.75];
+      // from his place by the rail, round the telescope's tripod (not through its legs)
+      if (!this.viaDesk && Gl.g.position.x > -0.2 && Gl.g.position.z < 0.2) { if (Math.hypot(Gl.g.position.x - 0.3, Gl.g.position.z + 1.1) < 0.15) this.viaDesk = true; else want = [0.3, -1.1]; }
+    }
     if (s.gal === 'leave' || this.galGone) want = [-1.225, -0.86];   // the top of the stairs
     if (!this.galGone && Gl.g.visible) {
       const arrived = walkToward(Gl, want[0], want[1], dt, { speed: 0.7, height: () => TOPB, stop: 0.08 });
@@ -941,7 +952,7 @@ export default class Galileo {
         if (s.gal === 'scope') { Gl.g.rotation.y = damp(Gl.g.rotation.y, Math.atan2(this.tubeDir.x, this.tubeDir.z), 3, dt); Gl.pose = 'hold'; Gl.look = sky(this.tubeDir); }
         else if (s.gal === 'cheer') { Gl.pose = 'cheer'; Gl.look = sky(this.dirs.jup); }
         else if (s.gal === 'desk') { Gl.g.rotation.y = damp(Gl.g.rotation.y, Math.PI * 0.75, 3, dt); Gl.pose = s.book ? 'hold' : 'write'; Gl.look = s.book === 2 ? _b.set(-1, TOPB + 4, 3).clone() : null; }
-        else if (s.gal === 'sad') { Gl.pose = 'idle'; Gl.look = _b.set(Gl.g.position.x, TOPB + 0.2, Gl.g.position.z + 2).clone(); }
+        else if (s.gal === 'sad') { Gl.pose = 'idle'; Gl.g.rotation.y = damp(Gl.g.rotation.y, Math.PI * 0.75, 3, dt); Gl.look = _b.set(Gl.g.position.x, TOPB + 0.2, Gl.g.position.z + 2).clone(); }
         else if (s.gal === 'leave') { this.galGone = true; }
         else { Gl.pose = s.venus ? 'point' : s.scope ? 'idle' : 'talk'; Gl.pointAt.copy(VEN); Gl.look = s.venus ? VEN.clone() : s.scope ? sky(this.aimDir) : cam; Gl.glance = !s.scope; Gl.g.rotation.y = damp(Gl.g.rotation.y, 2.5, 2, dt); }
       }
