@@ -96,7 +96,7 @@ export default class Kepler {
     this.start = { pos: new THREE.Vector3(0.45, 0, -0.15), yaw: 0 };
     this.s = {
       phase: 'arrive', guide: null, hour: 21,
-      tycho: 1,       // 1 here, 2 fading away, 0 gone
+      tycho: 1,       // 1 here, 2 walking out of the door, 0 gone
       books: 0,       // 1 = the logbooks fly to Kepler's desk
       orbit: 0,       // the orbit model showing
       dots: 0,        // Tycho's measurements shown
@@ -615,6 +615,9 @@ export default class Kepler {
     await D.cue('Tycho fell ill'); s.tycho = 2;
     await D.cue('Kepler got everything'); s.books = 1;
     await l2;
+    // (the logbooks fly to the desk once Tycho has gone out of the door)
+    await D.until(() => s.tycho === 0, fast ? 8 : 6);
+    if (s.tycho) { this.tyc.g.visible = false; s.tycho = 0; }
     // the circles
     s.phase = 'circles'; s.orbit = 1; s.dots = 1; s.guide = [ORR.x + 3.2, ORR.y + 0.8, ORR.z + 2.2];
     const l3 = D.sayAsync('ch10_03');
@@ -705,7 +708,7 @@ export default class Kepler {
       Bn.LeftUpLeg.getWorldPosition(_b); Bn.LeftLeg.getWorldPosition(_c); Bn.LeftFoot.getWorldPosition(_d);
       K.sit = { up: _b.y - gy, thigh: _b.distanceTo(_c), shin: _c.distanceTo(_d), ankle: _d.y - gy };
     }
-    const S = K.sit, hipH = SEAT + 0.07;
+    const S = K.sit, hipH = SEAT + 0.1;
     K.g.position.y = TOP + hipH - S.up;
     K.inner.position.y = 0;
     K.inner.updateWorldMatrix(true, false);
@@ -730,20 +733,19 @@ export default class Kepler {
     else if (s.galileo) { K.pose = 'idle'; K.look = this.scope.position.clone(); }
     else { K.pose = 'write'; K.look = null; }
     animatePerson(K, t, dt); this.seat(K);
-    // Tycho: guarding his books, then fading away
     // Tycho: guarding his ledger; then (he fell ill) he walks out through the door, and it shuts behind him
     if (s.tycho === 2 && T.g.visible) {
-      const tgt = T.g.position.z < 1.15 ? [0.22, 1.2] : [0.25, 2.0];
+      const tgt = T.g.position.z < 1.15 ? [0.3, 1.2] : [0.3, 2.0];
       walkToward(T, tgt[0], tgt[1], dt, { speed: 1.2, stop: 0.08 }); T.g.position.y = TOP + 0.05; T.look = null;
-      if (T.g.position.z > 1.88) { T.g.visible = false; s.tycho = 0; }
+      if (T.g.position.z > 1.68) { T.g.visible = false; s.tycho = 0; }
       this.tycBlk.x = T.g.position.x; this.tycBlk.z = T.g.position.z;
     } else if (T.g.visible) { T.pose = 'hold'; T.look = K.g.position.clone().setY(TOP + 1.2); }
     this.tycBlk.r = T.g.visible ? 0.3 : 0;
     if (T.g.visible) animatePerson(T, t, dt);
-    const near = T.g.visible && T.g.position.distanceTo(_a.set(0.25, TOP, RZ - 0.2)) < 1.3;
-    this.doorA = damp(this.doorA || 0, near ? 1.5 : 0, near ? 3 : 2, dt); this.door.rotation.y = this.doorA;
+    const near = T.g.visible && s.tycho === 2;    // open wide before he gets there, so the leaf never sweeps through him
+    this.doorA = damp(this.doorA || 0, near ? 1.55 : 0, near ? 4 : 2, dt); this.door.rotation.y = this.doorA;
     // the books fly from Tycho's arms to Kepler's desk
-    if (s.books && !this.booksFlying) { this.booksFlying = true; this.bookFrom = this.logs.position.clone(); this.bookF = 0; }
+    if (s.books && !T.g.visible && !this.booksFlying) { this.booksFlying = true; this.bookFrom = this.logs.position.clone(); this.bookF = 0; }
     if (this.booksFlying && this.bookF < 1) { this.bookF = Math.min(1, this.bookF + dt / 2.5); _a.set(2.12, TOP + DH + 0.06, -1.0); this.logs.position.lerpVectors(this.bookFrom, _a, ease(this.bookF)); this.logs.position.y += Math.sin(this.bookF * Math.PI) * 0.6; this.logs.rotation.set(0, this.bookF * 6.28 + 0.3, 0); }
     this.logGlow.material.opacity = this.booksFlying ? 0.6 * (1 - Math.abs(this.bookF - 0.5) * 2) + (s.tables ? 0.5 : 0) : 0;
     for (const P of this.walkers) { runRoutine(P, dt, { height: groundHeight, speed: 0.9 }); animatePerson(P, t, dt); P.lamp?.userData.flicker(t); }
