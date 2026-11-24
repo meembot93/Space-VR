@@ -672,7 +672,7 @@ export default class Copernicus {
       P.g.position.copy(pos); P.role = role; this.root.add(P.g); this.people.push(P); return P;
     };
     // Copernicus at his desk, and (later) his young friend Rheticus
-    this.cop = add('copernicus', new THREE.Vector3(HALF - 1.5, TOP, 0.15), { tunic: 0x7a1a1a, hair: 0x2a1a10, height: 1.74 }, 'cop');
+    this.cop = add('copernicus', new THREE.Vector3(HALF - 1.54, TOP, 0.15), { tunic: 0x7a1a1a, hair: 0x2a1a10, height: 1.74 }, 'cop');
     this.cop.g.rotation.y = Math.PI / 2; this.cop.glance = true;   // facing his desk (+x)
     this.friend = add('rheticus', new THREE.Vector3(this.HATCH.x, TOP - 2.5, this.HATCH.z), { tunic: 0x2a3a5a, hair: 0x6a4a2a, height: 1.72 }, 'friend');
     this.friend.g.visible = false;
@@ -693,10 +693,12 @@ export default class Copernicus {
       P.ri = i; const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L;
       this.walkers.push(P);
     });
-    // two townsfolk in the market square, far below
+    // two townsfolk walking up and down a lane of the town, far below (the lane runs from
+    // (-35, -60) to (-41, -140) with houses either side: they keep to its middle)
+    const lane = (z, o) => -35 - 6 * (-60 - z) / 80 + o;
     ['villager', 'builder_far'].forEach((model, i) => {
-      const x = -54 + i * 6, z = -92 - i * 5, P = add(model, new THREE.Vector3(x, groundHeight(x, z), z), { tunic: [0x5a4a32, 0x6a2a2a][i], hair: 0x3a2a1a, height: 1.64 + i * 0.08 }, 'town');
-      P.routine = [{ x: x + 6, z: z - 4, pose: i ? 'talk' : 'idle', secs: 6 + i }, { x: x - 4, z: z + 6, pose: 'work', secs: 5 }];
+      const o = i ? 0.7 : -0.7, z0 = i ? -66 : -72, z1 = i ? -80 : -86, P = add(model, new THREE.Vector3(lane(z0, o), groundHeight(lane(z0, o), z0), z0), { tunic: [0x5a4a32, 0x6a2a2a][i], hair: 0x3a2a1a, height: 1.64 + i * 0.08 }, 'town');
+      P.routine = [{ x: lane(z1, o), z: z1, pose: i ? 'talk' : 'idle', secs: 6 + i }, { x: lane(z0, o), z: z0, pose: 'work', secs: 5 }];
       this.walkers.push(P);
     });
     this.G.world.blockers.push(this.copBlk = { x: this.cop.g.position.x, z: this.cop.g.position.z, r: 0.3 });
@@ -918,7 +920,7 @@ export default class Copernicus {
   updatePeople(dt, t) {
     const G = this.G, s = this.s, C = this.cop;
     // Copernicus: at his desk writing, looking up, at the triquetrum, or talking with you
-    const deskSpot = [HALF - 1.5, 0.15], sightSpot = [this.TRI.x + 0.5, this.TRI.z - 1.65];   // at the low end of the triquetrum's arm
+    const deskSpot = [HALF - 1.54, 0.15], sightSpot = [this.TRI.x + 0.5, this.TRI.z - 1.65];   // at the low end of the triquetrum's arm
     const HA = this.HATCH;
     // ch8_09 (book 3): he lays the book on his desk, then goes quietly down the stairs for the last time
     const leaving = s.book === 3, want = leaving ? (this.bookOnDesk ? [HA.x, HA.z] : deskSpot) : s.cop === 'sight' ? sightSpot : s.book >= 1 && s.book < 3 ? [0.8, 0.9] : deskSpot;
@@ -950,7 +952,9 @@ export default class Copernicus {
     }
     // the messenger with the printed book
     const Ms = this.messenger;
-    if (s.book === 1 && !this.bookDelivered) {
+    // (he waits at the foot of the ladder until Rheticus is up it and clear of the hatch)
+    const ladderFree = !s.friend || Math.hypot(this.friend.g.position.x - this.HATCH.x, this.friend.g.position.z - this.HATCH.z) > 0.8;
+    if (s.book === 1 && !this.bookDelivered && (Ms.g.visible || ladderFree)) {
       Ms.g.visible = true;
       if (!this.msgBook) { this.msgBook = true; this.book.visible = true; holdProp(Ms, this.book, 'Right', [0, 0.06, 0.05]); }
       if (Ms.g.position.y < TOP) { Ms.g.position.y = Math.min(TOP, Ms.g.position.y + dt * 1.2); Ms.pose = 'walk'; Ms.stride = (Ms.stride || 0) + dt * 5; }
