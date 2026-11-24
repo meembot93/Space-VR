@@ -146,5 +146,100 @@
   "height": 1.72,
   "turn": 0,
   "hd": "hd/korolev.glb"
+ },
+ "esther_goddard": {
+  "file": "esther_goddard.glb",
+  "height": 1.63,
+  "turn": 0,
+  "hd": "hd/esther_goddard.glb"
+ },
+ "von_braun": {
+  "file": "von_braun.glb",
+  "height": 1.86,
+  "turn": 0,
+  "hd": "hd/von_braun.glb"
+ },
+ "henry_sachs": {
+  "file": "henry_sachs.glb",
+  "height": 1.74,
+  "turn": 0,
+  "hd": "hd/henry_sachs.glb"
+ },
+ "hannah_newton": {
+  "file": "hannah_newton.glb",
+  "height": 1.6,
+  "turn": 0,
+  "hd": "hd/hannah_newton.glb"
+ },
+ "venetian_senator": {
+  "file": "venetian_senator.glb",
+  "height": 1.74,
+  "turn": 0
+ },
+ "townsman_1600": {
+  "file": "townsman_1600.glb",
+  "height": 1.72,
+  "turn": 0
+ },
+ "townswoman_1600": {
+  "file": "townswoman_1600.glb",
+  "height": 1.62,
+  "turn": 0
+ },
+ "soviet_engineer": {
+  "file": "soviet_engineer.glb",
+  "height": 1.76,
+  "turn": 0,
+  "hd": "hd/soviet_engineer.glb"
+ },
+ "soviet_woman": {
+  "file": "soviet_woman.glb",
+  "height": 1.64,
+  "turn": 0
+ },
+ "soviet_boy": {
+  "file": "soviet_boy.glb",
+  "height": 1.32,
+  "turn": 0
+ },
+ "animal_cow": {
+  "file": "cow.glb",
+  "height": 1.45,
+  "turn": 0
+ },
+ "animal_dog": {
+  "file": "dog.glb",
+  "height": 0.6,
+  "turn": 0
+ },
+ "animal_horse": {
+  "file": "horse.glb",
+  "height": 1.6,
+  "turn": 0
+ },
+ "animal_moose": {
+  "file": "moose.glb",
+  "height": 2.0,
+  "turn": 0
+ },
+ "animal_sheep": {
+  "file": "sheep.glb",
+  "height": 0.9,
+  "turn": 0
+ },
+ "prop_v2": {
+  "file": "v2.glb",
+  "height": 14.0,
+  "turn": 0
+ },
+ "prop_r7": {
+  "file": "r7.glb",
+  "height": 30.0,
+  "turn": 0
+ },
+ "prop_sputnik": {
+  "file": "sputnik.glb",
+  "height": 0.58,
+  "turn": 0
  }
 }
