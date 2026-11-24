@@ -18,6 +18,7 @@ import { makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng } from '../shapes.js';
+import { moonFaceTexture } from '../moontex.js';
 
 const D2R = Math.PI / 180;
 const BASE = -24;                 // the city's ground level, below the terrace
@@ -94,21 +95,8 @@ function drawOldTablet(g, w, h, seed) {
   for (const v of PAT) eclipseSign(g, 0.84 * w, (v + (r() - 0.5) * 0.01) * h, 17);
 }
 
-// The Moon: a soft canvas picture (bright highlands, darker "seas"), not any real map
-function moonTex() {
-  return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#e9e6dc'; g.fillRect(0, 0, w, h);
-    const r = rng(77);
-    const seas = [[0.36, 0.34, 0.17], [0.55, 0.3, 0.13], [0.62, 0.5, 0.14], [0.42, 0.55, 0.1], [0.3, 0.66, 0.12], [0.7, 0.36, 0.08], [0.5, 0.42, 0.09]];
-    for (const [x, y, s] of seas) for (let i = 0; i < 10; i++) {
-      const gr = g.createRadialGradient(0, 0, 0, 0, 0, s * w * (0.6 + r() * 0.5));
-      gr.addColorStop(0, 'rgba(120,122,130,0.35)'); gr.addColorStop(1, 'rgba(120,122,130,0)');
-      g.save(); g.translate((x + (r() - 0.5) * s) * w, (y + (r() - 0.5) * s) * h); g.fillStyle = gr; g.fillRect(-w, -h, 2 * w, 2 * h); g.restore();
-    }
-    for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(255,255,250,${0.1 + r() * 0.2})`; g.beginPath(); g.arc(r() * w, r() * h, 1 + r() * 3, 0, 7); g.fill(); }
-    g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.arc(0.46 * w, 0.82 * h, 4, 0, 7); g.fill(); // a bright young crater
-  });
-}
+// The Moon: the real near side (shared with the sky's Moon, see js/moontex.js)
+const moonTex = moonFaceTexture;
 
 const MOON_VS = `varying vec2 vUv; void main(){ vUv = uv; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p; }`;
 const MOON_FS = `

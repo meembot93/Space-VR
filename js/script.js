@@ -151,7 +151,7 @@ export const LINES = {
   ch13_06: "All right, Henry. Light it.",
   ch13_07: "Two and a half seconds. Twelve meters high. It landed in a cabbage patch. That doesn't sound like much. But it was the first liquid-fuel rocket ever to fly, and every big rocket since works the same way.",
   ch13_08: "Newspapers made fun of Goddard. They said a rocket could never work in empty space, with nothing to push against. They were wrong. Almost fifty years later, as astronauts flew to the Moon, one newspaper finally said sorry.",
-  ch13_09: "Then came a terrible war. In Germany, engineers built a giant rocket called the V-2. It was a weapon, and prisoners were forced to build it. But in 1944, one of them did something nothing made by people had ever done. It reached space.",
+  ch13_09: "Then came a terrible war. Wars bring terrible loss, but they also push people to build new technology faster than ever. In Germany, a team led by a young engineer named Wernher von Braun built a rocket called the V-2. And in 1944, the V-2 rocket became the first rocket ever to reach space.",
   ch13_10: "After the war, the rocket builders and their rockets were taken to America, and to the Soviet Union. Two rival countries now held the key to space. And the race was about to begin.",
   // Era 2, Chapter 7: Sputnik
   ch14_01: "October the fourth, 1957. Night, in the desert of Kazakhstan, in the Soviet Union. Engineers have worked in secret for weeks. On the launch pad stands the most powerful rocket ever built.",
@@ -166,6 +166,9 @@ export const LINES = {
   ch14_10: "Remember the beep you heard at the very end of our first journey? Now you know what it was.",
   ch14_11: "For thirty thousand years, people looked up at the sky. Now, for the first time, something made by people was up there, looking back down.",
   ch14_12: "The Space Race had begun. In just twelve years, people would walk on the Moon. But that's the next part of our story.",
+  ch14_13: "Look who came to watch. Everyone who ever looked up at the sky and wondered.",
+  ch14_14: "The storytellers, the builders, the stargazers. Copernicus, Galileo, Newton. Each one stood on the shoulders of the ones who came before.",
+  ch14_15: "And tonight, Korolev and his team in the Soviet Union carried all of those dreams into space.",
 };
 
 // Lines spoken by someone other than Astra (a different voice in the recording)

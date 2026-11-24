@@ -16,11 +16,12 @@
 // the way round and comes back past the cannon (tiny Newton ducks): an orbit. Then the Moon swings
 // round the Earth doing the same, lines of pull flow toward the Earth's middle, the planets circle a
 // distant Sun, and the word GRAVITY glows. Back on the farm at night: the Principia, Kepler's ellipse
-// in the sky (Kepler's echo approves: js/wow/ch12.js), and a little new star creeping steadily across
+// in the sky (the summer constellations come out: js/wow/ch12.js), and a little new star creeping steadily across
 // the sky: a satellite, your own moon, three hundred years later (the next chapters).
 // World axes: -Z north, +X east, +Y up. You start at the origin looking east (az 95).
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
+import { appleTree, orchardTree, deciduousTree, conifer, grove, makeApple } from '../trees.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp } from '../people.js';
 import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
@@ -52,8 +53,8 @@ const SIT = TREE.clone().addScaledVector(TOWARD, 0.42);                    // Ne
 const SIDE = new THREE.Vector3(-TOWARD.z, 0, TOWARD.x);                    // to his left (our right)
 const APPLE0 = TREE.clone().addScaledVector(TOWARD, 1.05).addScaledVector(SIDE, -0.5).setY(1.95);
 const HOUSE = at(38, 24), BARN = at(352, 30), CHURCH = at(100, 760);
-const BOOKSPOT = at(86, 3.0);                      // where Newton stands with the Principia
-export const KEPSPOT = at(104, 3.5);               // ...and where Kepler's echo appears (js/wow/ch12.js)
+const BOOKSPOT = at(106, 2.4);                     // where Newton stands with the Principia (clear of the apple boughs)
+const KEPSPOT = at(104, 3.5);                      // an open patch of grass beside him (no trees)
 const ORR = at(100, 10, 9.5);                      // the ellipse over the orchard
 const MOON_AZ = (h) => 113 + (h - 19) * 9, MOON_EL = (h) => 7.5 + (h - 19) * 5;
 
@@ -78,16 +79,27 @@ function aimBone(bone, child, want, k) {
   bone.parent.getWorldQuaternion(_pq).invert(); _bq.premultiply(_pq);
   bone.quaternion.slerp(_bq, k);
 }
-// Sitting on the grass, legs stretched out in front (after animatePerson, which stands them up)
-function sitLegs(P, k) {
-  const B = P.rig?.bones; if (!B || k < 0.01) return;
+// Sitting on the grass with his back to the trunk (k = 1), getting up through a crouch (k = 0.5),
+// standing (k = 0). Runs after animatePerson, which stands the legs up. Returns the hips' height.
+const _t0 = new THREE.Vector3(), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
+function sitLegs(P, k, hipY) {
+  const B = P.rig?.bones; if (!B || k < 0.01) return hipY;
+  const crouch = 1 - Math.abs(k - 0.5) * 2, t = clamp01((k - 0.5) * 2);
+  B.Spine?.rotateX(-0.1 * t + 0.45 * crouch);   // leaning back on the trunk; forward as he gets up
   P.inner.updateWorldMatrix(true, false);
   for (const [side, sx] of [['Left', 1], ['Right', -1]]) {
     const up = B[side + 'UpLeg'], low = B[side + 'Leg'], foot = B[side + 'Foot'];
     if (!up || !low || !foot) continue;
-    aimBone(up, low, _w2.set(sx * 0.16, -0.08, 1).transformDirection(P.inner.matrixWorld), k);
-    aimBone(low, foot, _w2.set(sx * 0.08, -0.16, 1).transformDirection(P.inner.matrixWorld), k);
+    // sitting: knees drawn up a little (his left more than his right), heels on the grass
+    const kn = side === 'Left' ? 0.42 : 0.2;
+    _t0.set(sx * 0.2, kn, 1).normalize().lerp(_t2.set(sx * 0.14, 0.05, 1).normalize(), 1 - t).normalize();
+    _t1.set(sx * 0.06, -kn * 1.25 - 0.08, 1).normalize().lerp(_t2.set(sx * 0.03, -1, 0.12).normalize(), 1 - t).normalize();
+    const w = Math.min(1, k * 2);
+    aimBone(up, low, _t0.transformDirection(P.inner.matrixWorld), w);
+    aimBone(low, foot, _t1.transformDirection(P.inner.matrixWorld), w);
   }
+  // the hips: 0.12 m up sitting, 0.42 crouching, at standing height once up
+  return k > 0.5 ? lerp(0.42, 0.12, ease(t)) : lerp(hipY, 0.42, ease(k * 2));
 }
 
 export default class Newton {
@@ -163,51 +175,119 @@ export default class Newton {
   // Woolsthorpe Manor: a grey limestone farmhouse, two storeys and attics under a steep stone-slate
   // roof, tall chimneys at the gable ends, stone-mullioned windows, a rear wing (the T), a porch.
   buildManor() {
-    const k = new Kit(), wins = [], ST = 0xcfc2a0, ST2 = 0xb8aa88, ROOF = 0x6a645a;
+    const k = new Kit(), wins = [], r = rng(61), ST = 0xcfc2a0, ST2 = 0xbcae8c, MORTAR = 0x9a8f78, ROOF = 0x6a645a;
     const { x, z } = HOUSE, y = groundHeight(x, z) - 0.2, yaw = Math.atan2(-x, -z);   // its front looks at the orchard
     const c = Math.cos(yaw), s = Math.sin(yaw);
     const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
-    const W = 14, D = 6.4, H = 6.2, RH = 4.6;
-    k.box(W, H, D, ST, P(0, H / 2, 0), [0, yaw, 0]);
-    k.box(W + 0.2, 0.5, D + 0.2, ST2, P(0, 0.25, 0), [0, yaw, 0]);
+    const W = 14, D = 6.4, H = 6.2, RH = 4.6, PH = 2.7;
+    // the walls (their colour is the mortar: the dressed stones are laid over them below)
+    k.box(W, H, D, MORTAR, P(0, H / 2, 0), [0, yaw, 0]);
+    k.box(W + 0.2, 0.5, D + 0.2, ST2, P(0, 0.25, 0), [0, yaw, 0]);                 // the plinth
     k.box(W + 0.1, 0.22, D + 0.1, ST2, P(0, 3.1, 0), [0, yaw, 0]);                 // the string course between the floors
     k.add(gableRoof(W, D, RH, 0.3), ROOF, P(0, H, 0), [0, yaw, 0]);
     for (const sx of [-1, 1]) {
-      k.add(gableWall(D, RH, 0.3), ST, P(sx * (W / 2 - 0.15), H, 0), [0, yaw + Math.PI / 2, 0]);
-      k.box(1.2, RH + 2.6, 0.9, ST2, P(sx * (W / 2 - 0.5), H + (RH + 2.6) / 2, 0), [0, yaw, 0]);   // gable chimney stacks
-      k.box(1.35, 0.25, 1.05, 0x9a8e74, P(sx * (W / 2 - 0.5), H + RH + 2.7, 0), [0, yaw, 0]);
-      this.chimneys = (this.chimneys || []).concat([new THREE.Vector3(...P(sx * (W / 2 - 0.5), H + RH + 3, 0))]);
+      k.add(gableWall(D, RH, 0.3), MORTAR, P(sx * (W / 2 - 0.15), H, 0), [0, yaw + Math.PI / 2, 0]);
+      // the gable-end chimney stack: weathering bands, a moulded cap and two flues
+      const cx = sx * (W / 2 - 0.5), top = H + RH + 2.6;
+      k.box(1.2, RH + 2.6, 0.9, ST2, P(cx, H + (RH + 2.6) / 2, 0), [0, yaw, 0]);
+      k.box(1.3, 0.12, 1.0, 0x9a8e74, P(cx, H + RH + 0.5, 0), [0, yaw, 0]);
+      k.box(1.3, 0.1, 1.0, 0x9a8e74, P(cx, top - 0.45, 0), [0, yaw, 0]);
+      k.box(1.38, 0.22, 1.08, 0x9a8e74, P(cx, top + 0.1, 0), [0, yaw, 0]);
+      for (const oz of [-0.2, 0.2]) { k.box(0.36, 0.3, 0.32, ST2, P(cx, top + 0.36, oz), [0, yaw, 0]); k.box(0.22, 0.02, 0.18, 0x141210, P(cx, top + 0.52, oz), [0, yaw, 0]); }
+      this.chimneys = (this.chimneys || []).concat([new THREE.Vector3(...P(cx, top + 0.6, 0))]);
+      // coped gables: stone copings up both rakes, kneelers at the eaves, a finial at the top
+      const sl = Math.hypot(D / 2 + 0.1, RH + 0.15), ang = Math.atan2(RH, D / 2);
+      for (const sz of [-1, 1]) {
+        const g = new THREE.BoxGeometry(0.44, 0.16, sl); g.rotateX(sz > 0 ? ang : -ang);
+        k.add(g, 0xa89c80, P(sx * (W / 2 - 0.15), H + RH / 2 + 0.16, sz * D / 4), [0, yaw, 0]);
+        k.box(0.5, 0.36, 0.55, 0xa89c80, P(sx * (W / 2 - 0.15), H + 0.1, sz * (D / 2 + 0.02)), [0, yaw, 0]);
+      }
+    }
+    // the stone-slate roof: courses graded from big slates at the eaves to small ones at the ridge,
+    // each course kicked up a little at its lower edge, in lengths of slightly different stone
+    {
+      const over = 0.3, ang = Math.atan2(RH, D / 2), drop = over * RH / (D / 2), eave = D / 2 + over, len = Math.hypot(eave, RH + drop);
+      for (const sz of [-1, 1]) {
+        let sd = 0;
+        while (sd < len - 0.2) {
+          const cw = 0.44 - 0.2 * (sd / len), mid = sd + cw / 2, lift = 0.03;
+          const lz = sz * (eave - mid * Math.cos(ang)), ly = H - drop + mid * Math.sin(ang);
+          const nx = sz * Math.sin(ang) * lift, ny = Math.cos(ang) * lift;   // out from the roof
+          for (let ox = -W / 2 - over + 0.02; ox < W / 2 + over - 0.1;) {
+            const pl = Math.min(W / 2 + over - 0.02 - ox, 0.5 + r() * 1.2), g = new THREE.BoxGeometry(pl - 0.012, 0.025, cw + 0.03);
+            g.rotateX(sz > 0 ? ang - 0.05 : -ang + 0.05);
+            const sh = 0.86 + r() * 0.24, mossy = r() < 0.12;
+            k.add(g, new THREE.Color(mossy ? 0x5e6248 : ROOF).multiplyScalar(sh).getHex(), P(ox + pl / 2, ly + ny, lz + nx), [0, yaw, 0]);
+            ox += pl;
+          }
+          sd += cw;
+        }
+      }
+      // the ridge: a row of V-shaped ridge stones
+      for (let ox = -W / 2 - 0.2; ox < W / 2 + 0.2; ox += 0.62) { const g = new THREE.BoxGeometry(0.6, 0.24, 0.24); g.rotateX(Math.PI / 4); k.add(g, 0x5a554c, P(ox + 0.3, H + RH + 0.04, 0), [0, yaw, 0]); }
     }
     // the rear wing (the T) and its own roof
     k.box(6, H - 0.4, 7, ST, P(1.5, (H - 0.4) / 2, -D / 2 - 3.4), [0, yaw, 0]);
     k.add(gableRoof(7, 6, 4, 0.3).rotateY(Math.PI / 2), ROOF, P(1.5, H - 0.4, -D / 2 - 3.4), [0, yaw, 0]);
-    // the porch with its little gable, the door, a stone step
-    k.box(2.6, 3.2, 1.8, ST, P(-0.8, 1.6, D / 2 + 0.9), [0, yaw, 0]);
-    k.add(gableRoof(1.8, 2.6, 1.3, 0.15).rotateY(Math.PI / 2), ROOF, P(-0.8, 3.2, D / 2 + 0.9), [0, yaw, 0]);
-    k.add(gableWall(2.6, 1.3, 0.2), ST, P(-0.8, 3.2, D / 2 + 1.75), [0, yaw, 0]);
-    k.box(1.1, 2.1, 0.1, 0x3a2416, P(-0.8, 1.05, D / 2 + 1.82), [0, yaw, 0]);
-    k.box(1.6, 0.18, 0.6, ST2, P(-0.8, 0.09, D / 2 + 2.1), [0, yaw, 0]);
-    // stone-mullioned windows: a surround, the mullions, the panes (some glowing)
-    const win = (lx, ly, lz, n, face = 0) => {
+    // the porch with its little coped gable, a moulded doorway, the plank door, a worn stone step
+    k.box(2.6, PH, 1.8, MORTAR, P(-0.8, PH / 2, D / 2 + 0.9), [0, yaw, 0]);
+    k.box(2.7, 0.3, 1.9, ST2, P(-0.8, 0.15, D / 2 + 0.92), [0, yaw, 0]);
+    k.add(gableRoof(1.8, 2.6, 1.0, 0.15).rotateY(Math.PI / 2), ROOF, P(-0.8, PH, D / 2 + 0.9), [0, yaw, 0]);
+    k.add(gableWall(2.6, 1.0, 0.2), MORTAR, P(-0.8, PH, D / 2 + 1.72), [0, yaw, 0]);
+    { const sl = Math.hypot(1.4, 1.08), ang = Math.atan2(1.0, 1.3);
+      for (const sx of [-1, 1]) { const g = new THREE.BoxGeometry(sl, 0.12, 0.3); g.rotateZ(sx > 0 ? -ang : ang); k.add(g, 0xa89c80, P(-0.8 + sx * 0.66, PH + 0.56, D / 2 + 1.74), [0, yaw, 0]); }
+      k.ball(0.1, 0, 0xa89c80, P(-0.8, PH + 1.18, D / 2 + 1.74)); }
+    const fz = D / 2 + 1.8;
+    k.box(1.3, 2.3, 0.04, 0x1a120c, P(-0.8, 1.15, fz + 0.01), [0, yaw, 0]);                 // the dark doorway behind the door
+    for (let i = 0; i < 5; i++) k.box(0.2, 2.08, 0.05, new THREE.Color(0x4a3020).multiplyScalar(0.85 + r() * 0.3).getHex(), P(-0.8 - 0.42 + i * 0.21, 1.06, fz + 0.04), [0, yaw, 0]);
+    for (const yy of [0.35, 1.05, 1.75]) for (let i = 0; i < 5; i++) k.box(0.03, 0.03, 0.02, 0x1a1a1a, P(-0.8 - 0.42 + i * 0.21, yy, fz + 0.075), [0, yaw, 0]);   // nail heads
+    k.box(0.04, 0.12, 0.05, 0x1a1a1a, P(-0.8 + 0.4, 1.0, fz + 0.09), [0, yaw, 0]);           // the latch
+    for (const sx of [-1, 1]) k.box(0.18, 2.32, 0.1, ST2, P(-0.8 + sx * 0.64, 1.16, fz + 0.03), [0, yaw, 0]);   // the jambs
+    k.box(1.5, 0.26, 0.12, ST2, P(-0.8, 2.4, fz + 0.04), [0, yaw, 0]);                       // the lintel
+    k.box(1.7, 0.08, 0.2, ST2, P(-0.8, 2.56, fz + 0.06), [0, yaw, 0]);                       // its hood mould
+    k.box(1.6, 0.2, 0.6, 0xa89c80, P(-0.8, 0.1, D / 2 + 2.1), [0, yaw, 0]);
+    k.box(1.3, 0.16, 0.36, 0xa89c80, P(-0.8, 0.0, D / 2 + 2.55), [0, yaw, 0]);
+    // stone-mullioned windows: a surround, the mullions, a sill, the drip mould, the panes (some glowing)
+    const holes = { front: [], side: [] };
+    const win = (lx, ly, lz, n, face = 0, list = null) => {
       const w = n * 0.55, fz = lz + 0.04;
       const fy = yaw + face;
       const Q = (ax, ay, az) => { const cc = Math.cos(face), ss = Math.sin(face); return P(ax * cc + az * ss, ay, -ax * ss + az * cc); };
       k.box(w + 0.3, 1.35, 0.12, ST2, Q(lx, ly, fz), [0, fy, 0]);
       for (let i = 0; i < n; i++) wins.push({ p: new THREE.Vector3(...Q(lx - w / 2 + 0.275 + i * 0.55, ly, fz + 0.07)), yaw: fy });
       for (let i = 1; i < n; i++) k.box(0.08, 1.15, 0.16, ST2, Q(lx - w / 2 + i * 0.55, ly, fz + 0.06), [0, fy, 0]);
+      k.box(0.06, 1.15, 0.03, 0x2a2420, Q(lx - w / 2 + 0.01, ly, fz + 0.075), [0, fy, 0]);
       k.box(w + 0.45, 0.14, 0.24, ST2, Q(lx, ly + 0.72, fz + 0.06), [0, fy, 0]);   // the drip mould
+      for (const sx of [-1, 1]) k.box(0.1, 0.22, 0.24, ST2, Q(lx + sx * (w / 2 + 0.17), ly + 0.6, fz + 0.06), [0, fy, 0]);   // its return ends
+      k.box(w + 0.4, 0.09, 0.24, ST2, Q(lx, ly - 0.72, fz + 0.06), [0, fy, 0]);     // the sill
+      list?.push([lx - w / 2 - 0.3, lx + w / 2 + 0.3, ly - 0.82, ly + 0.84]);
     };
-    for (const [lx, n] of [[-5, 3], [2.3, 3], [5.2, 2]]) win(lx, 1.6, D / 2, n);
-    for (const [lx, n] of [[-5, 3], [-0.8, 2], [2.3, 3], [5.2, 2]]) win(lx, 4.6, D / 2, n);
+    for (const [lx, n] of [[-5, 3], [2.3, 3], [5.2, 2]]) win(lx, 1.6, D / 2, n, 0, holes.front);
+    for (const [lx, n] of [[-5, 3], [-0.8, 2], [2.3, 3], [5.2, 2]]) win(lx, 4.6, D / 2, n, 0, holes.front);
     for (const sx of [-1, 1]) win(0, 4.6, W / 2, 2, sx * Math.PI / 2);   // the gable ends
+    holes.side.push([-0.95, 0.95, 3.78, 5.44], [-0.55, 0.55, H - 0.01, H + RH + 3]);   // the gable window, the chimney
     win(0, H + 1.4, W / 2, 1, Math.PI / 2);
+    // dressed limestone laid in courses over the walls, and big quoin stones at the corners
+    holes.front.push([-0.8 - 1.42, -0.8 + 1.42, -1, PH + 1.1]);
+    ashlar(k, r, P, yaw, 0, 0, D / 2, W, H, 0, holes.front);
+    for (const sx of [-1, 1]) ashlar(k, r, P, yaw, sx * Math.PI / 2, sx * W / 2, 0, D, H, RH, sx > 0 ? holes.side.concat([[-0.6, 0.6, H + 0.6, H + 2.3]]) : holes.side);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) quoins(k, r, P, yaw, sx * W / 2, sz * D / 2, sx, sz, H);
+    for (const sx of [-1, 1]) quoins(k, r, P, yaw, -0.8 + sx * 1.3, D / 2 + 1.8, sx, 1, PH, 0.3, 0.42, 0.26);
+    ashlar(k, r, P, yaw, 0, -0.8, D / 2 + 1.8, 2.6, PH, 1.0, [[-0.78, 0.78, -1, 2.68]], 0.45, 0.3);
+    for (const sx of [-1, 1]) ashlar(k, r, P, yaw, sx * Math.PI / 2, -0.8 + sx * 1.3, D / 2 + 0.9, 1.8, PH, 0, [], 0.3, 0.3);
+    // the lantern on its iron bracket by the door
+    const LP = P(0.12, 2.3, fz + 0.32);
+    k.box(0.04, 0.04, 0.34, 0x1e1c1a, P(0.12, 2.58, fz + 0.17), [0, yaw, 0]); k.box(0.12, 0.2, 0.03, 0x1e1c1a, P(0.12, 2.55, fz + 0.015), [0, yaw, 0]);
+    k.cyl(0.006, 0.006, 0.12, 4, 0x1e1c1a, [LP[0], LP[1] + 0.22, LP[2]]);
+    k.cyl(0.01, 0.13, 0.1, 4, 0x1e1c1a, [LP[0], LP[1] + 0.15, LP[2]], [0, yaw + Math.PI / 4, 0]);
+    k.cyl(0.09, 0.09, 0.03, 4, 0x1e1c1a, [LP[0], LP[1] - 0.12, LP[2]], [0, yaw + Math.PI / 4, 0]);
+    for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(0.015, 0.22, 0.015, 0x1e1c1a, [LP[0] + (ox * c + oz * s) * 0.06, LP[1] - 0.01, LP[2] + (-ox * s + oz * c) * 0.06], [0, yaw, 0]);
+    k.box(0.1, 0.18, 0.1, 0xf0c070, [LP[0], LP[1] - 0.01, LP[2]], [0, yaw, 0]);
     this.root.add(k.mesh());
     this.manorWins = windows(wins, { lit: 0.55, w: 0.42, h: 1.0, seed: 6 }); this.root.add(this.manorWins);
-    // the lantern by the door
     this.doorPos = new THREE.Vector3(...P(-0.8, 0, D / 2 + 2.6));
-    this.lantern = new THREE.PointLight(0xffa860, 0, 14, 1.6); this.lantern.position.set(...P(0.6, 2.5, D / 2 + 1.95)); this.root.add(this.lantern);
+    this.lantern = new THREE.PointLight(0xffa860, 0, 14, 1.6); this.lantern.position.set(...LP); this.root.add(this.lantern);
     this.lanternGlow = glow(0xffb060, 0.5, 0); this.lanternGlow.position.copy(this.lantern.position); this.root.add(this.lanternGlow);
-    const lk = new Kit(); lk.box(0.2, 0.3, 0.2, 0x2a2018, [0, 0, 0]); const lm = lk.mesh(); lm.position.copy(this.lantern.position); this.root.add(lm);
     this.houseYaw = yaw;
   }
 
@@ -216,14 +296,26 @@ export default class Newton {
   buildFarm() {
     const k = new Kit(), r = rng(17), wins = [];
     const by = groundHeight(BARN.x, BARN.z);
-    house(k, { x: BARN.x, y: by - 0.2, z: BARN.z, w: 16, d: 7, h: 5, roof: 5, yaw: Math.atan2(-BARN.x, -BARN.z), wall: 0xc4b694, roofCol: 0x7a6a50 }, wins);
+    house(k, { x: BARN.x, y: by - 0.2, z: BARN.z, w: 16, d: 7, h: 5, roof: 5, yaw: Math.atan2(-BARN.x, -BARN.z), wall: 0xc4b694, roofCol: 0x7a6a50 }, []);   // (a barn: no house windows)
+    { // the barn's threshing doors (a big pair of plank doors under a timber lintel), ventilation
+      // slits in the stone, and corner stones
+      const yw = Math.atan2(-BARN.x, -BARN.z), c = Math.cos(yw), s = Math.sin(yw), fz = 3.5;
+      const Q = (lx, ly, lz) => [BARN.x + lx * c + lz * s, by - 0.2 + ly, BARN.z - lx * s + lz * c];
+      k.box(3.6, 3.9, 0.06, 0x14100c, Q(2.5, 1.95, fz + 0.01), [0, yw, 0]);
+      for (let i = 0; i < 12; i++) k.box(0.27, 3.6, 0.06, new THREE.Color(0x5a4430).multiplyScalar(0.8 + r() * 0.35).getHex(), Q(2.5 - 1.5 + i * 0.27 + (i >= 6 ? 0.06 : -0.06), 1.8, fz + 0.05 + (i >= 6 ? 0.012 : 0)), [0, yw + (i >= 6 ? 0.02 : 0), 0]);
+      for (const yy of [0.6, 1.8, 3.0]) for (const sx of [-1, 1]) k.box(1.5, 0.14, 0.04, 0x4a3828, Q(2.5 + sx * 0.83, yy, fz + 0.1), [0, yw, 0]);
+      k.box(4.2, 0.35, 0.3, 0x4a3828, Q(2.5, 4.05, fz + 0.06), [0, yw, 0]);
+      for (const sx of [-1, 1]) k.box(0.25, 4.0, 0.2, 0x4a3828, Q(2.5 + sx * 1.92, 2.0, fz + 0.06), [0, yw, 0]);
+      for (const lx of [-6.5, -4.6, -2.7, 5.6, 7.2]) for (const ly of [1.6, 3.4]) k.box(0.12, 0.7, 0.06, 0x14100c, Q(lx, ly, fz + 0.01), [0, yw, 0]);
+      for (const sx of [-1, 1]) for (let i = 0; i < 9; i++) k.box(i % 2 ? 0.35 : 0.6, 0.5, 0.06, 0xd2c6a6, Q(sx * (8 - (i % 2 ? 0.175 : 0.3) + 0.03), 0.45 + i * 0.52, fz + 0.02), [0, yw, 0]);
+    }
     const out = at(15, 34); house(k, { x: out.x, y: groundHeight(out.x, out.z) - 0.2, z: out.z, w: 7, d: 5, h: 3, roof: 3, yaw: Math.atan2(-out.x, -out.z) + 0.3, wall: 0xc8b898, roofCol: 0x8a5a3a }, wins);
     // the dovecote
     const dv = at(62, 36), dy = groundHeight(dv.x, dv.z);
     k.cyl(2.2, 2.4, 5, 14, 0xcfc2a0, [dv.x, dy + 2.5, dv.z]); k.cyl(0.001, 2.8, 2.6, 14, 0x6a645a, [dv.x, dy + 6.3, dv.z]); k.cyl(0.4, 0.4, 0.8, 8, 0x8a7a60, [dv.x, dy + 7.8, dv.z]);
     for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28; k.box(0.25, 0.25, 0.1, 0x1a1410, [dv.x + Math.sin(a) * 2.32, dy + 4 + (i % 2) * 0.5, dv.z + Math.cos(a) * 2.32], [0, a, 0]); }
-    // haystacks and a cart in the yard
-    for (const [az, d] of [[5, 22], [358, 21], [12, 20]]) { const p = at(az, d), y = groundHeight(p.x, p.z); k.cyl(1.6, 2.1, 3, 10, 0xb89a56, [p.x, y + 1.5, p.z]); k.cyl(0.001, 1.8, 1.8, 10, 0xa88a4a, [p.x, y + 3.9, p.z]); }
+    // haystacks (clear of the orchard wall) and a cart in the yard
+    for (const [az, d] of [[5, 22.5], [358, 21.5], [14, 27]]) { const p = at(az, d), y = groundHeight(p.x, p.z); k.cyl(1.6, 2.1, 3, 10, 0xb89a56, [p.x, y + 1.5, p.z]); k.cyl(0.001, 1.8, 1.8, 10, 0xa88a4a, [p.x, y + 3.9, p.z]); }
     const ca = at(25, 18), cy = groundHeight(ca.x, ca.z), cyaw = 0.6;
     k.box(1.4, 0.15, 2.6, 0x6a4a2e, [ca.x, cy + 0.85, ca.z], [0, cyaw, 0]);
     for (const sx of [-1, 1]) { k.box(0.06, 0.5, 2.6, 0x5a3e26, [ca.x + Math.cos(cyaw) * sx * 0.68, cy + 1.1, ca.z - Math.sin(cyaw) * sx * 0.68], [0, cyaw, 0]); k.cyl(0.55, 0.55, 0.08, 12, 0x4a3420, [ca.x + Math.cos(cyaw) * sx * 0.8, cy + 0.55, ca.z - Math.sin(cyaw) * sx * 0.8], [0, cyaw, Math.PI / 2]); }
@@ -231,23 +323,34 @@ export default class Newton {
     k.box(0.08, 0.08, 2.4, 0x5a3e26, [ca.x + Math.sin(cyaw) * 2.4, cy + 0.6, ca.z + Math.cos(cyaw) * 2.4], [0.25, cyaw, 0]);
     // beehives: straw skeps on a bench by the orchard wall
     const bh = at(150, 11), bhy = groundHeight(bh.x, bh.z);
-    k.box(2.2, 0.08, 0.5, 0x6a4a2e, [bh.x, bhy + 0.5, bh.z], [0, 0.4, 0]); for (const ox of [-0.8, 0, 0.8]) k.box(0.08, 0.5, 0.4, 0x5a3e26, [bh.x + ox * Math.cos(0.4), bhy + 0.25, bh.z - ox * Math.sin(0.4)], [0, 0.4, 0]);
-    for (const ox of [-0.7, 0, 0.7]) { k.ball(0.32, 1, 0xc8a050, [bh.x + ox * Math.cos(0.4), bhy + 0.75, bh.z - ox * Math.sin(0.4)], 0, [1, 1.15, 1]); for (let j = 0; j < 4; j++) k.cyl(0.33 - j * 0.06, 0.34 - j * 0.06, 0.03, 10, 0xa88038, [bh.x + ox * Math.cos(0.4), bhy + 0.58 + j * 0.12, bh.z - ox * Math.sin(0.4)]); }
-    this.hives = new THREE.Vector3(bh.x, bhy + 0.8, bh.z);
-    // the dry-stone wall round the orchard (a rough square), with a gap and a wooden gate to the south
-    const wall = (ax, az, bx, bz, gap = null) => {
-      const len = Math.hypot(bx - ax, bz - az), yw = Math.atan2(-(bz - az), bx - ax);
-      for (let d = 0; d < len; d += 0.9) {
-        const f = (d + 0.45) / len, wx = ax + (bx - ax) * f, wz = az + (bz - az) * f;
-        if (gap && Math.hypot(wx - gap[0], wz - gap[1]) < 1.8) continue;
-        const wy = groundHeight(wx, wz), h = 1.05 + r() * 0.15;
-        k.box(0.95, h, 0.55, [0x9a9080, 0x8a8272, 0xa8a090][Math.floor(r() * 3)], [wx, wy + h / 2, wz], [0, yw + (r() - 0.5) * 0.06, 0]);
-        k.box(0.95, 0.18, 0.35, 0x7a7466, [wx, wy + h + 0.09, wz], [0, yw, 0.1 * (r() - 0.5)]);   // the coping stones
+    { // a weathered plank on two little stone piers, a straw skep on a board on each third, each
+      // under its own straw hackle (a rain hat), with a dark entrance at the foot facing the sun
+      const BY = 0.4, c4 = Math.cos(0.4), s4 = Math.sin(0.4), Q = (ox, y, oz = 0) => [bh.x + ox * c4 + oz * s4, bhy + y, bh.z - ox * s4 + oz * c4];
+      k.box(2.3, 0.07, 0.48, 0x7a6448, Q(0, BY + 0.035), [0, 0.4, 0]); k.box(2.3, 0.05, 0.03, 0x5e4a34, Q(0, BY + 0.01, 0.25), [0, 0.4, 0]);
+      for (const ox of [-0.85, 0.85]) for (let j = 0; j < 3; j++) k.box(0.36 - j * 0.03, 0.12, 0.4 - j * 0.02, pickStone(r), Q(ox + (r() - 0.5) * 0.03, 0.06 + j * 0.125), [0, 0.4 + (r() - 0.5) * 0.1, 0]);
+      for (const ox of [-0.7, 0, 0.7]) {
+        k.box(0.5, 0.025, 0.42, 0x6a5038, Q(ox, BY + 0.083), [0, 0.4 + (r() - 0.5) * 0.2, 0]);
+        k.ball(0.3, 1, 0xc8a050, Q(ox, BY + 0.3), 0, [1, 1.05, 1]);
+        for (let j = 0; j < 6; j++) { const d = -0.2 + j * 0.075, rr = Math.sqrt(0.09 - d * d) + 0.012; k.cyl(rr, rr, 0.028, 12, 0xa88038, Q(ox, BY + 0.3 + d)); }
+        k.box(0.09, 0.05, 0.04, 0x1a1208, Q(ox, BY + 0.13, 0.27), [0, 0.4, 0]);
+        k.cyl(0.03, 0.42, 0.3, 12, 0xb89a56, Q(ox, BY + 0.68), [0, r(), 0]);      // the hackle
       }
-    };
+    }
+    this.hives = new THREE.Vector3(bh.x, bhy + 0.8, bh.z);
+    // the dry-stone wall round the orchard (a rough square): coursed limestone, through-stones,
+    // upright coping, built-up corners and wall ends, stone gateposts and two five-bar gates
     const WX = 30, WZ0 = -18, WZ1 = 24;
-    wall(-26, WZ0, 6, WZ0); wall(WX, WZ1, -26, WZ1, [8, WZ1]); wall(-26, WZ1, -26, WZ0); wall(WX, -6, WX, WZ1, [WX, 12]);
-    for (let i = 0; i < 5; i++) k.box(0.06, 0.08, 3.2, 0x6a5038, [WX, groundHeight(WX, 12) + 0.25 + i * 0.22, 12]);
+    const ws = new Kit();
+    dryWall(ws, r, -26, WZ0, 6, WZ0, { a: 'corner', b: 'end' });
+    dryWall(ws, r, -26, WZ1, -26, WZ0, { a: 'corner', b: 'corner' });
+    dryWall(ws, r, -26, WZ1, 6.2, WZ1, { a: 'corner', b: 'post' }); dryWall(ws, r, 9.8, WZ1, WX, WZ1, { a: 'post', b: 'corner' });
+    dryWall(ws, r, WX, -6, WX, 10.2, { a: 'end', b: 'post' }); dryWall(ws, r, WX, 13.8, WX, WZ1, { a: 'post', b: 'corner' });
+    for (const [cx, cz] of [[-26, WZ0], [-26, WZ1], [WX, WZ1]]) wallCorner(ws, r, cx, cz);
+    // gateposts and the gates: the east one shut, the south one swung open into the orchard
+    for (const [px, pz] of [[6.0, WZ1], [10.0, WZ1], [WX, 10.0], [WX, 14.0]]) gatePost(ws, r, px, pz);
+    fiveBarGate(ws, WX, 10.25, -Math.PI / 2 - 0.1, 3.45);
+    fiveBarGate(ws, 6.25, WZ1, 1.3, 3.45);
+    this.root.add(ws.mesh());
     // the harvest field: rows of corn stooks
     for (let i = 0; i < 90; i++) {
       const x = -10 + (i % 15) * 7 + r() * 1.5, z = 38 + Math.floor(i / 15) * 9 + r() * 1.5, y = groundHeight(x, z);
@@ -261,25 +364,40 @@ export default class Newton {
   buildOrchard() {
     const k = new Kit(), ak = new Kit(), r = rng(29);
     this.trees = [];
-    const tree = (x, z, s, hero = false) => {
-      const y = groundHeight(x, z), lean = [(r() - 0.5) * 0.16, 0, (r() - 0.5) * 0.16];
-      k.cyl(0.1 * s, 0.16 * s, 1.5 * s, 7, 0x4a3a2a, [x, y + 0.75 * s, z], lean);
-      for (let b = 0; b < 4; b++) { const a = b / 4 * 6.28 + r(); k.cyl(0.04 * s, 0.07 * s, 1.2 * s, 5, 0x4a3a2a, [x + Math.cos(a) * 0.35 * s, y + 1.8 * s, z + Math.sin(a) * 0.35 * s], [Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7]); }
-      const greens = [0x46642a, 0x547430, 0x3c5a24, 0x5a7a34];
-      const blobs = [[0, 2.65, 0, 1.15]];
-      for (let b = 0; b < 5; b++) { const a = b / 5 * 6.28 + r(); blobs.push([Math.cos(a) * 0.85, 2.3 + r() * 0.6, Math.sin(a) * 0.85, 0.75 + r() * 0.3]); }
-      for (const [bx, by, bz, br] of blobs) k.ball(br * s, 1, greens[Math.floor(r() * greens.length)], [x + bx * s, y + by * s, z + bz * s], [r(), r(), r()], [1, 0.8, 1]);
-      // apples on the outside of the crown, and a few windfalls in the grass
-      const n = hero ? 34 : 18;
-      for (let i = 0; i < n; i++) {
-        const [bx, by, bz, br] = blobs[1 + Math.floor(r() * 5)], a = r() * 6.28, e = (r() - 0.6) * 1.6;
-        ak.ball(0.045 * (hero ? 1.1 : 1), 0, r() < 0.8 ? 0xc0281c : 0x9aa030, [x + (bx + Math.cos(a) * Math.cos(e) * br * 0.95) * s, y + (by + Math.sin(e) * br * 0.75) * s, z + (bz + Math.sin(a) * Math.cos(e) * br * 0.95) * s]);
+    // the hero: Newton's apple tree (full detail). One apple near the ideal spot over the grass by
+    // him is left off the tree: that is the one that falls (it hangs from a real twig).
+    // (seed 14 turned so no low limb reaches over Newton and the shallow side of the root flare
+    // is under him; the apple that falls hangs about 1.85 m up, just past his knees, to his right)
+    const ty = groundHeight(TREE.x, TREE.z), UPV = new THREE.Vector3(0, 1, 0);
+    const yaw = Math.atan2(-TOWARD.z, TOWARD.x) + 270 * D2R;
+    const toWorld = (v) => v.clone().applyAxisAngle(UPV, yaw);
+    const want = new THREE.Vector3().addScaledVector(TOWARD, 0.7).addScaledVector(SIDE, -0.45).setY(1.9).applyAxisAngle(UPV, -yaw);
+    this.heroTree = appleTree({ seed: 14, height: 5.4, apples: 30, windfalls: 9, reserveApples: 1, reserveNear: want,
+      ground: (x, z) => { const w = toWorld(new THREE.Vector3(x, 0, z)); return groundHeight(TREE.x + w.x, TREE.z + w.z) - ty; } });
+    this.heroTree.group.position.set(TREE.x, ty, TREE.z); this.heroTree.group.rotation.y = yaw; this.root.add(this.heroTree.group);
+    const ra = this.heroTree.reserved[0];
+    if (ra) APPLE0.copy(toWorld(ra.pos)).add(TREE).setY(ty + ra.pos.y);
+    // seat Newton just clear of the real trunk (its bark between hip and shoulder height, toward him)
+    {
+      const pos = this.heroTree.bark.geometry.attributes.position, w = new THREE.Vector3(); let rmax = 0.15;
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i); if (y < 0.15 || y > 0.9) continue;
+        w.set(pos.getX(i), 0, pos.getZ(i)).applyAxisAngle(UPV, yaw);
+        const along = w.x * TOWARD.x + w.z * TOWARD.z, side = Math.abs(w.x * SIDE.x + w.z * SIDE.z);
+        if (along > 0 && side < 0.25 && Math.hypot(w.x, w.z) < 0.6) rmax = Math.max(rmax, along);
       }
-      for (let i = 0; i < 4; i++) { const a = r() * 6.28, d = 0.5 + r() * 1.6; ak.ball(0.042, 0, 0xa02818, [x + Math.cos(a) * d, groundHeight(x + Math.cos(a) * d, z + Math.sin(a) * d) + 0.035, z + Math.sin(a) * d]); }
+      SIT.copy(TREE).addScaledVector(TOWARD, rmax + 0.2); this.trunkR = rmax;
+    }
+    this.trees.push(new THREE.Vector3(TREE.x, ty, TREE.z));
+    this.G.world.blockers.push({ x: TREE.x, z: TREE.z, r: 0.35 });
+    // the rest of the orchard: fruit trees in rows, nearer ones in more detail
+    const near = [], far = [];
+    const tree = (x, z, sc) => {
+      const y = groundHeight(x, z), spot = { x, y: y - 0.03, z, s: sc, yaw: r() * 6.28 };
+      (Math.hypot(x, z) < 10 ? near : far).push(spot);
       this.trees.push(new THREE.Vector3(x, y, z));
-      this.G.world.blockers.push({ x, z, r: 0.3 * s });
+      this.G.world.blockers.push({ x, z, r: 0.3 * sc });
     };
-    tree(TREE.x, TREE.z, 1.2, true);
     for (let gx = -24; gx <= 28; gx += 6.5) for (let gz = -16; gz <= 22; gz += 6.5) {
       const x = gx + (r() - 0.5) * 1.6, z = gz + (r() - 0.5) * 1.6, d = Math.hypot(x, z), az = (Math.atan2(x, -z) / D2R + 360) % 360;
       if (d < 3.2 || (d < 7 && az > 30 && az < 175) || Math.hypot(x - TREE.x, z - TREE.z) < 4.5) continue;
@@ -288,16 +406,28 @@ export default class Newton {
       if (Math.hypot(x - KEPSPOT.x, z - KEPSPOT.z) < 2.5 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 2.5) continue;
       tree(x, z, 0.8 + r() * 0.35);
     }
+    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6 }); this.root.add(g.group); }
     // a wooden ladder against one tree and a basket of picked apples beside it
     const lt = this.trees[3] || TREE;
     k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z - 0.25], [0, 0, 0.3]); k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z + 0.25], [0, 0, 0.3]);
     for (let i = 0; i < 8; i++) k.box(0.05, 0.05, 0.5, 0x7a5a3a, [lt.x + 1.32 - i * 0.12, lt.y + 0.2 + i * 0.38, lt.z]);
     k.cyl(0.3, 0.22, 0.32, 10, 0x9a7440, [lt.x + 1.8, lt.y + 0.16, lt.z + 0.5]);
     for (let i = 0; i < 9; i++) ak.ball(0.05, 0, 0xc0281c, [lt.x + 1.8 + (r() - 0.5) * 0.35, lt.y + 0.33 + r() * 0.06, lt.z + 0.5 + (r() - 0.5) * 0.35]);
+    // the orchard grass round you: tufts of longer grass, clover, buttercups and daisies, molehills
+    // (kept clear of Newton's spot and where the apple lands)
+    const GR = [0x4a6a2c, 0x5a7a34, 0x3e5a26, 0x6a8040, 0x7a8a46];
+    for (let i = 0; i < 520; i++) {
+      const a = r() * 6.28, d = 1.2 + Math.pow(r(), 0.7) * 17, x = Math.sin(a) * d, z = -Math.cos(a) * d;
+      if (Math.hypot(x - SIT.x, z - SIT.z) < 1.7 || Math.hypot(x - APPLE0.x, z - APPLE0.z) < 0.9 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 1.4 || Math.hypot(x - TREE.x, z - TREE.z) < 0.5) continue;
+      const y = groundHeight(x, z), col = GR[Math.floor(r() * GR.length)];
+      for (let b = 0; b < 3; b++) { const h = 0.12 + r() * 0.16, ba = r() * 6.28; k.cyl(0.002, 0.018, h, 3, col, [x + Math.cos(ba) * 0.05, y + h / 2 - 0.01, z + Math.sin(ba) * 0.05], [(r() - 0.5) * 0.5, r() * 3, (r() - 0.5) * 0.5]); }
+      if (r() < 0.25) k.ball(0.014, 0, r() < 0.6 ? 0xe8d040 : 0xf2f0e8, [x + 0.08, y + 0.1 + r() * 0.06, z + 0.03]);
+    }
+    for (let i = 0; i < 3; i++) { const p = at(200 + i * 40, 9 + i * 3), y = groundHeight(p.x, p.z); k.ball(0.22, 1, 0x4a3a28, [p.x, y - 0.06, p.z], [r(), r(), 0], [1, 0.45, 1]); }
     // Newton's little pile of books on the grass beside him, and an open notebook
-    k.box(0.22, 0.05, 0.3, 0x5a2a1a, [SIT.x + SIDE.x * 0.55, groundHeight(SIT.x, SIT.z) + 0.025, SIT.z + SIDE.z * 0.55], [0, 0.4, 0]);
-    k.box(0.2, 0.05, 0.28, 0x2a3a2a, [SIT.x + SIDE.x * 0.55, groundHeight(SIT.x, SIT.z) + 0.075, SIT.z + SIDE.z * 0.55], [0, 0.7, 0]);
-    k.box(0.36, 0.01, 0.26, 0xece0c0, [SIT.x + SIDE.x * 0.75 + TOWARD.x * 0.5, groundHeight(SIT.x, SIT.z) + 0.01, SIT.z + SIDE.z * 0.75 + TOWARD.z * 0.5], [0, 0.9, 0]);
+    k.box(0.22, 0.05, 0.3, 0x5a2a1a, [SIT.x + SIDE.x * 0.68, groundHeight(SIT.x, SIT.z) + 0.025, SIT.z + SIDE.z * 0.68], [0, 0.4, 0]);
+    k.box(0.2, 0.05, 0.28, 0x2a3a2a, [SIT.x + SIDE.x * 0.68, groundHeight(SIT.x, SIT.z) + 0.075, SIT.z + SIDE.z * 0.68], [0, 0.7, 0]);
+    k.box(0.36, 0.01, 0.26, 0xece0c0, [SIT.x + SIDE.x * 0.92 + TOWARD.x * 0.5, groundHeight(SIT.x, SIT.z) + 0.01, SIT.z + SIDE.z * 0.92 + TOWARD.z * 0.5], [0, 0.9, 0]);
     this.root.add(k.mesh());
     this.applesMesh = ak.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })); this.root.add(this.applesMesh);
   }
@@ -305,22 +435,25 @@ export default class Newton {
   // Beyond the walls: hedgerows and oaks along the fields, woods on the far hills, and across the
   // valley Colsterworth: its church tower with pinnacles, cottages with lit windows.
   buildCountry() {
-    const k = new Kit(), r = rng(37), wins = [];
+    const k = new Kit(), r = rng(37), wins = [], oaks = [];
     const hedge = (ax, az, bx, bz) => {
       const len = Math.hypot(bx - ax, bz - az);
       for (let d = 0; d < len; d += 3.2) {
         const f = d / len, x = ax + (bx - ax) * f + (r() - 0.5), z = az + (bz - az) * f + (r() - 0.5), y = groundHeight(x, z);
         k.ball(1.6 + r() * 0.6, 0, [0x2e4422, 0x36502a, 0x283c1e][Math.floor(r() * 3)], [x, y + 1.2, z], [r(), r(), 0], [1, 0.85, 1]);
-        if (r() < 0.07 && !(Math.abs((Math.atan2(x, -z) / D2R + 360) % 360 - 117) < 22)) { const h = 7 + r() * 5; k.cyl(0.3, 0.45, h * 0.5, 6, 0x3a2e22, [x, y + h * 0.25, z]); k.ball(h * 0.42, 1, 0x2a401e, [x, y + h * 0.75, z], [r(), r(), 0], [1, 0.8, 1]); }
+        if (r() < 0.04 && !(Math.abs((Math.atan2(x, -z) / D2R + 360) % 360 - 117) < 22)) oaks.push({ x, y: y - 0.1, z, s: 0.6 + r() * 0.4 });   // a hedgerow oak
       }
     };
     for (const [ax, az, bx, bz] of [[-260, 32, 120, 32], [120, -200, 120, 260], [-60, 120, 300, 120], [-260, -60, -40, -60], [-40, -260, -40, -40], [40, -120, 300, -120], [-200, 200, 120, 200], [200, -300, 200, 300], [-160, -260, -160, 120]]) hedge(ax, az, bx, bz);
     // woods on the hills all round
-    for (let i = 0; i < 260; i++) {
-      const a = r() * 360, d = 380 + r() * 700, p = at(a, d), y = groundHeight(p.x, p.z), h = 10 + r() * 8;
+    const woods = [];
+    for (let i = 0; i < 70; i++) {
+      const a = r() * 360, d = 380 + r() * 700, p = at(a, d), y = groundHeight(p.x, p.z), h = 13 + r() * 8;
       if (a > 92 && a < 140 && d < 800) continue;
-      k.ball(h * 0.55, 0, [0x24361c, 0x2a3e20, 0x30462a][Math.floor(r() * 3)], [p.x, y + h * 0.6, p.z], [r(), r(), 0], [1, 0.8, 1]);
+      woods.push({ x: p.x, y: y - 0.3, z: p.z, s: h / 12 * 1.3 });
     }
+    // the hedgerow oaks, and the trees of the woods (far off: the simplest level of detail)
+    for (const [list, shape, seed] of [[oaks, 'oak', 3], [woods, 'oak', 7]]) if (list.length) { const g = grove(deciduousTree, list, { detail: 'low', variants: 4, seed, shape }); this.root.add(g.group); }
     // Colsterworth across the valley
     const cy = groundHeight(CHURCH.x, CHURCH.z);
     k.box(30, 12, 12, 0xb8ab8a, [CHURCH.x + 18, cy + 6, CHURCH.z]); k.add(gableRoof(30, 12, 6, 0.3), 0x5a5448, [CHURCH.x + 18, cy + 12, CHURCH.z]);
@@ -345,19 +478,29 @@ export default class Newton {
     this.smallBook = bk.mesh(); holdProp(this.nw, this.smallBook, 'Right', [0, 0.08, 0.04]);
     this.G.world.blockers.push(this.nwBlk = { x: SIT.x, z: SIT.z, r: 0.4 });
     // his mother, Hannah, at the door with a lantern; later calling him in
-    this.hannah = add('villager', this.doorPos.clone().setY(groundHeight(this.doorPos.x, this.doorPos.z)), { tunic: 0x5a4a5a, hair: 0x4a3a2a, height: 1.62 });
+    // (no model of a 1660s countrywoman yet: a dressed stand-in in a long skirt, apron, collar and coif)
+    this.hannah = add(null, this.doorPos.clone().setY(groundHeight(this.doorPos.x, this.doorPos.z)), { tunic: 0x4a3a46, skin: 0xd8b49a, hair: 0x4a3a2a, height: 1.62 });
+    { const hk = new Kit(), WH = 0xe4ddc8;
+      hk.cyl(0.19, 0.37, 0.98, 12, 0x3e3240, [0, 0.49, 0]);                       // the skirt, to the ground
+      hk.box(0.32, 0.62, 0.02, WH, [0, 0.62, 0.285], [-0.16, 0, 0]);               // the apron
+      hk.cyl(0.215, 0.215, 0.05, 12, WH, [0, 0.97, 0]);                            // its band
+      hk.cyl(0.13, 0.25, 0.12, 12, WH, [0, 1.39, 0]);                              // the falling collar
+      hk.ball(0.145, 1, WH, [0, 1.67, -0.04], 0, [1.02, 0.92, 1.08]);             // the linen coif
+      this.hannah.inner.add(hk.mesh()); }
     this.hannah.g.rotation.y = this.houseYaw;
     this.hannahLamp = makeTorch({ len: 0.3, color: 0xffc070, size: 0.6 }); holdProp(this.hannah, this.hannahLamp, 'Right', [0, 0.02, 0.02]);
     this.hannah.routine = [{ x: this.doorPos.x, z: this.doorPos.z, pose: 'idle', secs: 14, look: this.nw.g.position.clone().setY(1) }, { x: this.doorPos.x + 3, z: this.doorPos.z + 2, pose: 'work', secs: 8 }, { x: this.doorPos.x - 2, z: this.doorPos.z + 3, pose: 'idle', secs: 6 }];
     // a shepherd bringing the flock in, and a farmhand forking hay onto the cart
-    const sp = at(150, 45);
+    const sp = at(138, 36);   // (this side of the lane's hedge)
     this.shep = add('townsman', sp.setY(groundHeight(sp.x, sp.z)), { tunic: 0x5a5a3a, hair: 0x4a3a2a, beard: true, height: 1.7 });
     const staff = new Kit(); staff.cyl(0.02, 0.02, 1.6, 5, 0x5a4028, [0, 0.8, 0]); holdProp(this.shep, staff.mesh(), 'Right', [0, 0.05, 0.02]);
-    this.shep.routine = [at(140, 40), at(110, 46), at(80, 40), at(60, 52), at(100, 58), at(135, 52)].map((p, i) => ({ x: p.x, z: p.z, pose: i % 3 === 2 ? 'beckon' : 'idle', secs: 4 + (i % 3) * 3, speed: 0.6 }));
-    const hp = at(8, 20.5);
-    this.hand = add('townsman', hp.setY(groundHeight(hp.x, hp.z)), { tunic: 0x6a5a40, hair: 0x2a1a10, height: 1.74 });
+    this.shep.routine = [at(132, 40), at(110, 46), at(80, 40), at(60, 52), at(100, 58), at(118, 52)].map((p, i) => ({ x: p.x, z: p.z, pose: i % 3 === 2 ? 'beckon' : 'idle', secs: 4 + (i % 3) * 3, speed: 0.6 }));
+    const hp = new THREE.Vector3(9.23, 0, -25.3);
+    this.hand = add('rheticus', hp.setY(groundHeight(hp.x, hp.z)), { tunic: 0x6a5a40, hair: 0x2a1a10, height: 1.74 });
     const fork = new Kit(); fork.cyl(0.018, 0.018, 1.5, 5, 0x6a4a2e, [0, 0.75, 0]); for (const ox of [-0.05, 0, 0.05]) fork.cyl(0.006, 0.006, 0.25, 4, 0x5a5a5a, [ox, 1.6, 0]); holdProp(this.hand, fork.mesh(), 'Right', [0, 0.05, 0.02]);
-    this.hand.routine = [{ ...at(10, 20.5), pose: 'work', secs: 12, face: 0.9 }, { ...at(22, 18.2), pose: 'work', secs: 8, face: -1 }, { ...at(14, 22), pose: 'idle', secs: 5 }];
+    // (he forks hay from the haystack by the manor's gable end and loads the cart, walking round the
+    // front corner of the house both ways, never through it)
+    this.hand.routine = [{ x: 9.23, z: -25.3, pose: 'work', secs: 12, face: -1.89 }, { x: 6.3, z: -20.4, pose: 'idle', secs: 3 }, { x: 8.84, z: -17.14, pose: 'work', secs: 8, face: -0.97 }, { x: 6.0, z: -21.2, pose: 'idle', secs: 3 }];
     for (const P of [this.hand]) for (const st of P.routine) { delete st.y; }
     this.people = [this.nw, this.hannah, this.shep, this.hand];
   }
@@ -367,7 +510,7 @@ export default class Newton {
     this.sheep = L.add(makeHerd('sheep', { n: 16, area: { x: at(140, 48).x, z: at(140, 48).z, r: 9 }, height: groundHeight, mode: 'follow', seed: 7 }));
     this.sheepDog = L.add(makeHerd('dog', { n: 1, area: { x: 0, z: 40, r: 4 }, height: groundHeight, mode: 'follow', seed: 3, speed: 2.4 }));
     // the farm dog, asleep by Newton (it goes to sniff the apple)
-    const dp = SIT.clone().addScaledVector(SIDE, 1.2).addScaledVector(TOWARD, 0.4);
+    const dp = SIT.clone().addScaledVector(SIDE, -1.25).addScaledVector(TOWARD, 0.4);   // on his right, the side the apple falls (so it never crosses his legs)
     this.dog = L.add(makeHerd('dog', { n: 1, area: { x: dp.x, z: dp.z, r: 0.25 }, height: groundHeight, mode: 'follow', seed: 9, speed: 1.8, scale: 0.8 }));
     this.dog.lead.copy(dp); this.dogHome = dp.clone();
     this.cows = L.add(makeHerd('cow', { n: 5, area: { x: at(330, 55).x, z: at(330, 55).z, r: 14 }, height: groundHeight, seed: 4 }));
@@ -379,8 +522,7 @@ export default class Newton {
 
   // ---------- The apple and the arrows ----------
   buildApple() {
-    const k = new Kit(); k.ball(0.055, 1, 0xc8281a, [0, 0, 0]); k.cyl(0.004, 0.004, 0.04, 4, 0x3a2a1a, [0, 0.06, 0]); k.box(0.04, 0.005, 0.02, 0x4a7a2a, [0.02, 0.07, 0], [0, 0, 0.4]);
-    this.apple = k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x000000 }));
+    this.apple = makeApple(this.heroTree.reserved[0]?.r ?? 0.045, 0xb8261a);   // the same apple as the ones on the tree
     this.apple.position.copy(APPLE0); this.root.add(this.apple);
     this.appleGlow = glow(0xffd890, 0.45, 0); this.apple.add(this.appleGlow);
     this.appleTrail = glowPoints(40, { sizeScale: 260 }); this.root.add(this.appleTrail); this.trailPts = [];
@@ -413,15 +555,48 @@ export default class Newton {
     this.ellPlanet = new THREE.Group(); this.ellPlanet.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 10), new THREE.MeshBasicMaterial({ color: 0x9ac8ff, fog: false })), glow(0x9ac8ff, 0.5, 0.9)); M.add(this.ellPlanet);
     this.ellLab = label("Kepler's ellipse, explained", 0.2); this.ellLab.position.set(-EC, 0.55, EB + 0.25); this.ellLab.material.opacity = 0; M.add(this.ellLab);
     // the Principia in Newton's hands
-    const bk = new Kit(); bk.box(0.26, 0.06, 0.34, 0x4a2a16, [0, 0, 0]); bk.box(0.24, 0.055, 0.33, 0xece0c0, [0.008, 0, 0]);
+    // (a big quarto, lying open: calf boards, a rounded spine, two thick blocks of pages with lines of
+    // Latin and a diagram of an orbit, and a ribbon)
+    const bk = new Kit(), CALF = 0x5a3018, PAGE = 0xeee2c4, INKC = 0x8a7a64;
+    for (const sx of [-1, 1]) {
+      bk.box(0.205, 0.008, 0.3, CALF, [sx * 0.104, 0.004, 0], [0, 0, sx * 0.04]);
+      bk.box(0.19, 0.026, 0.28, PAGE, [sx * 0.1, 0.021, 0], [0, 0, sx * 0.04]);
+      bk.box(0.18, 0.006, 0.27, 0xf6ecd4, [sx * 0.098, 0.035, 0], [0, 0, sx * 0.07]);      // the top leaf, curling up from the gutter
+      for (let i = 0; i < 11; i++) { if (sx > 0 && i > 2 && i < 8) continue; bk.box(0.14 - (i % 3) * 0.02, 0.0015, 0.0032, INKC, [sx * (0.1 - (i % 3) * 0.01), 0.0415 - (i % 3) * 0.0007, 0.11 - i * 0.022], [0, 0, sx * 0.07]); }
+    }
+    bk.cyl(0.012, 0.012, 0.3, 8, CALF, [0, 0.006, 0], [Math.PI / 2, 0, 0]);
+    bk.box(0.008, 0.002, 0.2, 0x8a1a1a, [0.004, 0.039, 0.16], [0.3, 0, 0]);
+    // the diagram on the right-hand page: an orbit round a dot
+    for (let j = 0; j < 14; j++) { const a = j / 14 * 6.28; bk.box(0.012, 0.0015, 0.005, INKC, [0.1 + Math.cos(a) * 0.045, 0.0415 + 0.07 * Math.cos(a) * 0.045, Math.sin(a) * 0.035], [0, -a, 0.07]); }
+    bk.ball(0.006, 0, INKC, [0.088, 0.041, 0]);
     this.principia = bk.mesh(); this.principia.visible = false;
     // ...lying open on a little garden table, by a candle lantern
     const tk = new Kit(), tdir = BOOKSPOT.clone().negate().normalize(), tp = BOOKSPOT.clone().addScaledVector(tdir, 0.62);
-    tk.box(0.8, 0.05, 0.55, 0x6a4a2e, [0, 0.78, 0]); for (const [ox, oz] of [[-0.34, -0.22], [0.34, -0.22], [-0.34, 0.22], [0.34, 0.22]]) tk.box(0.05, 0.78, 0.05, 0x4a3420, [ox, 0.39, oz]);
-    tk.box(0.12, 0.2, 0.12, 0x2a2018, [0.28, 0.9, -0.12]);
+    // an oak side table: a thick top, a frieze rail, turned legs on a low stretcher frame
+    const OAK = 0x6a4a2e, OAK2 = 0x553a22, IRON = 0x1e1c1a;
+    tk.box(0.86, 0.045, 0.6, OAK, [0, 0.785, 0]); tk.box(0.84, 0.02, 0.58, OAK2, [0, 0.755, 0]);
+    for (const sz of [-1, 1]) tk.box(0.72, 0.09, 0.03, OAK2, [0, 0.695, sz * 0.235]);
+    for (const sx of [-1, 1]) tk.box(0.03, 0.09, 0.44, OAK2, [sx * 0.345, 0.695, 0]);
+    for (const [ox, oz] of [[-0.34, -0.23], [0.34, -0.23], [-0.34, 0.23], [0.34, 0.23]]) {
+      tk.box(0.055, 0.12, 0.055, OAK2, [ox, 0.69, oz]);                              // the square top of the leg
+      tk.cyl(0.022, 0.028, 0.18, 8, OAK, [ox, 0.54, oz]); tk.ball(0.038, 1, OAK, [ox, 0.42, oz], 0, [1, 1.5, 1]);   // the turned bulb
+      tk.cyl(0.028, 0.022, 0.2, 8, OAK, [ox, 0.27, oz]); tk.box(0.05, 0.12, 0.05, OAK2, [ox, 0.08, oz]);          // and the foot
+    }
+    for (const sz of [-1, 1]) tk.box(0.66, 0.04, 0.03, OAK2, [0, 0.08, sz * 0.23]);
+    tk.box(0.03, 0.04, 0.44, OAK2, [0, 0.08, 0]);
+    // on it: a candle lantern, an inkwell and quill, loose sheets of calculation, two small books
+    const LX = 0.28, LZ = -0.14, LY = 0.81;
+    tk.box(0.13, 0.02, 0.13, IRON, [LX, LY + 0.01, LZ]); tk.cyl(0.001, 0.1, 0.07, 4, IRON, [LX, LY + 0.25, LZ], [0, Math.PI / 4, 0]); tk.cyl(0.012, 0.012, 0.04, 6, IRON, [LX, LY + 0.3, LZ]);
+    for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) tk.box(0.012, 0.2, 0.012, IRON, [LX + ox * 0.058, LY + 0.12, LZ + oz * 0.058]);
+    tk.cyl(0.015, 0.015, 0.08, 8, 0xf2ead2, [LX, LY + 0.06, LZ]);
+    tk.cyl(0.03, 0.035, 0.045, 8, 0x1c1c22, [-0.3, LY + 0.022, -0.17]);
+    tk.box(0.004, 0.004, 0.26, 0xf0ece0, [-0.27, LY + 0.1, -0.12], [0.9, 0.5, 0]);
+    tk.box(0.02, 0.002, 0.15, 0xf0ece0, [-0.25, LY + 0.17, -0.07], [0.9, 0.5, 0]);
+    for (let i = 0; i < 4; i++) tk.box(0.2, 0.003, 0.27, i % 2 ? 0xe8dcc0 : 0xf0e6cc, [0.12 + i * 0.03, LY + 0.002 + i * 0.004, 0.12 - i * 0.02], [0, 0.3 - i * 0.35, 0]);
+    tk.box(0.12, 0.035, 0.17, 0x5a2a1a, [-0.32, LY + 0.018, 0.17], [0, 0.2, 0]); tk.box(0.11, 0.03, 0.16, 0x2a3a2a, [-0.31, LY + 0.05, 0.17], [0, 0.5, 0]);
     this.table = tk.mesh(); this.table.position.set(tp.x, groundHeight(tp.x, tp.z), tp.z); this.table.rotation.y = Math.atan2(tdir.x, tdir.z); this.root.add(this.table);
-    this.table.add(this.principia); this.principia.position.set(-0.05, 0.835, 0.02); this.principia.rotation.y = 0.15;
-    this.tableLamp = glow(0xffb050, 0.35, 0.9); this.tableLamp.position.set(0.28, 0.92, -0.12); this.table.add(this.tableLamp);
+    this.table.add(this.principia); this.principia.position.set(-0.06, 0.808, 0.03); this.principia.rotation.y = 0.12;
+    this.tableLamp = glow(0xffb050, 0.35, 0.9); this.tableLamp.position.set(0.28, 0.88, -0.14); this.table.add(this.tableLamp);
     this.table.visible = false;
     this.bookGlow = glow(0xffd890, 0.8, 0); this.principia.add(this.bookGlow);
     this.bookLab = label('Principia, 1687', 0.16); this.bookLab.material.opacity = 0; this.root.add(this.bookLab);
@@ -438,31 +613,57 @@ export default class Newton {
     const G = this.G, sp = this.space = new Space(G, { earthR: ER });
     // everything in the plane of the orbits: x along the cannon's aim, y up through the mountain
     const C = this.cg = new THREE.Group(); sp.group.add(C);
-    // the impossibly tall mountain (over England), craggy, with snow on its peak
-    const mg = new THREE.CylinderGeometry(0.07, 0.8, 1.45, 28, 8).toNonIndexed(), mp = mg.attributes.position, mc = new Float32Array(mp.count * 3), col = new THREE.Color();
+    const mtnNoise = (ux, uz, f) => ((Math.abs(N2(ux * 1.7 + 3, uz * 1.7 + f * 1.3) - 0.5) * 2 - 0.45) * 0.42 + (N1(ux * 5 + f * 4, uz * 5 - f * 3) - 0.5) * 0.16) * (1 - f * 0.5) * clamp01((0.965 - f) * 12);
+    // the impossibly tall mountain (over England): concave flanks cut by ridges and gullies, green
+    // foothills, bare rock, snow fields above, and a small flat summit for the cannon
+    const mg = new THREE.CylinderGeometry(0.2, 0.8, 1.45, 44, 18).toNonIndexed(), mp = mg.attributes.position, mc = new Float32Array(mp.count * 3), col = new THREE.Color();
+    const GRASS = new THREE.Color(0x4a6a32), GRASS2 = new THREE.Color(0x5e7a3a), ROCK = new THREE.Color(0x7a7060), ROCK2 = new THREE.Color(0x5a5248), SNOW = new THREE.Color(0xeef2f6);
     for (let i = 0; i < mp.count; i++) {
-      const x = mp.getX(i), y = mp.getY(i), z = mp.getZ(i), f = (y + 0.725) / 1.45, a = Math.atan2(z, x);
-      const n = (N2(a * 2.2, f * 4) - 0.5) * 0.22 * (1 - f * 0.7) * (f > 0.98 ? 0 : 1);
-      const rr = Math.hypot(x, z); if (rr > 0.01) { mp.setX(i, x * (1 + n / Math.max(0.1, rr))); mp.setZ(i, z * (1 + n / Math.max(0.1, rr))); }
-      col.setHex(f < 0.25 ? 0x4a6a32 : f < 0.72 ? 0x7a7060 : 0xeef2f6).lerp(new THREE.Color(0x5a5248), (N1(a * 3, f * 6) - 0.4) * 0.5);
+      const x = mp.getX(i), y = mp.getY(i), z = mp.getZ(i), f = clamp01((y + 0.725) / 1.45), rr = Math.hypot(x, z);
+      const ux = rr > 1e-4 ? x / rr : 0, uz = rr > 1e-4 ? z / rr : 0;
+      // the profile (wide foothills, steepening to the summit), then ridges and gullies
+      const r0 = 0.8 - 0.6 * f, R = 0.15 + 0.73 * Math.pow(1 - f, 1.25);
+      const n = mtnNoise(ux, uz, f);
+      const k = rr > 1e-4 ? (R / r0) * (1 + n) : 1; mp.setX(i, x * k); mp.setZ(i, z * k);
+      const snowLine = 0.6 + (N2(ux * 3 + 9, uz * 3) - 0.5) * 0.25 - n * 0.6;
+      if (f < 0.2 + (N1(ux * 3, uz * 3) - 0.5) * 0.1) col.copy(GRASS).lerp(GRASS2, N1(ux * 6, uz * 6 + f * 8));
+      else if (f < snowLine || f > 0.97) col.copy(ROCK).lerp(ROCK2, clamp01(0.5 - n * 2.5 + (N1(ux * 7, f * 9) - 0.5)));
+      else col.copy(SNOW).lerp(ROCK, clamp01(n * 2.5));
       mc.set([col.r, col.g, col.b], i * 3);
     }
     mg.setAttribute('color', new THREE.BufferAttribute(mc, 3)); mg.computeVertexNormals();
     this.mountain = new THREE.Mesh(mg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, fog: false }));
     this.mountain.position.y = ER - 0.4 + 0.725; C.add(this.mountain);
+    // dark pine forests on its lower slopes (they grow with it)
+    { const rr = rng(77), spots = [];
+      for (let i = 0; i < 40; i++) { const f = 0.03 + rr() * 0.3, a = rr() * 6.283, R = (0.15 + 0.73 * Math.pow(1 - f, 1.25)) * (1 + mtnNoise(Math.cos(a), Math.sin(a), f)) - 0.012; spots.push({ x: Math.cos(a) * R, y: -0.725 + f * 1.45 - 0.01, z: Math.sin(a) * R, s: 0.008 + rr() * 0.006 }); }
+      const g = grove(conifer, spots, { detail: 'low', variants: 3, seed: 5, type: 'pine' }); this.mountain.add(g.group); }
     // the cannon: a long iron barrel on a wooden carriage, aimed level along +x
     const ck = new Kit(), top = ER + MT;
-    ck.cyl(0.022, 0.03, 0.26, 12, 0x2a2a2e, [0.06, 0.06, 0], [0, 0, -Math.PI / 2]);
-    ck.ball(0.03, 1, 0x2a2a2e, [-0.07, 0.06, 0]);
-    ck.box(0.2, 0.04, 0.08, 0x6a4a2e, [0.0, 0.025, 0]);
-    for (const sz of [-1, 1]) ck.cyl(0.035, 0.035, 0.015, 12, 0x4a3420, [0.02, 0.03, sz * 0.05], [Math.PI / 2, 0, 0]);
+    // (an iron barrel with reinforcing rings, a muzzle swell and a knob at the breech, on an oak
+    // carriage: stepped side cheeks, two axles, four little wheels)
+    const IRN = 0x2a2a2e, OAKC = 0x6a4a2e, OAKD = 0x4a3420, Z = [0, 0, -Math.PI / 2];
+    ck.cyl(0.021, 0.029, 0.26, 14, IRN, [0.06, 0.06, 0], Z);
+    for (const [x, rr] of [[-0.055, 0.032], [-0.005, 0.03], [0.07, 0.027]]) ck.cyl(rr, rr, 0.012, 14, 0x34343a, [x, 0.06, 0], Z);
+    ck.cyl(0.025, 0.023, 0.025, 14, 0x34343a, [0.18, 0.06, 0], Z);
+    ck.ball(0.029, 1, IRN, [-0.07, 0.06, 0]); ck.ball(0.011, 1, IRN, [-0.1, 0.06, 0]);
+    for (const sz of [-1, 1]) {
+      ck.box(0.17, 0.034, 0.012, OAKC, [0.0, 0.04, sz * 0.033]);
+      ck.box(0.07, 0.022, 0.012, OAKC, [-0.06, 0.068, sz * 0.033]);
+      ck.box(0.012, 0.012, 0.014, 0x1e1e20, [0.02, 0.06, sz * 0.033]);           // the trunnion cap
+    }
+    ck.box(0.16, 0.012, 0.06, OAKD, [0.0, 0.022, 0]);
+    for (const x of [-0.055, 0.06]) {
+      ck.box(0.016, 0.014, 0.1, OAKD, [x, 0.018, 0]);
+      for (const sz of [-1, 1]) ck.cyl(0.018, 0.018, 0.01, 12, OAKD, [x, 0.018, sz * 0.048], [Math.PI / 2, 0, 0]);
+    }
     this.cannon = ck.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.3, fog: false }));
     this.cannon.position.set(0, top, 0); C.add(this.cannon);
     this.muzzle = new THREE.Vector3(0.2, top + 0.06, 0);
     this.flash = glow(0xffc070, 0.6, 0); this.flash.position.copy(this.muzzle); C.add(this.flash);
     // a tiny Newton beside it (the same model, very small)
     this.tiny = makePerson({ model: 'newton', seed: 4, tunic: 0x3a3a44, hair: 0x6a4a2a, height: 1.72 });
-    this.tiny.g.scale.setScalar(0.13); this.tiny.g.position.set(-0.12, top - 0.005, 0.07); this.tiny.g.rotation.y = Math.PI / 2; C.add(this.tiny.g);
+    this.tiny.g.scale.setScalar(0.13); this.tiny.g.position.set(-0.11, top - 0.003, 0.055); this.tiny.g.rotation.y = Math.PI / 2; C.add(this.tiny.g);
     // the cannonballs, their glowing trails, the dust where they land, the lines of pull
     this.balls = SPEEDS.map(() => { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d0, fog: false })), glow(0xffd890, 0.6, 1)); g.visible = false; C.add(g); return g; });
     this.trails = glowPoints(2600, { sizeScale: 1000 }); C.add(this.trails);
@@ -636,19 +837,19 @@ export default class Newton {
     if (this.spaceOn && !busy) {
       // in space Astra waits by the lever while a shot is ready
       const ready = s.armed > s.pull;
-      if (ready !== this.guideLever) { this.guideLever = ready; if (ready) { this.knobGlow.getWorldPosition(_a); G.guide.flyTo(_a.add(_b.set(0, 0.25, 0)).clone()); G.guide.chime(); } else G.guide.follow(); this.guideAt = null; }
+      if (ready !== this.guideLever) { this.guideLever = ready; if (ready) { this.knobGlow.getWorldPosition(_a); G.guide.flyTo(_a.add(_b.set(0, 0.25, 0)).clone()); G.guide.chime(); } else G.guide.flyTo(this.astraSpot.clone()); this.guideAt = null; }
     } else guideUpdate(this, busy);
   }
 
   updatePeople(dt, t, sun) {
     const s = this.s, N = this.nw;
     // Newton: reading under the tree; looking at the apple; up on his feet, the apple held up to the
-    // Moon; at the table with the Principia. Meem's Newton model has no rig yet, so until it does he
-    // stands by the trunk and acts with his whole body (turning, leaning in, looking up); with a rig
-    // he sits on the grass and uses his hands (the same code, both ways).
+    // Moon; at the table with the Principia. With Meem's rigged model he sits on the grass with his
+    // back to the trunk, gets up through a crouch and steps clear of the tree before he stands; a model
+    // without a rig stands by the trunk and acts with his whole body (turning, leaning, looking up).
     const rigged = !!N.rig, statue = !!N.model && !rigged;
-    const sitting = rigged && (s.nw === 'read' || s.nw === 'look');
-    N.sitK = damp(N.sitK, sitting ? 1 : 0, 2.2, dt);
+    const sitting = s.nw === 'read' || s.nw === 'look';
+    N.sitK = Math.max(0, N.sitK - dt * 0.7 * (sitting ? -1 : 1)); N.sitK = Math.min(1, N.sitK);   // about a second and a half to get up
     if (rigged && N.hipY == null) { N.rig.bones.Hips?.getWorldPosition(_a); N.hipY = N.rig.bones.Hips ? _a.y - N.g.getWorldPosition(_b).y : 0.9; }
     const turn = (p, k = 1.5) => { let dy = Math.atan2(p.x - N.g.position.x, p.z - N.g.position.z) - N.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); N.g.rotation.y += dy * Math.min(1, dt * k); };
     let lean = 0;
@@ -668,8 +869,11 @@ export default class Newton {
       if (s.nw === 'moon') { dirFromAzEl(MOON_AZ(s.hour), MOON_EL(s.hour), _a).multiplyScalar(300).add(N.g.position); N.pose = 'point'; N.pointAt.copy(_a); N.look = _a.clone(); turn(_a); lean = -0.14; }
       else { N.pose = 'hold'; N.look = this.applePicked ? N.g.position.clone().addScaledVector(TOWARD, 0.6).setY(1.2) : this.apple.position.clone(); if (statue) { turn(this.apple.position, 1.2); lean = 0.15; } }
     }
-    N.g.position.y = groundHeight(N.g.position.x, N.g.position.z) - Math.max(0, (N.hipY ?? 0.9) - 0.12) * ease(N.sitK);
-    animatePerson(N, t, dt); sitLegs(N, ease(N.sitK));
+    // standing up, he steps forward off the trunk he was leaning on
+    if (!this.atBook && rigged) { const f = 0.42 * (1 - ease(N.sitK)); N.g.position.set(SIT.x + TOWARD.x * f, 0, SIT.z + TOWARD.z * f); this.nwBlk.x = N.g.position.x; this.nwBlk.z = N.g.position.z; }
+    animatePerson(N, t, dt);
+    const hipH = sitLegs(N, N.sitK, N.hipY ?? 0.9);
+    N.g.position.y = groundHeight(N.g.position.x, N.g.position.z) - Math.max(0, (N.hipY ?? 0.9) - hipH);
     if (statue) { this.nwLean = damp(this.nwLean || 0, lean, 2, dt); N.inner.rotation.x = this.nwLean; }
     // Hannah at the door; at moonrise she calls him in (he doesn't come)
     const H = this.hannah;
@@ -679,6 +883,13 @@ export default class Newton {
     runRoutine(this.shep, dt, { height: groundHeight }); animatePerson(this.shep, t, dt);
     this.sheep.lead.copy(this.shep.g.position).addScaledVector(_a.set(Math.sin(this.shep.g.rotation.y), 0, Math.cos(this.shep.g.rotation.y)), -4);
     this.sheepDog.lead.copy(this.shep.g.position).add(_a.set(Math.sin(t * 0.3) * 6, 0, Math.cos(t * 0.23) * 5));
+    // the flock (and his dog) step aside for the shepherd when he turns back through them
+    { const sx = this.shep.g.position.x, sz = this.shep.g.position.z;
+      for (const o of [...this.sheep.animals, ...this.sheepDog.animals]) {
+        const dx = o.x - sx, dz = o.z - sz, d = Math.hypot(dx, dz) || 1e-3;
+        if (d < 1.2) { o.x = sx + dx / d * 1.2; o.z = sz + dz / d * 1.2; }
+        if (Math.hypot(o.tx - sx, o.tz - sz) < 1.6) { o.tx = sx + dx / d * 2.4; o.tz = sz + dz / d * 2.4; }
+      } }
     runRoutine(this.hand, dt, { height: groundHeight }); animatePerson(this.hand, t, dt);
   }
 
@@ -695,7 +906,7 @@ export default class Newton {
       if (y <= gy) {
         this.landed = true; this.landT = 0; if (G.isHost !== false && s.apple === 1) s.apple = 2;
         if (G.audio.ctx) { const o = G.audio.out(A.position, 0.7, 3); G.audio.tone(o, { f: 140, f2: 70, peak: 0.6, a: 0.003, d: 0.25 }); G.audio.noise(o, { f: 700, f2: 200, peak: 0.4, a: 0.003, d: 0.15 }); }
-        this.dog.lead.copy(A.position).addScaledVector(TOWARD, 0.45); this.dogBack = 7; this.bark(A.position, 0.6);
+        this.dog.lead.copy(A.position).addScaledVector(TOWARD, 0.3).addScaledVector(SIDE, -0.35); this.dogBack = 7; this.bark(A.position, 0.6);
       }
     }
     if (this.landed && !this.applePicked) { this.landT += dt; const b = Math.max(0, Math.sin(this.landT * 9)) * 0.06 * Math.exp(-this.landT * 4); A.position.y = gy + b; A.position.addScaledVector(TOWARD, dt * 0.08 * Math.exp(-this.landT * 2)); }
@@ -765,7 +976,7 @@ export default class Newton {
     this.bookGlow.material.opacity = damp(this.bookGlow.material.opacity, s.book === 2 ? 0.9 + 0.1 * Math.sin(t * 3) : s.book ? 0.35 : 0, 2, dt);
     this.principia.getWorldPosition(_a);
     this.bookLab.material.opacity = damp(this.bookLab.material.opacity, s.book === 2 && s.phase === 'principia' ? 1 : 0, 2, dt);
-    this.bookLab.position.copy(_a).add(_b.set(0, 0.55, 0));
+    this.table.localToWorld(this.bookLab.position.set(0.95, 1.2, 0.1));   // beside the table, clear of Newton
     if (s.book === 2 && !this.bookFlare) { this.bookFlare = true; shimmer(G, 4, 0.16); G.events.emit('sfx', { k: 'page' }); }
     this.bookSparks.visible = s.book === 2 && s.phase === 'principia';
     if (this.bookSparks.visible) { const S = this.bookSparks.userData; this.bs.forEach((q, i) => { q.a += dt * q.v * 2; q.y = (q.y + dt * q.v) % 3; S.pos.set([_a.x + Math.cos(q.a) * q.r * (1 + q.y), _a.y + q.y * 1.4, _a.z + Math.sin(q.a) * q.r * (1 + q.y)], i * 3); const b = 1 - q.y / 3; S.col.set([b, b * 0.85, b * 0.5], i * 3); S.size[i] = 0.03; }); S.commit(); }
@@ -806,7 +1017,7 @@ export default class Newton {
     const G = this.G; this.spaceBusy = true;
     whoosh(G, 2.4, 0.35);
     await G.ui.fadeOut(0.7);
-    if (on) this.layoutSpace(); else { this.space.exit(); G.sky.uni.milky.value = 1; }
+    if (on) this.layoutSpace(); else { this.space.exit(); G.sky.uni.milky.value = 1; G.guide.follow(); this.guideLever = null; }
     this.spaceOn = on;
     if (on) { rumble(G, 4, 0.3); this.tl0 = G.t; }
     await G.ui.fadeIn(1.2);
@@ -833,6 +1044,8 @@ export default class Newton {
     this.mini.position.copy(cam).addScaledVector(f, 10).addScaledVector(r, -11).add(_a.set(0, 4, 0));
     this.lever.position.copy(cam).addScaledVector(f, 0.42).addScaledVector(r, 0.4).add(_a.set(0, -0.72, 0));
     this.lever.rotation.y = Math.atan2(r.x, r.z);
+    this.astraSpot = cam.clone().addScaledVector(f, 1.7).addScaledVector(r, -1.0).add(_a.set(0, 0.15, 0));   // off to the left, clear of the mountain and the shots
+    this.guideLever = null;
     sp.enter(this.root);
     this.mtnK = this.s.mtn ? 1 : 0;
   }
@@ -965,6 +1178,145 @@ export default class Newton {
     this.G.sky.hideMoon();
     this.G.sky.uni.milky.value = 1;
   }
+}
+
+// ---------- The manor's masonry ----------
+// Dressed limestone blocks laid in courses over one face of the house (the wall behind shows through
+// the joints as mortar). face: the face's outward angle in the house's own frame (0 = front, +z);
+// (cx, cz) its middle; w wide, h to the eaves, plus a gable triangle gh high; holes: [u0, u1, v0, v1].
+const ASHLAR = [0xcfc2a0, 0xc6b896, 0xd6caa8, 0xbfb290, 0xd0c09a, 0xc8bea4];
+function ashlar(k, r, P, yaw, face, cx, cz, w, h, gh, holes, margin = 0.66, v0 = 0.52) {
+  const tx = Math.cos(face), tz = -Math.sin(face), nx = Math.sin(face), nz = Math.cos(face), R = [0, yaw + face, 0];
+  const all = holes;
+  let v = v0;
+  while (v < h + gh - 0.3) {
+    if (v < 3.23 && v + 0.33 > 2.97 && h > 4) { v = 3.23; continue; }     // the string course
+    const rh = 0.26 + r() * 0.09, vm = v + rh / 2;
+    const hw = vm < h ? w / 2 - margin : (w / 2) * (1 - (v + rh - h) / gh) - 0.3;
+    if (hw < 0.2) break;
+    // the row's free stretches between the windows
+    let segs = [[-hw, hw]];
+    for (const [u0, u1, v0, v1] of all) {
+      if (v1 < v || v0 > v + rh) continue;
+      segs = segs.flatMap(([a, b]) => (u1 <= a || u0 >= b ? [[a, b]] : [[a, u0], [u1, b]].filter(([p, q]) => q - p > 0.12)));
+    }
+    for (const [a, b] of segs) {
+      for (let u = a + r() * 0.05; u < b - 0.1;) {
+        const bl = Math.min(b - u, 0.36 + r() * 0.5), out = 0.012 + r() * 0.02 - 0.03, um = u + bl / 2;
+        const col = new THREE.Color(ASHLAR[Math.floor(r() * ASHLAR.length)]).multiplyScalar(0.93 + r() * 0.12).getHex();
+        k.box(bl - 0.025, rh - 0.025, 0.06, col, P(cx + tx * um + nx * out, vm, cz + tz * um + nz * out), R);
+        u += bl;
+      }
+    }
+    v += rh;
+  }
+}
+// Quoins: big long-and-short stones up a corner, proud of both faces
+function quoins(k, r, P, yaw, cx, cz, sx, sz, h, v0 = 0.5, L = 0.62, S = 0.36) {
+  let v = v0, i = 0;
+  while (v < h - 0.15) {
+    if (h > 4 && v < 3.23 && v + 0.34 > 2.97) { v = 3.23; continue; }
+    const rh = Math.min(0.34, h - v), dx = i % 2 ? S : L, dz = i % 2 ? L : S;
+    const col = new THREE.Color(ASHLAR[Math.floor(r() * ASHLAR.length)]).multiplyScalar(1.02 + r() * 0.06).getHex();
+    k.box(dx, rh - 0.022, dz, col, P(cx - sx * dx / 2 + sx * 0.04, v + rh / 2, cz - sz * dz / 2 + sz * 0.04), [0, yaw, 0]);
+    v += rh; i++;
+  }
+}
+
+// ---------- The orchard's dry-stone wall ----------
+// Lincolnshire limestone, laid dry: a dark hearting (the core, seen between the stones), two faces of
+// coursed stones that lean in as the wall rises (the batter), through-stones tying the faces, and a
+// row of upright coping stones on top. a/b: how each end finishes: 'corner', 'post' or 'end'.
+const WALL_H = 1.06, WALL_COURSES = [0.25, 0.22, 0.2, 0.2, 0.19];
+const WALL_STONE = [0xa39b88, 0x958e7c, 0xb0a892, 0x8a8474, 0x9c9684, 0xaaa08a, 0x8e8a76, 0x9a9a84];
+const wallHalf = (y) => 0.33 - 0.13 * clamp(y / WALL_H, 0, 1);
+const pickStone = (r, shade = 1) => { const c = new THREE.Color(WALL_STONE[Math.floor(r() * WALL_STONE.length)]).multiplyScalar(shade * (0.9 + r() * 0.18)); return c.getHex(); };
+function dryWall(k, r, ax, az, bx, bz, { a = 'end', b = 'end' } = {}) {
+  const L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz, nz = ux, yw = Math.atan2(-uz, ux);
+  const ins = { corner: 0.42, post: 0.27, end: 0 }, s0 = ins[a], s1 = L - ins[b];
+  const px = (d, o) => ax + ux * d + nx * o, pz = (d, o) => az + uz * d + nz * o, gy = (d) => groundHeight(px(d, 0), pz(d, 0));
+  // the hearting, in short lengths so it follows the ground
+  const nCore = Math.ceil((s1 - s0) / 2), cl = (s1 - s0) / nCore;
+  for (let i = 0; i < nCore; i++) {
+    const g = new THREE.BoxGeometry(cl, WALL_H + 0.15, 1), p = g.attributes.position;
+    for (let j = 0; j < p.count; j++) p.setZ(j, p.getZ(j) * 2 * (p.getY(j) > 0 ? wallHalf(WALL_H) - 0.02 : wallHalf(0) - 0.02));
+    const dm = s0 + (i + 0.5) * cl;
+    k.add(g, 0x4e4a42, [px(dm, 0), gy(dm) + (WALL_H + 0.15) / 2 - 0.15, pz(dm, 0)], [0, yw, 0]);
+  }
+  // the two faces, course by course
+  for (const side of [-1, 1]) {
+    let y = 0;
+    WALL_COURSES.forEach((ch, c) => {
+      let d = s0 + r() * 0.15;
+      if (d > s0 + 0.02) { const l = d - s0 - 0.02, dm = s0 + l / 2; if (l > 0.05) k.box(l, ch - 0.03, 0.14, pickStone(r), [px(dm, side * (wallHalf(y + ch / 2) - 0.05)), gy(dm) + y + ch / 2, pz(dm, side * (wallHalf(y + ch / 2) - 0.05))], [0, yw, 0]); }
+      while (d < s1 - 0.06) {
+        const sl = (0.24 + r() * 0.36) * (1.25 - c * 0.08), e = Math.min(s1, d + sl), len = e - d - 0.018 - r() * 0.015;
+        if (len < 0.06) break;
+        const sh = ch - 0.02 - r() * 0.035, ym = y + ch / 2 + (r() - 0.5) * 0.012, dm = d + len / 2, proud = 0.012 + r() * 0.03, off = side * (wallHalf(ym) + proud - 0.07);
+        k.box(len, sh, 0.14, pickStone(r), [px(dm, off), gy(dm) + ym, pz(dm, off)], [0, yw + (r() - 0.5) * 0.05, (r() - 0.5) * 0.07]);
+        d = e;
+      }
+      y += ch;
+    });
+  }
+  // through-stones: long flat stones right through the wall, sticking out a little on both faces
+  for (let d = s0 + 0.6 + r() * 0.4; d < s1 - 0.4; d += 1.1 + r() * 0.5) {
+    const ym = WALL_COURSES[0] + WALL_COURSES[1] + WALL_COURSES[2] + 0.005;
+    k.box(0.26 + r() * 0.1, 0.075, wallHalf(ym) * 2 + 0.16, pickStone(r, 0.95), [px(d, 0), gy(d) + ym, pz(d, 0)], [0, yw + (r() - 0.5) * 0.08, 0]);
+  }
+  // the coping: a row of stones set on edge
+  for (let d = s0 + 0.02; d < s1 - 0.05;) {
+    const t = 0.07 + r() * 0.05, hh = 0.2 + r() * 0.13, w = wallHalf(WALL_H) * 2 + 0.04 + r() * 0.05, dm = d + t / 2;
+    k.box(t, hh, w, pickStone(r, 0.92), [px(dm, 0), gy(dm) + WALL_H + hh / 2 - 0.04, pz(dm, 0)], [0, yw + (r() - 0.5) * 0.12, (r() - 0.5) * 0.16]);
+    d += t + 0.01 + r() * 0.012;
+  }
+  // a finished wall end: big tie stones laid across the wall, alternating, and a capstone
+  for (const [kind, de, dir] of [[a, s0, 1], [b, s1, -1]]) {
+    if (kind !== 'end') continue;
+    let y = 0;
+    WALL_COURSES.forEach((ch, c) => {
+      const l = c % 2 ? 0.32 : 0.48, dm = de + dir * l / 2, wd = wallHalf(y + ch / 2) * 2 + 0.07;
+      k.box(l, ch - 0.02, wd, pickStone(r, 1.04), [px(dm, 0), gy(de) + y + ch / 2, pz(dm, 0)], [0, yw, (r() - 0.5) * 0.04]);
+      y += ch;
+    });
+    k.box(0.5, 0.16, wallHalf(WALL_H) * 2 + 0.12, pickStone(r, 0.96), [px(de + dir * 0.25, 0), gy(de) + WALL_H + 0.08, pz(de + dir * 0.25, 0)], [0, yw, 0]);
+  }
+}
+// The corner where two walls meet: big quoin stones laid alternately one way and the other
+function wallCorner(k, r, x, z) {
+  const gy = groundHeight(x, z); let y = 0;
+  WALL_COURSES.forEach((ch, c) => {
+    const w = wallHalf(y + ch / 2) * 2 + 0.1, l = w + 0.28;
+    k.box(c % 2 ? w : l, ch - 0.02, c % 2 ? l : w, pickStone(r, 1.04), [x + (c % 2 ? 0 : 0.06), gy + y + ch / 2, z + (c % 2 ? 0.06 : 0)], [0, (r() - 0.5) * 0.05, 0]);
+    y += ch;
+  });
+  k.box(0.62, 0.2, 0.62, pickStone(r, 0.94), [x, gy + WALL_H + 0.1, z], [0, 0.1, 0]);
+}
+// A square stone gatepost: stacked blocks and a weathered capstone, with iron hinge pins
+function gatePost(k, r, x, z) {
+  const gy = groundHeight(x, z) - 0.1; let y = 0;
+  for (const h of [0.42, 0.36, 0.34, 0.3, 0.26]) { const w = 0.46 - y * 0.03; k.box(w, h - 0.015, w, pickStone(r, 1.08), [x, gy + y + h / 2, z], [0, (r() - 0.5) * 0.06, 0]); y += h; }
+  k.box(0.56, 0.1, 0.56, pickStone(r, 0.95), [x, gy + y + 0.05, z]);
+  k.cyl(0.001, 0.26, 0.16, 4, pickStone(r, 0.9), [x, gy + y + 0.18, z], [0, Math.PI / 4, 0]);
+}
+// A five-bar field gate in weathered oak: hinged at (hx, hz), swung to `yaw` (its length runs along
+// the local x axis), with a diagonal brace, iron hinge straps and a latch
+function fiveBarGate(k, hx, hz, yaw, len) {
+  const c = Math.cos(yaw), s = Math.sin(yaw), gy = groundHeight(hx, hz) + 0.1;
+  const P = (lx, ly, lz) => [hx + lx * c + lz * s, gy + ly, hz - lx * s + lz * c], R = [0, yaw, 0];
+  const OAK = 0x8c7a60, OAK2 = 0x75644e, IRON = 0x2a2826;
+  k.box(0.11, 1.26, 0.1, OAK2, P(0.06, 0.6, 0), R);                     // the heel (hinge) stile
+  k.box(0.08, 1.12, 0.07, OAK2, P(len - 0.05, 0.56, 0), R);             // the head stile
+  k.box(len, 0.1, 0.075, OAK, P(len / 2, 1.13, 0), R);                  // the heavy top rail
+  for (const y of [0.1, 0.3, 0.52, 0.78]) k.box(len - 0.06, 0.075, 0.04, OAK, P(len / 2, y, 0), R);
+  // the brace, from the foot of the heel up toward the middle of the top rail
+  const bx0 = 0.12, by0 = 0.12, bx1 = len * 0.55, by1 = 1.08, bl = Math.hypot(bx1 - bx0, by1 - by0);
+  k.box(bl, 0.07, 0.035, OAK2, P((bx0 + bx1) / 2, (by0 + by1) / 2, 0.058), [0, yaw, Math.atan2(by1 - by0, bx1 - bx0)]);
+  // a short upright in the middle
+  k.box(0.06, 1.0, 0.035, OAK2, P(len * 0.55, 0.6, -0.058), R);
+  // iron hinge straps and the latch
+  for (const y of [0.3, 1.13]) { k.box(0.55, 0.035, 0.012, IRON, P(0.32, y, 0.05), R); k.cyl(0.02, 0.02, 0.12, 6, IRON, P(-0.02, y, 0), R); }
+  k.box(0.16, 0.03, 0.02, IRON, P(len + 0.03, 0.95, 0.045), R);
 }
 
 // A cannonball fired level from the mountain top at speed v: its path (in the orbit's plane) until

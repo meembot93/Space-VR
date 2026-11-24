@@ -107,6 +107,9 @@ lines play at real speed after that line; LOOK='js' points the view at something
 prints each narration line as the chapter plays itself.
 `node audit-shots.js <chapter> <dir>` plays a chapter in Kids mode and saves two screenshots per narration
 line, to check that what's on screen matches what Astra is saying.
+`node clip-test.js <chapter ...>` plays chapters in Kids mode and checks everyone, twice a second, for
+bodies clipping into the set (legs through a chair, a head inside a camera) and feet sunk or floating;
+it exits with 1 and lists each problem with its narration line, person, body part and the mesh hit.
 
 ## Scenes that act out the story
 

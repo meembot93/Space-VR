@@ -11,7 +11,7 @@
 //    brass quarter circle on a wall, with Tycho painted inside it). Helpers sight stars and call out
 //    times; his elk wanders the garden; twenty years of nights fly by as measurements pile up on a
 //    giant star chart, and the Great Comet of 1577 smashes through a crystal sphere. At the end the
-//    measurements of Mars glow red, and an echo of Kepler (next chapter) looks them over.
+//    measurements of Mars glow red.
 // World axes: -Z north, +X east, +Y up.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
@@ -20,7 +20,7 @@ import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { glowPoints, textSprite, shatter, rumble, whoosh, awe, shimmer } from '../wow/fx.js';
-import { Echo } from '../wow/echo.js';
+import { grove, bareTree, orchardTree, bush } from '../trees.js';
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(91), N2 = noise2(93);
@@ -28,6 +28,13 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const SEA = -26;
 const CASTLE = new THREE.Vector3(0, 0, -34);   // Uraniborg's middle
 const QUAD = new THREE.Vector3(-2.6, 0, -1.2); // the mural quadrant's corner (its arc faces east)
+const SIGHT_T = 40;
+// the parallax demo's layout (metres, in its own little frame): Earth's middle, the Moon, the sky's arc, the new star
+const PE = -0.75, PM = -0.2, SKY_R = 1.75, NS = new THREE.Vector2(1.05, PE + Math.sqrt(SKY_R * SKY_R - 1.05 * 1.05));
+function skyHit(w, d) {   // where a line from w along d meets the sky's arc (a circle of radius SKY_R round the Earth)
+  const ox = w.x, oy = w.y - PE, b = ox * d.x + oy * d.y, c = ox * ox + oy * oy - SKY_R * SKY_R, t = -b + Math.sqrt(b * b - c);
+  return new THREE.Vector2(w.x + d.x * t, w.y + d.y * t);
+}                             // the star's height: where the sight must go on the arc (degrees)
 
 // ---------- the ground in each place ----------
 function fieldsHeight(x, z) {
@@ -119,12 +126,15 @@ export default class Tycho {
     this.labSmoke = makeSmoke(new THREE.Vector3(31, 10, -8), { n: 7, rise: 8, size: 1.2, opacity: 0.18, color: 0x9a9aa8 }); A.add(this.labSmoke.group);
     // a fence along the lane, bare trees, haystacks
     for (let x = -12; x < 50; x += 2.4) { const z = 4 + Math.sin(x / 30) * 3 - 2.4; k.box(0.1, 1.1, 0.1, 0x4a3a2a, [x, fieldsHeight(x, z) + 0.55, z]); k.box(2.4, 0.08, 0.05, 0x5a4a3a, [x + 1.2, fieldsHeight(x, z) + 0.85, z]); }
+    // bare November trees: a few detailed ones near the lane, the rest a cheap grove
+    const near = [], far = [];
     for (let i = 0; i < 90; i++) {
       const a = r() * 6.28, d = 18 + r() * 300, x = Math.cos(a) * d, z = Math.sin(a) * d; if (x > 10 && x < 90 && z > -20 && z < 40) continue;
-      const y = fieldsHeight(x, z), s = 0.8 + r() * 0.7;
-      k.cyl(0.12 * s, 0.25 * s, 5 * s, 5, 0x2a221c, [x, y + 2.5 * s, z]);
-      for (let j = 0; j < 5; j++) { const b = r() * 6.28; k.cyl(0.03 * s, 0.08 * s, 3 * s, 4, 0x2a221c, [x + Math.cos(b) * 0.9 * s, y + (4.5 + r() * 1.5) * s, z + Math.sin(b) * 0.9 * s], [Math.sin(b) * 0.7, 0, -Math.cos(b) * 0.7]); }
+      if (Math.abs(z - 4 + Math.sin(x / 30) * 3) < 4) continue;   // not on the lane
+      (d < 60 ? near : far).push({ x, y: fieldsHeight(x, z) - 0.05, z, s: 0.8 + r() * 0.5 });
     }
+    A.add(grove(bareTree, near, { detail: 'mid', variants: 4, seed: 3, height: 9 }).group);
+    A.add(grove(bareTree, far, { detail: 'low', variants: 4, seed: 5, height: 9 }).group);
     for (let i = 0; i < 8; i++) { const x = -30 - r() * 60, z = -20 - r() * 60; k.cyl(0.4, 2.2, 3, 8, 0x8a7a4a, [x, fieldsHeight(x, z) + 1.5, z]); }
     A.add(k.mesh());
     A.add(windows(wins, { lit: 0.55, seed: 2 }));
@@ -148,7 +158,7 @@ export default class Tycho {
       if (y < -2) c.copy(cliff);
       // the garden: paths in a cross and a circle, flower beds between
       const gx = x - CASTLE.x, gz = z - CASTLE.z;
-      if (Math.abs(gx) < 37 && Math.abs(gz) < 37) { const onPath = Math.abs(gx) < 2 || Math.abs(gz) < 2 || Math.abs(Math.hypot(gx, gz) - 24) < 1.5 || Math.hypot(gx, gz) < 14; c.copy(onPath ? path : bed).lerp(grass, onPath ? 0 : 0.3 * N2(x, z)); }
+      if (Math.abs(gx) + Math.abs(gz) < 52) { const onPath = Math.abs(gx) < 2 || Math.abs(gz) < 2 || Math.abs(Math.hypot(gx, gz) - 24) < 1.5 || Math.hypot(gx, gz) < 14; c.copy(onPath ? path : bed).lerp(grass, onPath ? 0 : 0.3 * N2(x, z)); }
       cols.set([c.r, c.g, c.b], i * 3);
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals(); Bg.add(new THREE.Mesh(g, FLAT));
@@ -173,26 +183,106 @@ export default class Tycho {
     k.cyl(2.4, 2.6, 8, 12, RB, [X, 18, Z]); k.cyl(2.8, 2.8, 0.4, 12, SS, [X, 22.2, Z]);
     k.ball(2.4, 1, CU, [X, 23.6, Z], 0, [1, 1.1, 1]); k.cyl(0.001, 0.7, 6, 8, CU, [X, 27.5, Z]); k.ball(0.35, 0, 0xe0b040, [X, 30.6, Z]);
     for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { wins.push({ p: new THREE.Vector3(X - 6 + i * 4, 3, Z + s * 8.03), yaw: s > 0 ? 0 : Math.PI }); wins.push({ p: new THREE.Vector3(X - 6 + i * 4, 7, Z + s * 8.03), yaw: s > 0 ? 0 : Math.PI }); }
-    // the square garden wall with its semicircular bulges and gatehouses east and west
-    const W = 37;
-    for (const [ax, az, bx, bz] of [[-W, -W, W, -W], [W, -W, W, W], [W, W, -W, W], [-W, W, -W, -W]]) {
-      const len = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(-(bz - az), bx - ax);
-      for (const f of [0.25, 0.75]) k.box(len / 2 - 6, 3, 1, 0x9a8a6a, [X + ax + (bx - ax) * f, 1.5, Z + az + (bz - az) * f], [0, yaw, 0]);
-      const mx = X + (ax + bx) / 2, mz = Z + (az + bz) / 2, ox = -(bz - az) / len, oz = (bx - ax) / len;
-      for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI, px = mx + ((bx - ax) / len) * Math.cos(a) * 6 + ox * Math.sin(a) * -6, pz = mz + ((bz - az) / len) * Math.cos(a) * 6 + oz * Math.sin(a) * -6; k.box(2, 3, 1, 0x9a8a6a, [px, 1.5, pz], [0, yaw + a, 0]); }
+    // The garden wall, as Tycho built it: a square about 75 m a side, turned so its corners point
+    // north, south, east and west. Red brick on a sandstone plinth, with sandstone bands, pilasters
+    // and coping; a half-round bay bulging out of the middle of every side (each with a little
+    // arbour); gatehouses with arched gates and pointed copper roofs at the east and west corners;
+    // the servants' house in the north corner and the printing house in the south corner.
+    const HD = 52;                                   // centre to corner
+    const BRK = [0x96442c, 0x8c3e28, 0x9e4a30], STN = 0xcbb98f, STN2 = 0xb9a67c, WH = 4.6;
+    const wallRun = (ax, az, bx, bz, pil = true) => {
+      const len = Math.hypot(bx - ax, bz - az); if (len < 0.2) return;
+      const yaw = Math.atan2(-(bz - az), bx - ax), mx = (ax + bx) / 2, mz = (az + bz) / 2, R = [0, yaw, 0];
+      const nx = -(bz - az) / len, nz = (bx - ax) / len;   // sideways
+      k.box(len + 0.2, 0.7, 1.7, STN2, [mx, 0.2, mz], R);                     // plinth
+      k.box(len + 0.1, 0.18, 1.5, STN, [mx, 0.62, mz], R);                    // plinth moulding
+      for (let i = 0; i < 7; i++) k.box(len, 0.5, 1.1 + (i % 2) * 0.03, BRK[i % 3], [mx, 0.96 + i * 0.5, mz], R);   // brick courses
+      k.box(len + 0.05, 0.22, 1.3, STN, [mx, 2.3, mz], R);                    // sandstone band
+      k.box(len + 0.15, 0.2, 1.5, STN, [mx, WH - 0.1, mz], R);                // coping
+      k.box(len, 0.22, 0.7, STN2, [mx, WH + 0.1, mz], R);                     // coping ridge
+      if (!pil) return;
+      const n = Math.max(1, Math.round(len / 6));
+      for (let i = 0; i <= n; i++) {
+        const f = i / n, px = ax + (bx - ax) * f, pz = az + (bz - az) * f;
+        for (const sd of [-1, 1]) {
+          k.box(0.7, WH - 0.5, 0.3, STN, [px + nx * sd * 0.62, (WH - 0.5) / 2 + 0.3, pz + nz * sd * 0.62], R);
+          k.box(0.85, 0.22, 0.42, STN2, [px + nx * sd * 0.66, WH - 0.15, pz + nz * sd * 0.66], R);
+        }
+        k.box(0.5, 0.5, 0.5, STN, [px, WH + 0.45, pz], [0, yaw + Math.PI / 4, 0]); k.ball(0.22, 0, STN2, [px, WH + 0.85, pz]);   // finial
+      }
+    };
+    const corners = [[HD, 0], [0, HD], [-HD, 0], [0, -HD]];   // east, south, west, north (offsets from the castle)
+    const trimAt = [4.2, 4.2, 4.2, 4.2], BAY = 7.5;
+    for (let c = 0; c < 4; c++) {
+      const [ax, az] = corners[c], [bx, bz] = corners[(c + 1) % 4], len = Math.hypot(bx - ax, bz - az);
+      const ux = (bx - ax) / len, uz = (bz - az) / len, ox = (ax + bx) / 2, oz = (az + bz) / 2;
+      const on = Math.hypot(ox, oz), outx = ox / on, outz = oz / on;
+      const mx = X + ox, mz = Z + oz;
+      wallRun(X + ax + ux * trimAt[c], Z + az + uz * trimAt[c], mx - ux * BAY, mz - uz * BAY);
+      wallRun(mx + ux * BAY, mz + uz * BAY, X + bx - ux * trimAt[c], Z + bz - uz * trimAt[c]);
+      // the half-round bay, bulging outward
+      const N = 18; let px = mx - ux * BAY, pz = mz - uz * BAY;
+      for (let i = 1; i <= N; i++) {
+        const a = Math.PI - i / N * Math.PI, qx = mx + ux * Math.cos(a) * BAY + outx * Math.sin(a) * BAY, qz = mz + uz * Math.cos(a) * BAY + outz * Math.sin(a) * BAY;
+        wallRun(px, pz, qx, qz, i % 3 === 0); px = qx; pz = qz;
+      }
+      // the arbour in the bay: eight posts, a ring beam and a little copper cap; a bench inside
+      const cx = mx + outx * 3, cz = mz + outz * 3;
+      for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28; k.cyl(0.08, 0.1, 2.6, 6, 0x5a4028, [cx + Math.cos(a) * 2, 1.3, cz + Math.sin(a) * 2]); }
+      k.cyl(2.15, 2.15, 0.18, 16, 0x5a4028, [cx, 2.65, cz]); k.cyl(0.05, 2.5, 1.6, 8, 0x4a8070, [cx, 3.55, cz]); k.ball(0.15, 0, 0xe0b040, [cx, 4.4, cz]);
+      for (let i = 0; i < 5; i++) { const a = Math.atan2(outz, outx) + (i - 2) * 0.45; k.box(0.9, 0.08, 0.4, 0x6a5038, [cx + Math.cos(a) * 1.5, 0.45, cz + Math.sin(a) * 1.5], [0, -a + Math.PI / 2, 0]); }
+      // a clipped hedge along the inside of each wall, with a gap at the bay
+      for (const sd of [-1, 1]) {
+        const h0x = mx - outx * 3 + ux * sd * (BAY + 1), h0z = mz - outz * 3 + uz * sd * (BAY + 1), hl = len / 2 - BAY - 9;
+        const yaw = Math.atan2(-uz, ux), hx = h0x + ux * sd * hl / 2, hz = h0z + uz * sd * hl / 2;
+        k.box(hl, 1.1, 0.9, 0x2e4a24, [hx, 0.55, hz], [0, yaw, 0]); k.box(hl, 0.15, 0.7, 0x3a5a2c, [hx, 1.15, hz], [0, yaw, 0]);
+      }
     }
-    for (const s of [-1, 1]) { k.box(6, 7, 6, RB, [X + s * W, 3.5, Z]); k.add(gableRoof(6, 6, 4, 0.3), 0x6a3426, [X + s * W, 7, Z]); }
+    // the gatehouses (east and west corners): the gate road runs east-west through an arch
+    for (const s of [-1, 1]) {
+      const gx = X + s * HD, gz = Z, GW = 7.4, GH = 7.5;
+      k.box(GW + 0.4, 0.8, GW + 0.4, STN2, [gx, 0.3, gz]);
+      k.box(GW, GH, GW, BRK[0], [gx, GH / 2 + 0.6, gz]);
+      for (const y of [2.6, 5.2]) k.box(GW + 0.12, 0.24, GW + 0.12, STN, [gx, y, gz]);
+      k.box(GW + 0.4, 0.4, GW + 0.4, STN, [gx, GH + 0.7, gz]);
+      for (const [qx, qz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let i = 0; i < 9; i++) k.box(i % 2 ? 0.55 : 0.85, 0.42, i % 2 ? 0.85 : 0.55, STN, [gx + qx * (GW / 2 - 0.2), 1 + i * 0.8, gz + qz * (GW / 2 - 0.2)]);   // quoins
+      for (const f of [-1, 1]) {   // the arch on both faces (outer and inner), the doors, the arms above
+        const fx = gx + f * (GW / 2 + 0.02);
+        k.box(0.3, 4.0, 3.6, STN, [fx + f * 0.1, 2.6, gz]); k.cyl(1.8, 1.8, 0.3, 18, STN, [fx + f * 0.1, 4.5, gz], [0, 0, Math.PI / 2]);
+        k.box(0.36, 3.2, 2.6, 0x1a120c, [fx + f * 0.12, 2.2, gz]); k.cyl(1.3, 1.3, 0.36, 18, 0x1a120c, [fx + f * 0.12, 3.8, gz], [0, 0, Math.PI / 2]);
+        k.box(0.5, 0.55, 0.5, STN, [fx + f * 0.3, 5.45, gz]);   // keystone
+        k.box(0.16, 1.2, 1.0, STN, [fx + f * 0.15, 6.3, gz]); k.box(0.2, 0.8, 0.7, 0xc89a40, [fx + f * 0.2, 6.3, gz]);   // carved arms
+        for (const sz of [-1, 1]) wins.push({ p: new THREE.Vector3(fx + f * 0.05, 6.2, gz + sz * 2.3), yaw: f > 0 ? Math.PI / 2 : -Math.PI / 2 });
+      }
+      for (const f of [-1, 1]) for (const sz of [-1, 1]) {   // a lantern on an iron bracket each side of both arches
+        const lx = gx + f * (GW / 2 + 0.45), lz = gz + sz * 2.4;
+        k.box(0.5, 0.06, 0.06, 0x2a2420, [lx - f * 0.2, 4.6, lz]); k.box(0.28, 0.4, 0.28, 0x2a2420, [lx, 4.35, lz]); k.cyl(0.001, 0.22, 0.2, 4, 0x2a2420, [lx, 4.65, lz], [0, Math.PI / 4, 0]);
+        const L = glow(0xffc070, 1.6, 0.85); L.position.set(lx, 4.35, lz); this.gateLamps = (this.gateLamps || []); this.gateLamps.push(L);
+      }
+      for (const sz of [-1, 1]) k.box(0.12, 3.0, 1.25, 0x5a3a22, [gx + s * (GW / 2 - 0.3), 2.1, gz + sz * 1.75], [0, sz * s * 0.9, 0]);   // the gates, swung open
+      k.box(GW + 0.2, 0.06, 2.6, 0x6a6058, [gx, 0.62, gz]);   // the paved way through
+      k.cyl(0.001, GW * 0.78, 6, 4, 0x4a8070, [gx, GH + 3.9, gz], [0, Math.PI / 4, 0]);   // pointed roof
+      k.cyl(0.5, 0.5, 1.4, 8, 0x4a8070, [gx, GH + 7.3, gz]); k.cyl(0.001, 0.6, 2, 8, 0x4a8070, [gx, GH + 9, gz]); k.ball(0.22, 0, 0xe0b040, [gx, GH + 10.1, gz]);
+      for (const sz of [-1, 1]) for (const dx of [-1.6, 1.6]) wins.push({ p: new THREE.Vector3(gx + dx, 4, gz + sz * (GW / 2 + 0.03)), yaw: sz > 0 ? 0 : Math.PI });
+    }
+    // the servants' house (north corner) and the printing house (south corner), gable ends stepped
+    for (const s of [-1, 1]) house(k, { x: X, y: 0, z: Z + s * (HD - 2.5), w: 7.5, d: 6, h: 4.6, yaw: s > 0 ? Math.PI : 0, wall: BRK[1], roofCol: 0x6a3426, gableFront: true, stepped: true }, wins);
     // garden trees (fruit trees in rows) and hedges
-    for (let i = 0; i < 64; i++) { const a = i / 64 * 6.28, d = i % 2 ? 30 : 18, x = X + Math.cos(a) * d, z = Z + Math.sin(a) * d; if (Math.abs(x - X) < 3 || Math.abs(z - Z) < 3 || Math.hypot(x, z) < 8) continue; k.cyl(0.08, 0.12, 1.6, 5, 0x3a2a1c, [x, 0.8, z]); k.ball(1.1, 1, i % 3 ? 0x4a6a2a : 0x5a6a30, [x, 2.2, z]); }
+    const orch = [], shrubs = [];
+    for (let i = 0; i < 64; i++) { const a = i / 64 * 6.28, d = i % 2 ? 30 : 18, x = X + Math.cos(a) * d, z = Z + Math.sin(a) * d; if (Math.abs(x - X) < 3 || Math.abs(z - Z) < 3 || Math.hypot(x, z) < 8) continue; orch.push({ x, y: -0.05, z, s: 0.85 + r() * 0.3 }); }
+    for (let i = 0; i < 40; i++) { const a = (i + 0.5) / 40 * 6.28, x = X + Math.cos(a) * 21.5, z = Z + Math.sin(a) * 21.5; if (Math.abs(x - X) < 3.5 || Math.abs(z - Z) < 3.5) continue; shrubs.push({ x, y: -0.03, z, s: 0.8 + r() * 0.4 }); }
+    Bg.add(grove(orchardTree, orch, { detail: 'mid', variants: 4, seed: 7, height: 4.2 }).group);
+    Bg.add(grove(bush, shrubs, { detail: 'low', variants: 3, seed: 2, height: 1.1 }).group);
     // Stjerneborg: the half-underground observatory nearby, its little domes just above the ground
     for (const [dx, dz] of [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]]) k.ball(dx || dz ? 1.8 : 2.4, 1, 0x7a5a3a, [70 + dx, -0.5, -80 + dz], 0, [1, 0.7, 1]);
     // fields, farms and the village of Tuna
     for (let i = 0; i < 14; i++) { const q = at(120 + r() * 120, 120 + r() * 100); house(k, { x: q.x, y: hvenHeight(q.x, q.z), z: q.z, w: 9, d: 6, h: 3.2, yaw: r() * 6, wall: 0xd8c8a8, roofCol: 0x8a7a40, timber: 0x3a2a1c }, wins); }
     // The terrace where you stand, and the great mural quadrant on its wall
-    k.box(12, 0.25, 9, 0x8a8478, [0, 0.12, 0]);
+    k.box(12, 0.25, 9, 0x8a8478, [0, -0.11, 0]);   // top at the people's feet
     k.box(0.6, 3.4, 4.2, RB, [QUAD.x - 0.35, 1.7, QUAD.z - 0.4]); k.box(0.7, 0.3, 4.4, SS, [QUAD.x - 0.35, 3.5, QUAD.z - 0.4]);
     Bg.add(k.mesh());
     Bg.add(windows(wins, { lit: 0.6, seed: 6 }));
+    for (const L of this.gateLamps || []) Bg.add(L);
     // the quadrant: a brass quarter circle (radius 1.9 m) on the wall, centred at its top corner
     const q = new Kit(), BR = 0xc89a40, R = 1.9;
     for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI / 2, a2 = (i + 1) / 24 * Math.PI / 2, ca = (a + a2) / 2; q.box(0.06, R * 0.07, 0.08, BR, [0, -Math.sin(ca) * R, Math.cos(ca) * R], [ca, 0, 0]); }
@@ -213,9 +303,22 @@ export default class Tycho {
     pm.rotation.y = Math.PI / 2; pm.position.set(QUAD.x - 0.04, 2.9 - R * 0.48, QUAD.z - 2.2 + R * 0.48); Bg.add(pm);
     // the sight that slides along the arc (ch9_07)
     const sk = new Kit(); sk.box(0.12, 0.12, 0.08, 0x8a6a2a, [0, 0, 0]); sk.box(0.02, 0.18, 0.02, 0x1a1a1a, [0.07, 0, 0]);
-    this.sightM = sk.mesh(); Bg.add(this.sightM); this.sightA = 12;   // degrees up the arc
+    this.sightM = sk.mesh(); Bg.add(this.sightM); this.sightA = 72;   // degrees down the arc from its top corner (starts low, within reach)
     this.sightGlow = glow(0xffe0a0, 0.25, 0); this.sightM.add(this.sightGlow);
     this.beam = glowPoints(80, { sizeScale: 250 }); this.beam.visible = false; Bg.add(this.beam);
+    // where the sight has to go: a gold notch on the arc, a dotted guide along the arc, the star itself
+    // marked in the sky, and the reading that pops up once it's lined up
+    const ta = SIGHT_T * D2R;
+    this.notch = new THREE.Group(); this.notch.position.set(QUAD.x + 0.1, 2.9 - Math.sin(ta) * R, QUAD.z - 2.2 + Math.cos(ta) * R); Bg.add(this.notch);
+    { const nk = new Kit(); nk.box(0.05, 0.03, 0.22, 0xffd060, [0, 0, 0], [ta, 0, 0]); this.notch.add(nk.mesh()); }
+    this.notchGlow = glow(0xffd060, 0.45, 0); this.notch.add(this.notchGlow);
+    this.guide = glowPoints(40, { sizeScale: 250 }); this.guide.visible = false; Bg.add(this.guide);
+    this.starMark = glow(0xfff4d0, 40, 0); this.starMark.visible = false; Bg.add(this.starMark);
+    this.starLab = label('this star', 14); this.starLab.material.opacity = 0; Bg.add(this.starLab);
+    this.readLab = label('Lined up!  40° above the horizon, at 9:14 and 30 seconds', 0.16); this.readLab.material.opacity = 0;
+    this.readLab.position.set(QUAD.x + 0.25, 3.45, QUAD.z - 1.3); Bg.add(this.readLab);
+    this.readLab2 = label('One measurement. Tycho made tens of thousands.', 0.12, { color: '#ffe8b0' }); this.readLab2.material.opacity = 0;
+    this.readLab2.position.set(QUAD.x + 0.25, 3.2, QUAD.z - 1.3); Bg.add(this.readLab2);
     // lanterns and a table of logbooks on the terrace
     const tk = new Kit(); tk.box(1.4, 0.05, 0.8, 0x5a3a22, [1.6, 0.85, -0.6]); for (const [ox, oz] of [[-0.6, -0.3], [0.6, -0.3], [-0.6, 0.3], [0.6, 0.3]]) tk.box(0.05, 0.85, 0.05, 0x2a1a10, [1.6 + ox, 0.42, -0.6 + oz]);
     for (let i = 0; i < 4; i++) tk.box(0.24, 0.07, 0.32, [0x5a2a1a, 0x2a3a2a, 0x4a3a1a, 0x3a2a3a][i], [1.3 + (i % 2) * 0.05, 0.91 + i * 0.07, -0.6]);
@@ -234,17 +337,22 @@ export default class Tycho {
     const add = (parent, model, pos, look = {}) => { const P = makePerson({ model, seed: 7 + parent.children.length * 3, ...look }); P.g.position.copy(pos); parent.add(P.g); return P; };
     // Herrevad: Tycho walks home; two farm folk come out with a lantern
     this.tycho = add(this.A, 'tycho', new THREE.Vector3(26, 0, 3), { tunic: 0x1a1a1a, hair: 0x9a5a2a, height: 1.78 });
-    this.folk = [add(this.A, 'townsman', new THREE.Vector3(36, 0, 26), { height: 1.68 }), add(this.A, 'townsman', new THREE.Vector3(39, 0, 27), { height: 1.6, tunic: 0x6a4a3a })];
+    this.folk = [add(this.A, 'sailor', new THREE.Vector3(34, fieldsHeight(34, 22.5), 22.5), { height: 1.68 }), add(this.A, null, new THREE.Vector3(37, fieldsHeight(37, 23), 23), { height: 1.6, tunic: 0x6a4a3a, hair: 0x5a3a20 })];
     this.folkLamp = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(this.folk[0], this.folkLamp, 'Right', [0, 0.02, 0.02]);
     this.folkLight = new THREE.PointLight(0xffb060, 1.4, 8, 1.8); this.folk[0].g.add(this.folkLight); this.folkLight.position.set(0.3, 1.2, 0.2);
     // Hven: Tycho, a helper at the sight, a timekeeper with the clock, a scribe at the book table
     this.tychoB = add(this.B, 'tycho', new THREE.Vector3(0.6, 0, -2.4), { tunic: 0x1a1a1a, hair: 0x9a5a2a, height: 1.78 });
     this.observer = add(this.B, 'rheticus', new THREE.Vector3(QUAD.x + 0.7, 0, QUAD.z + 0.3), {});
-    this.timer = add(this.B, 'townsman', new THREE.Vector3(2.6, 0, -1.4), { tunic: 0x3a4a5a });
+    this.timer = add(this.B, 'instrument_maker', new THREE.Vector3(2.6, 0, -1.4), {});
     this.scribe = add(this.B, 'canon', new THREE.Vector3(1.6, 0, 0.1), {});
     this.helpers = [];
-    for (let i = 0; i < 4; i++) { const P = add(this.B, 'townsman', new THREE.Vector3(-6 + i * 4, 0, -20), { height: 1.65 + (i % 2) * 0.06, tunic: [0x5a4a32, 0x3a3a4a, 0x6a3a2a, 0x4a4a3a][i] }); P.routine = [{ x: -10 + i * 6, z: -20, pose: 'idle', secs: 6 + i }, { x: -8 + i * 5, z: -48, pose: 'talk', secs: 5 }, { x: 18 - i * 3, z: -14, pose: 'work', secs: 6 }]; const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; this.helpers.push(P); }
-    this.keplerEcho = new Echo(this.G, this.B, { model: 'kepler', tint: 0xa8c8ff, pos: new THREE.Vector3(2.6, 0, 0.4), face: -1.2, seed: 9 });
+    // two lantern-carriers going round the garden's circular path (one of each person, none through the castle)
+    for (let i = 0; i < 2; i++) {
+      const at24 = (a) => ({ x: CASTLE.x + Math.cos(a) * 24, z: CASTLE.z + Math.sin(a) * 24 });
+      const a0 = i ? 0.4 : 2.4, P = add(this.B, i ? null : 'townsman', new THREE.Vector3(at24(a0).x, 0, at24(a0).z), { height: 1.66, tunic: i ? 0x3a3a4a : 0x5a4a32, hair: 0x3a2a18 });
+      P.routine = [0, 1, 2, 3, 4, 5].map((k) => ({ ...at24(a0 + k * 0.55 * (i ? 1 : -1)), pose: k % 3 ? 'idle' : 'talk', secs: k % 3 ? 0.5 : 5 }));
+      const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; this.helpers.push(P);
+    }
   }
 
   // ---------- The new star (and what it really was) ----------
@@ -268,16 +376,41 @@ export default class Tycho {
 
   // ch9_04: the Moon shifts against the stars when seen from two places; the new star doesn't
   buildParallax() {
-    const M = this.par = new THREE.Group(); M.position.set(-1.3, 1.75, -2.6); M.rotation.y = 0.45; M.visible = false; this.A.add(M);
-    const earth = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 16), new THREE.MeshBasicMaterial({ color: 0x4a80d0, transparent: true, fog: false }));
+    // Why the new star is far away, acted out: two watchers far apart on the Earth look up. Their lines
+    // through the nearby Moon land on DIFFERENT stars (the Moon jumps); their lines to the new star land on
+    // the SAME spot. Shown big in front of you at ch9_04, and once more just before the journal page.
+    const M = this.par = new THREE.Group(); M.visible = false; this.root.add(M);
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 20), new THREE.MeshBasicMaterial({ color: 0x4a80d0, transparent: true, fog: false }));
     new THREE.TextureLoader().load(new URL('../../data/earth.jpg', import.meta.url).href, (t) => { t.colorSpace = THREE.SRGBColorSpace; earth.material.map = t; earth.material.color.setHex(0xffffff); earth.material.needsUpdate = true; });
-    earth.position.set(0, -0.55, 0);
-    const moon = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), new THREE.MeshBasicMaterial({ color: 0xd8dce8, transparent: true, fog: false })); moon.position.set(0.05, -0.1, 0);
-    this.parPts = glowPoints(420, { sizeScale: 260 }); M.add(earth, moon, this.parPts);
+    earth.position.set(0, PE, 0);
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(0.045, 20, 14), new THREE.MeshBasicMaterial({ color: 0xd8dce8, transparent: true, fog: false })); moon.position.set(0, PM, 0);
+    this.parPts = glowPoints(900, { sizeScale: 900 }); M.add(earth, moon, this.parPts);
+    // a round dark window of night with a gold rim, so the drawing stands clear of the real sky behind it
+    const back = new THREE.Mesh(new THREE.CircleGeometry(2.05, 64), new THREE.MeshBasicMaterial({ color: 0x050914, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false }));
+    back.position.set(0, -0.2, -0.06);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(2.05, 2.1, 96), new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false }));
+    rim.position.copy(back.position); M.add(back, rim); this.parBack = [back, rim];
+    earth.material.toneMapped = moon.material.toneMapped = false;
+    // drawn last, over the real sky's stars and the ground, so nothing shows through the window
+    back.renderOrder = 30; rim.renderOrder = 31; earth.renderOrder = moon.renderOrder = 32; this.parPts.renderOrder = 33;
+    for (const o of [back, rim, earth, moon, this.parPts]) o.material.depthTest = false;
     this.parEarth = earth; this.parMoon = moon;
-    this.parLabs = [label('Moon: jumps', 0.06), label('New star: stays put', 0.06)];
-    this.parLabs[0].position.set(0.35, -0.05, 0); this.parLabs[1].position.set(0.15, 0.95, 0); M.add(...this.parLabs);
-    const ST = this.parStars = []; const r = rng(4); for (let i = 0; i < 60; i++) { const a = (r() - 0.5) * 1.6; ST.push([Math.sin(a) * 1.4, -0.55 + Math.cos(a) * 1.4]); }
+    const L = (txt, h, x, y, col) => { const l = label(txt, h, col ? { color: col } : undefined); l.material.toneMapped = false; l.material.depthTest = false; l.renderOrder = 34; l.position.set(x, y, 0.02); l.material.opacity = 0; M.add(l); return l; };
+    // where each watcher's line through the Moon lands on the sky (computed once)
+    this.parW = [-1, 1].map((sd) => { const a = sd * 0.62, w = new THREE.Vector2(Math.sin(a) * 0.26, PE + Math.cos(a) * 0.26), d = new THREE.Vector2(0, PM).sub(w).normalize(); return { w, d, hit: skyHit(w, d) }; });
+    const [h1, h2] = this.parW.map((q) => q.hit);
+    this.parLabs = {
+      w1: L('Watcher 1', 0.13, this.parW[0].w.x - 0.32, this.parW[0].w.y - 0.02, '#a8ccff'),
+      w2: L('Watcher 2', 0.13, this.parW[1].w.x + 0.32, this.parW[1].w.y - 0.02, '#ffc090'),
+      moon: L('the Moon', 0.12, 0.2, PM, '#e8ecf8'),
+      h1: L("Watcher 1's Moon", 0.11, h1.x, h1.y + 0.13, '#a8ccff'),
+      h2: L("Watcher 2's Moon", 0.11, h2.x, h2.y + 0.13, '#ffc090'),
+      jump: L('The Moon jumps!', 0.17, 0, Math.max(h1.y, h2.y) + 0.32),
+      star: L('The new star: the SAME spot for both', 0.12, NS.x - 0.2, NS.y - 0.2),
+      cap1: L('So the new star is far, far beyond the Moon, out among the stars.', 0.12, 0, PE - 0.42),
+      cap2: L('The heavens CAN change. Aristotle was wrong!', 0.12, 0, PE - 0.6, '#ffe0a0'),
+    };
+    const ST = this.parStars = []; const r = rng(4); for (let i = 0; i < 70; i++) { const a = (r() - 0.5) * 2.2; ST.push([Math.sin(a) * SKY_R, PE + Math.cos(a) * SKY_R]); }
   }
 
   // ch9_09: the giant star chart that fills with twenty years of measurements
@@ -313,11 +446,21 @@ export default class Tycho {
   registerInteractables() {
     const G = this.G, self = this;
     this.sightIt = {
-      hint: 'Grab the sight with GRIP and slide it up to the star', deskHint: 'Click the sight to line it up with the star',
+      hint: 'Grab the glowing brass sight with GRIP and slide it up the arc to the gold mark. That points it at the star.',
+      deskHint: 'Click the glowing brass sight to slide it up to the gold mark and line it up with the star',
       get disabled() { return self.s.sight !== 1; },
       reach(pos) { self.sightM.getWorldPosition(_a); return Math.max(0, pos.distanceTo(_a) - 0.15); },
       aim(o, d) { self.sightM.getWorldPosition(_a); _b.copy(_a).sub(o); const t = _b.dot(d); return t > 0 && _b.addScaledVector(d, -t).length() < 0.2 ? t : Infinity; },
-      onGrab() { G.act({ type: 'sight' }); }, onTouch() { G.act({ type: 'sight' }); },
+      onGrab() { if (G.mode !== 'vr') G.act({ type: 'sight' }); },
+      onTouch() { G.act({ type: 'sight' }); },
+      // in VR the sight follows your hand along the arc; near the gold mark it clicks into place
+      onHold(h) {
+        if (!h?.pos || self.s.sight !== 1) return;
+        const a = Math.atan2(2.9 - h.pos.y, h.pos.z - (QUAD.z - 2.2)) / D2R;
+        self.sightA = clamp(a, 5, 85); self.dragging = true;
+        if (Math.abs(self.sightA - SIGHT_T) < 4) G.act({ type: 'sight' });
+      },
+      onRelease() { self.dragging = false; },
     };
     G.interactables.push(this.sightIt);
   }
@@ -348,6 +491,7 @@ export default class Tycho {
     s.guide = null; s.cas = 0;
     s.phase = 'measure'; s.parallax = 1;
     await D.say('ch9_04');
+    await D.until(() => this.parT > 13, fast ? 2 : 10);
     s.parallax = 0;
     // what it really was
     s.phase = 'boom'; s.boom = 1;
@@ -364,6 +508,9 @@ export default class Tycho {
     s.guide = null;
     // the mural quadrant
     s.phase = 'quadrant';
+    await G.ui.fadeOut(0.6);
+    G.events.emit('placePlayers', { x: QUAD.x + 1.05, z: QUAD.z - 1.1, yaw: Math.PI / 2 });
+    await G.ui.fadeIn(0.8);
     const l7 = D.sayAsync('ch9_07');
     await D.cue('Line up'); s.sight = 1;
     await l7;
@@ -372,6 +519,7 @@ export default class Tycho {
     if (s.sight < 2) s.sight = 2;
     G.ui.showHint('');
     await D.until(() => this.sightDone, fast ? 2 : 6);
+    await D.wait(fast ? 0.5 : 4);   // let the reading show
     // the nose, the helpers, the elk
     s.phase = 'nose';
     await D.say('ch9_08');
@@ -385,6 +533,11 @@ export default class Tycho {
     s.phase = 'mars'; s.mars = 1;
     await D.say('ch9_10');
     await D.wait(fast ? 0.5 : 2.5);
+    // once more before the journal page: why the new star proved the heavens can change
+    s.phase = 'recap'; s.parallax = 2; s.years = 0; s.mars = 0;
+    await D.until(() => this.parT > 16, fast ? 3 : 18);
+    s.parallax = 0;
+    await D.wait(fast ? 0.3 : 1);
     s.phase = 'journal';
     await this.journal.present(D);
     s.years = 0; s.mars = 0;
@@ -440,8 +593,6 @@ export default class Tycho {
       if (this.sightDone && !this.called) { this.called = true; this.G.audio.ctx && this.G.audio.chime(Tm.g.position, 0.4); }
       for (const P of [TB, O, Tm, Sc]) animatePerson(P, t, dt);
       for (const P of this.helpers) { runRoutine(P, dt, { height: hvenHeight, speed: 0.9 }); animatePerson(P, t, dt); P.lamp.userData.flicker(t); }
-      this.keplerEcho.update(dt, t);
-      this.keplerEcho.show(s.mars === 1);
     }
   }
 
@@ -478,25 +629,43 @@ export default class Tycho {
   }
 
   updateParallax(dt, t) {
-    const s = this.s, M = this.par;
-    this.parV = damp(this.parV || 0, s.parallax ? 1 : 0, 2, dt); M.visible = this.parV > 0.01 && this.A.visible;
+    const G = this.G, s = this.s, M = this.par, fast = G.params.has('fast') ? 4 : 1;
+    if (s.parallax && !this.parOn) {   // each showing: float it up in front of you, facing you, and start over
+      this.parOn = true; this.parT = 0;
+      G.camera.getWorldPosition(_a); G.camera.getWorldDirection(_b); _b.y = 0; _b.normalize();
+      M.position.copy(_a).addScaledVector(_b, 4.4).add(_c.set(0, 0.55, 0)); M.lookAt(_a.x, M.position.y, _a.z); M.scale.setScalar(1.8);
+      _c.set(-_b.z, 0, _b.x);   // Astra waits off to the side, out of the way
+      s.guide = M.position.clone().addScaledVector(_c, -4.4).add(_d.set(0, 0.6, 0)).toArray(); this.parGuide = true;
+    }
+    if (!s.parallax) { this.parOn = false; if (this.parGuide) { this.parGuide = false; s.guide = null; } }
+    this.parV = damp(this.parV || 0, s.parallax ? 1 : 0, 2, dt); M.visible = this.parV > 0.01;
     if (!M.visible) return;
-    this.parEarth.material.opacity = this.parMoon.material.opacity = this.parV;
-    this.parLabs.forEach((l) => { l.material.opacity = this.parV; });
-    // two watchers on the Earth's surface, looking up: lines through the Moon land on different stars;
-    // lines to the new star (far away among the stars) stay together
-    const side = Math.floor(t / 1.6) % 2 ? 1 : -1, P = this.parPts.userData; let n = 0;
-    const dot = (x, y, r, g, b, sz) => { P.pos.set([x, y, 0], n * 3); P.col.set([r * this.parV, g * this.parV, b * this.parV], n * 3); P.size[n] = sz; n++; };
-    for (const [x, y] of this.parStars) dot(x, y, 0.6, 0.65, 0.8, 0.012);
-    const ox = side * 0.12, oy = -0.55 + 0.12;
-    dot(ox, oy, 1, 0.9, 0.4, 0.04);
-    const mx = 0.05, my = -0.1, dx = mx - ox, dy = my - oy, L = Math.hypot(dx, dy);
-    for (let i = 0; i < 160; i++) { const f = i / 160 * 3.2; dot(ox + dx / L * f * 0.6, oy + dy / L * f * 0.6, 0.9, 0.9, 1, 0.008); }
-    dot(ox + dx / L * 1.92, oy + dy / L * 1.92, 1, 0.6, 0.4, 0.05);
-    const nx = 0.15, ny = 0.82;
-    for (let i = 0; i < 120; i++) { const f = i / 120; dot(ox + (nx - ox) * f, oy + (ny - oy) * f, 1, 0.85, 0.5, 0.008); }
-    dot(nx, ny, 1, 1, 0.85, 0.07);
-    while (n < 420) dot(0, 0, 0, 0, 0, 0);
+    const T = this.parT = (this.parT || 0) + dt * fast, V = this.parV;
+    this.parEarth.material.opacity = this.parMoon.material.opacity = V;
+    this.parBack[0].material.opacity = 0.88 * V; this.parBack[1].material.opacity = 0.6 * V;
+    // the steps: 1 watcher one (0-3 s), 2 watcher two and "the Moon jumps" (3-7), 3 the new star (7-11), 4 so... (11+)
+    const k1 = clamp01(T / 1), k2 = clamp01((T - 3) / 1), k3 = clamp01((T - 7) / 1), k4 = clamp01((T - 11) / 1), k5 = clamp01((T - 13.5) / 1);
+    const Lb = this.parLabs, op = (l, k) => { l.material.opacity = V * k; };
+    op(Lb.w1, k1); op(Lb.w2, k2); op(Lb.moon, k1); op(Lb.h1, k1); op(Lb.h2, k2); op(Lb.jump, k2 * (1 - k3 * 0.5)); op(Lb.star, k3); op(Lb.cap1, k4); op(Lb.cap2, s.parallax === 2 ? k5 : 0);
+    const P = this.parPts.userData; let n = 0;
+    const dot = (x, y, r, g, b, sz) => { if (n >= 900) return; P.pos.set([x, y, 0], n * 3); P.col.set([r * V, g * V, b * V], n * 3); P.size[n] = sz; n++; };
+    for (const [x, y] of this.parStars) dot(x, y, 0.6, 0.65, 0.8, 0.025);
+    const cols = [[0.5, 0.75, 1], [1, 0.62, 0.3]];
+    this.parW.forEach((q, i) => {
+      const k = i ? k2 : k1; if (k <= 0) return; const [r, g, b] = cols[i];
+      dot(q.w.x, q.w.y, r * k, g * k, b * k, 0.08);   // the watcher
+      // the line through the Moon, drawn out to the sky (it grows), and where it lands
+      const len = q.w.distanceTo(q.hit), grow = clamp01((i ? T - 3 : T) / 1.5);
+      for (let j = 0; j < 150; j++) { const f = j / 149 * grow; dot(q.w.x + q.d.x * len * f, q.w.y + q.d.y * len * f, r * k, g * k, b * k, 0.022); }
+      if (grow >= 1) { const pulse = 1 + 0.3 * Math.sin(t * 5 + i); dot(q.hit.x, q.hit.y, r, g, b, 0.12 * pulse); }
+      // the line to the new star
+      if (k3 > 0) { const gs = clamp01((T - 7 - i * 0.6) / 1.5); for (let j = 0; j < 110; j++) { const f = j / 109 * gs; dot(q.w.x + (NS.x - q.w.x) * f, q.w.y + (NS.y - q.w.y) * f, r * k3, g * k3, b * k3, 0.022); } }
+    });
+    // the jump: a dotted arc between the two places the Moon lands
+    if (k2 > 0) { const [a, b] = this.parW.map((q) => q.hit); for (let j = 0; j < 30; j++) { const f = j / 29, on = ((f * 5 - t) % 1 + 1) % 1 < 0.5; if (on) dot(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f + Math.sin(f * Math.PI) * 0.18, k2, k2, k2 * 0.9, 0.04); } }
+    // the new star, steady and bright
+    dot(NS.x, NS.y, 1, 1, 0.85, 0.16 * (k3 > 0 ? 1 + 0.15 * Math.sin(t * 3) : 0.8));
+    while (n < 900) dot(0, 0, 0, 0, 0, 0);
     P.commit();
   }
 
@@ -504,11 +673,39 @@ export default class Tycho {
     const s = this.s;
     if (!this.B.visible) return;
     // the target star, due south along the wall's line of sight (the arc faces east, sighting south)
-    const target = 38;
-    if (s.sight >= 2) { this.sightA = damp(this.sightA, target, 1.5, dt); if (Math.abs(this.sightA - target) < 0.5 && !this.sightDone) { this.sightDone = true; this.G.audio.ctx && this.G.audio.chime(this.sightM.position, 0.5); } }
+    const target = SIGHT_T;
+    if (s.sight >= 2) { this.sightA = damp(this.sightA, target, 3, dt); if (Math.abs(this.sightA - target) < 0.5 && !this.sightDone) { this.sightDone = true; this.G.audio.ctx && this.G.audio.chime(this.sightM.position, 0.5); } }
     const a = this.sightA * D2R, R = 1.9;
     this.sightM.position.set(QUAD.x + 0.08, 2.9 - Math.sin(a) * R, QUAD.z - 2.2 + Math.cos(a) * R);
     this.sightGlow.material.opacity = s.sight === 1 ? 0.6 + 0.4 * Math.sin(t * 5) : this.sightDone ? 0.5 : 0;
+    // the hint: the gold notch pulses, dots run along the arc from the sight to it, the star is marked
+    const want = s.sight === 1, quad = s.phase === 'quadrant';
+    this.notchGlow.material.opacity = want ? 0.55 + 0.45 * Math.sin(t * 5 + 1) : this.sightDone && quad ? 0.8 : 0;
+    this.guide.visible = want;
+    if (want) {
+      const Gd = this.guide.userData, a0 = this.sightA, a1 = SIGHT_T;
+      for (let i = 0; i < 40; i++) {
+        const f = i / 39, aa = (a0 + (a1 - a0) * f) * D2R, on = ((f * 6 - t * 1.5) % 1 + 1) % 1 < 0.35 ? 1 : 0.25;
+        Gd.pos.set([QUAD.x + 0.12, 2.9 - Math.sin(aa) * 1.9, QUAD.z - 2.2 + Math.cos(aa) * 1.9], i * 3); Gd.col.set([on, on * 0.8, on * 0.3], i * 3); Gd.size[i] = 0.025;
+      }
+      Gd.commit();
+    }
+    // the star, straight out along the line from the sight through the arc's corner
+    const showStar = quad && s.sight >= 1;
+    this.starMark.visible = showStar; this.starLab.visible = showStar;
+    if (showStar) {
+      const ta = SIGHT_T * D2R; _c.set(0, Math.sin(ta), -Math.cos(ta));
+      this.starMark.position.set(QUAD.x, 2.9, QUAD.z - 2.2).addScaledVector(_c, 600);
+      this.flare = this.sightDone ? (this.flare ?? 0) + dt : null;
+      const fl = this.flare != null ? Math.max(0, 1 - this.flare / 2.5) : 0;
+      this.starMark.scale.setScalar(40 * (want ? 1 + 0.25 * Math.sin(t * 4) : 1 + fl * 2.5));
+      this.starMark.material.opacity = want ? 0.8 : 0.6 + fl * 0.4;
+      this.starLab.position.copy(this.starMark.position).add(_d.set(0, 34, 0)); this.starLab.material.opacity = want ? 0.9 : 0;
+    }
+    // the payoff: the reading appears over the quadrant
+    const rv = this.sightDone && quad ? 1 : 0;
+    this.readLab.material.opacity = damp(this.readLab.material.opacity, rv, 2, dt);
+    this.readLab2.material.opacity = damp(this.readLab2.material.opacity, rv && this.flare > 2 ? 1 : 0, 2, dt);
     // the sight line from the arc's corner through the sight, out to the star
     this.beam.visible = !!this.sightDone && s.phase === 'quadrant';
     if (this.beam.visible) {
@@ -581,8 +778,9 @@ function drawJournal(g, w, h) {
   g.fillStyle = '#c0801a'; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28 - Math.PI / 2, r = i % 2 ? 9 : 22; g.lineTo(200 + Math.cos(a) * r, 150 + Math.sin(a) * r); } g.fill();
   g.fillStyle = INK; g.font = 'italic 26px Georgia, serif'; g.fillText('the new star', 232, 156); g.fillText('Cassiopeia', 160, 370);
   // the Moon jumps between two watchers; the new star doesn't
-  g.font = 'italic 28px Georgia, serif'; g.fillText('Seen from two places:', 540, 150);
-  g.fillText('the Moon jumps,', 560, 200); g.fillText('the new star stays put.', 560, 240); g.fillText('So it is far, far away,', 560, 300); g.fillText('among the stars.', 560, 340);
+  g.font = 'italic 28px Georgia, serif'; g.fillText('Two watchers, far apart:', 540, 150);
+  g.fillText('the Moon is in a different', 560, 200); g.fillText('place for each of them.', 560, 236); g.fillText('The new star is in the', 560, 290); g.fillText('SAME place for both.', 560, 326);
+  g.fillText('So it is far beyond the Moon.', 540, 380);
   g.fillText('The heavens CAN change.', 40, h - 90);
   g.fillText('Uraniborg, Hven: 20 years of the best measurements ever made.', 40, h - 40);
 }
