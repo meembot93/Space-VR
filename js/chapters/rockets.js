@@ -1259,8 +1259,8 @@ export default class Rockets {
     s.phase = 'v2';
     const l9 = D.sayAsync('ch13_09');
     await D.cue('Wernher'); s.phase = 'vonbraun'; s.braun = 1;
-    await D.cue('called the V-2'); s.braun = 2; s.phase = 'v2'; s.v2 = 1;
-    await D.cue('prisoners'); s.lights = 1;
+    await D.cue('called the V-2'); s.phase = 'v2'; s.v2 = 1;
+    await D.cue('prisoners'); s.braun = 2; s.lights = 1;
     await D.cue('But in 1944'); s.v2 = 2;
     await D.cue('first rocket'); s.v2 = 3;
     await l9;
