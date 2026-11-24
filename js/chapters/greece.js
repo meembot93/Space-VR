@@ -21,6 +21,7 @@ import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeCard } from '../ui.js';
 import { rng, noise2 } from '../shapes.js';
+import { grove, grassTuft, palm as palmTree, olive as oliveTree, cypress as cypressTree } from '../trees.js';
 import { buildAthens } from './athens.js';
 
 const D2R = Math.PI / 180;
@@ -82,38 +83,16 @@ function buildGround(size, seg, height, color, hole) {
 
 // Little tufts of grass (or dry desert scrub), one instanced mesh
 function tufts(n, seed, place, colA, colB, h = 0.3) {
-  const v = [], rb = rng(seed);
-  for (let i = 0; i < 6; i++) {
-    const a = i / 6 * 6.28 + rb(), w = 0.02, hgt = h * (0.7 + rb() * 0.6), lean = 0.06 + rb() * 0.1;
-    const cx = Math.cos(a) * 0.04, cz = Math.sin(a) * 0.04, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
-    v.push(cx - px, 0, cz - pz, cx + px, 0, cz + pz, cx + Math.cos(a) * lean, hgt, cz + Math.sin(a) * lean);
-  }
-  const blade = new THREE.BufferGeometry(); blade.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); blade.computeVertexNormals();
-  const m = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), n);
+  // curved blades, dark at the root and pale at the tip (js/trees.js grassTuft)
+  const blade = grassTuft({ blades: 6, height: h, seed, root: _col.setHex(colA).multiplyScalar(0.8).getHex(), tip: _col.setHex(colB).multiplyScalar(1.2).getHex() });
+  const m = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), n);
   const r = rng(seed + 1), mm = new THREE.Matrix4(), cc = new THREE.Color(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3();
   for (let i = 0; i < n; i++) {
     place(r, p); _q.setFromAxisAngle(up, r() * 6.28); const sc = 0.7 + r() * 0.8;
     mm.compose(p, _q, _a.set(sc, sc, sc)); m.setMatrixAt(i, mm);
-    m.setColorAt(i, cc.setHex(colA).lerp(_col.setHex(colB), r()));
+    m.setColorAt(i, cc.setRGB(0.8 + r() * 0.3, 0.8 + r() * 0.3, 0.8 + r() * 0.25));
   }
   return m;
-}
-
-// A tree crown or bush: lumpy blobs coloured darker underneath, merged into the given kit
-function blobs(k, x, y, z, s, n, dark, light, seed) {
-  const r = rng(seed), nz = noise2(seed), lc = new THREE.Color(light);
-  for (let i = 0; i < n; i++) {
-    const a = r() * 6.28, d = (i ? 0.5 + r() * 0.7 : 0) * s, rad = (0.7 + r() * 0.45) * s;
-    const g = new THREE.IcosahedronGeometry(rad, 1), p = g.attributes.position;
-    for (let j = 0; j < p.count; j++) { const vx = p.getX(j), vy = p.getY(j), vz = p.getZ(j), b = 0.8 + nz(vx * 1.7 + 5, vz * 1.7 + vy) * 0.4; p.setXYZ(j, vx * b, vy * b * 0.7, vz * b); }
-    g.translate(x + Math.cos(a) * d, y + (r() - 0.4) * 0.6 * s, z + Math.sin(a) * d);
-    const out = k.add(g, 0xffffff), c = out.attributes.color, q = out.attributes.position;
-    for (let j = 0; j < q.count; j++) {
-      const t = clamp((q.getY(j) - (y - s)) / (2 * s), 0, 1);
-      _col.setHex(dark).lerp(lc, t * (0.6 + r() * 0.4));
-      c.setXYZ(j, _col.r, _col.g, _col.b);
-    }
-  }
 }
 
 // A plain Greek-style column (drum shaft, a little swell, square capital)
@@ -275,28 +254,15 @@ function house(k, x, z, w, d, h, yaw, wall, y = 0) {
   k.box(0.5, 0.5, 0.1, 0x2a2018, [x + s * (d / 2 + 0.01) + c * w * 0.28, y + h * 0.65, z + c * (d / 2 + 0.01) - s * w * 0.28], [0, yaw, 0]);
 }
 
-// A date palm: a curved ringed trunk and a crown of drooping fronds
-function palm(k, x, y, z, h, seed) {
-  const r = rng(seed), lean = (r() - 0.5) * 0.5, la = r() * 6.28;
-  const top = [x + Math.cos(la) * lean * h * 0.3, y + h, z + Math.sin(la) * lean * h * 0.3];
-  k.tube([[x, y, z], [x + (top[0] - x) * 0.4, y + h * 0.5, z + (top[2] - z) * 0.4], top], 0.16, 0x7a6248, 6);
-  for (let i = 0; i < 9; i++) {
-    const a = i / 9 * 6.28 + r() * 0.3, L = 2 + r() * 0.8;
-    const pts = [top, [top[0] + Math.cos(a) * L * 0.5, top[1] + 0.45, top[2] + Math.sin(a) * L * 0.5], [top[0] + Math.cos(a) * L, top[1] - 0.5 - r() * 0.4, top[2] + Math.sin(a) * L]];
-    const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p))), 6, 0.16, 3, false); g.scale(1, 1, 1);
-    k.add(g, i % 2 ? 0x4e6e2c : 0x5e7e34);
-  }
-  k.ball(0.25, 0, 0x8a5a2a, [top[0], top[1] - 0.2, top[2]]);
-}
-
-// A gnarled olive tree: a twisted, split trunk and a grey-green silvery crown
-function olive(trunks, leaves, x, y, z, s, seed) {
-  const r = rng(seed);
-  for (let i = 0; i < 2 + (r() * 2 | 0); i++) {
-    const a = r() * 6.28, l = 0.4 * s;
-    trunks.tube([[x, y - 0.1, z], [x + Math.cos(a) * l * 0.6, y + 0.9 * s, z + Math.sin(a) * l * 0.6], [x + Math.cos(a) * l, y + 1.8 * s, z + Math.sin(a) * l]], 0.13 * s, 0x5a4a3a, 5);
-  }
-  blobs(leaves, x, y + 2.5 * s, z, 1.3 * s, 6, 0x3e4a32, 0x8a9a74, seed + 7);
+// Date palms and olive trees come from js/trees.js: palm() and olive() just note where they stand
+// (on the kit or list given); addPalms() and the grove set grow them as a grove or two (a few draw calls).
+function palm(k, x, y, z, h, seed) { (k.palms ||= []).push({ x, y, z, s: h / 9, yaw: seed * 2.39996 }); }
+function olive(list, _unused, x, y, z, s, seed) { list.push({ x, y, z, s, yaw: seed * 2.39996 }); }
+function addPalms(g, k, nearR = 25) {
+  const pl = k.palms || [], near = pl.filter((p) => Math.hypot(p.x, p.z) < nearR), far = pl.filter((p) => Math.hypot(p.x, p.z) >= nearR);
+  if (near.length) g.add(grove(palmTree, near, { detail: 'high', height: 9, dates: true, seed: 51, variants: Math.min(4, near.length) }).group);
+  if (far.length) g.add(grove(palmTree, far, { detail: 'mid', height: 9, seed: 53, variants: 4 }).group);
+  k.palms = [];
 }
 
 // The sky journal page at the end of the chapter: two sticks on a curved Earth, parallel sunbeams
@@ -533,7 +499,7 @@ export default class Greece {
     at(MOON_AZ, 520, -28.9, glit.position); g.add(glit); this.glitter = glit;
 
     // Olive trees all around (but not in the way of the sea view or the lamp table)
-    const trunks = new Kit(), leaves = new Kit(), r = rng(5);
+    const trunks = [], leaves = null, r = rng(5);
     for (let i = 0; i < 90; i++) {
       const a = r() * 360, d = 7 + r() * 36, p = at(a, d);
       if ((a > 120 && a < 210 && d < 40) || Math.hypot(p.x, p.z + 4) < 6) continue;
@@ -588,13 +554,10 @@ export default class Greece {
     this.fires.push(new THREE.Vector3(front.x + 9, TERR + 1.55, TC.z));
     for (const f of this.fires.slice(0, 2)) S.blockers.push({ x: f.x, z: f.z, r: 0.5 });
     // tall dark cypresses framing the terrace, a few statues on plinths along the path
-    const cyp = new Kit();
+    const cyp = [];
     for (let i = 0; i < 14; i++) {
       const side = i % 2 ? 1 : -1, x = TC.x - TL / 2 + (i >> 1) * 6.5 - 2, z = TC.z + side * (TW / 2 + 7.5 + r() * 2);
-      const h = 9 + r() * 4, y = H(x, z);
-      cyp.cyl(0.15, 0.22, 1.5, 6, 0x4a3a2a, [x, y + 0.75, z]);
-      const c = new THREE.ConeGeometry(1.1, h, 8, 3); const cp = c.attributes.position; for (let j = 0; j < cp.count; j++) { const yy = cp.getY(j) / h + 0.5; const b = 1 + 0.25 * Math.sin(yy * Math.PI) ; cp.setX(j, cp.getX(j) * b); cp.setZ(j, cp.getZ(j) * b); }
-      cyp.add(c, i % 3 ? 0x24331e : 0x2a3a22, [x, y + 1 + h / 2, z]);
+      cyp.push({ x, y: H(x, z) - 0.1, z, s: (10 + r() * 4) / 11 });
       S.blockers.push({ x, z, r: 0.8 });
     }
     for (let i = 0; i < 3; i++) {
@@ -606,7 +569,10 @@ export default class Greece {
       k.cyl(0.06, 0.06, 0.6, 5, 0xeee6d2, [x + 0.25, y + 2.0, z], [0, 0, 0.6]);
       S.blockers.push({ x, z, r: 0.7 });
     }
-    g.add(k.mesh(), trunks.mesh(), leaves.mesh(), cyp.mesh());
+    g.add(k.mesh(), grove(cypressTree, cyp, { detail: 'high', height: 11, seed: 5, variants: 5 }).group);
+    const nearOl = trunks.filter((p) => Math.hypot(p.x, p.z) < 18), farOl = trunks.filter((p) => Math.hypot(p.x, p.z) >= 18);
+    if (nearOl.length) g.add(grove(oliveTree, nearOl, { detail: 'high', height: 4.6, seed: 7, variants: 5 }).group);
+    if (farOl.length) g.add(grove(oliveTree, farOl, { detail: 'mid', height: 4.6, seed: 9, variants: 5 }).group);
     // firelight on the temple front: one warm light for the bowls and the altar, plus the flames
     this.templeLight = new THREE.PointLight(0xff9a50, 30, 34, 1.4); this.templeLight.position.set(front.x + 5, TERR + 3.2, TC.z); g.add(this.templeLight);
     const fm = glowMat('rgba(255,170,70,1)');
@@ -706,7 +672,7 @@ export default class Greece {
     for (let i = 0; i < 30; i++) { const a = r() * 360, d = 8 + r() * 60, p = at(a, d); k.ball(0.3 + r() * 0.8, 0, 0x9a7650, [p.x, H(p.x, p.z), p.z], [r(), r(), r()], [1.3, 0.6, 1]); }
     // a few boats with triangular sails on the Nile
     for (let i = 0; i < 3; i++) { const z = -60 + i * 50; k.box(1.4, 0.5, 6, 0x6a4a2a, [52, -0.7, z]); k.cyl(0.06, 0.06, 6, 5, 0x5a3a22, [52, 2.3, z]); k.add(new THREE.CircleGeometry(2.4, 3), 0xe8dcc0, [52.05, 3, z], [0, Math.PI / 2, 0]); }
-    S.g.add(k.mesh());
+    S.g.add(k.mesh()); addPalms(S.g, k);
     S.g.add(tufts(900, 23, (r2, p) => { at(r2() * 360, 4 + Math.pow(r2(), 1.2) * 60, 0, p); p.y = H(p.x, p.z); }, 0x8a8a4a, 0xb8a060, 0.22));
     this.stickS = this.makeStick(S.g); this.stickS.userData.home = [W.x + 1.6, 0.04, W.z + 1.4, ...new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0.4)).toArray()];
     this.ringS = [W.x + 1.5, W.z - 0.2];
@@ -821,7 +787,7 @@ export default class Greece {
     const ph = at(345, 650);
     k.box(30, 4, 30, 0xc8bca0, [ph.x, 1, ph.z]); k.box(18, 55, 18, 0xe8e0cc, [ph.x, 30, ph.z]); k.cyl(6, 8, 28, 8, 0xe8e0cc, [ph.x, 71, ph.z]);
     k.cyl(3.5, 4, 14, 12, 0xe0d8c4, [ph.x, 92, ph.z]); k.ball(3, 1, 0xd8b050, [ph.x, 101, ph.z]);
-    S.g.add(k.mesh());
+    S.g.add(k.mesh()); addPalms(S.g, k);
     S.g.add(tufts(300, 31, (r2, p) => { at(r2() * 360, 20 + r2() * 40, 0, p); }, 0x8a8a4a, 0xa8a060, 0.25));
     this.stickA = this.makeStick(S.g); this.stickA.userData.home = [1.1, 0.04, -1.0, ...new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0.9)).toArray()];
     this.ringA = [0, -2.2];

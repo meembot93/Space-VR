@@ -16,6 +16,7 @@ import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
 import { rng, noise2, roughStone } from '../shapes.js';
+import { grove, deciduousTree, grassTuft } from '../trees.js';
 
 const AXIS = 50;                 // midsummer sunrise bearing, degrees from north
 const WINTER = 130;              // midwinter sunrise bearing
@@ -174,15 +175,8 @@ export default class Stonehenge {
     this.root.add(m);
 
     // Grass clumps: thin leaning blades, thickest where you walk, plus a scatter of wild flowers
-    const v = [], rb = rng(3);
-    for (let i = 0; i < 7; i++) {
-      const a = i / 7 * 6.28 + rb(), w = 0.018 + rb() * 0.012, hgt = 0.22 + rb() * 0.22, lean = 0.06 + rb() * 0.1;
-      const cx = Math.cos(a) * 0.04, cz = Math.sin(a) * 0.04, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
-      v.push(cx - px, 0, cz - pz, cx + px, 0, cz + pz, cx + Math.cos(a) * lean, hgt, cz + Math.sin(a) * lean);
-    }
-    const blade = new THREE.BufferGeometry();
-    blade.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); blade.computeVertexNormals();
-    const N = 4600, tufts = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), N);
+    const blade = grassTuft({ blades: 6, height: 0.32, seed: 3, root: 0x34461e, tip: 0xc4d488 });   // curved blades (js/trees.js)
+    const N = 4600, tufts = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), N);
     const r = rng(5), mm = new THREE.Matrix4(), cc = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
     for (let i = 0; i < N; i++) {
       const az = r() * 360, rad = 4.5 + Math.pow(r(), 1.6) * 85, pos = at(az, rad);   // (far grass is too small to see)
@@ -190,7 +184,7 @@ export default class Stonehenge {
       _q.setFromAxisAngle(up, r() * 6.28);
       const sc = 0.7 + r() * 0.8;
       mm.compose(pos, _q, _a.set(sc, sc * (0.7 + r() * 0.7), sc)); tufts.setMatrixAt(i, mm);
-      tufts.setColorAt(i, cc.setHex(0x5d7f34).lerp(new THREE.Color(0xa3a65a), r() * 0.6));
+      tufts.setColorAt(i, cc.setHex(0xd8f0c0).lerp(new THREE.Color(0xfff4d0), r() * 0.8));
     }
     this.root.add(tufts);
     const NF = 1400, flowers = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.035, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 }), NF);
@@ -303,31 +297,17 @@ export default class Stonehenge {
   // slopes away from the sunrise, and a dark belt of woodland along the far horizon.
   buildTrees() {
     const r = rng(31), G = this.G;
-    const trunks = new Kit(), leaves = [];
+    const leaves = [], near = [], far = [];
     const dark = new THREE.Color(0x2c4320), mid = new THREE.Color(0x456a2e), light = new THREE.Color(0x7a9a48), tmp = new THREE.Color();
     const okAz = (az) => { const a = ((az % 360) + 360) % 360; return a > 165 || a < 15; }; // keep the sunrise side open
     const village = at(150, 165);
+    // real branching oaks (js/trees.js), more detailed nearer the circle
     const tree = (x, z, s) => {
-      const y = groundHeight(x, z) - 0.2, lean = (r() - 0.5) * 0.08, trunkH = 3.4 * s;
-      const far = Math.hypot(x, z) > 150;   // far trees get simpler shapes (you can't tell from here)
-      trunks.add(new THREE.CylinderGeometry(0.28 * s, 0.5 * s, trunkH, far ? 6 : 9, far ? 1 : 2, far), 0x4a3a2a, [x, y + trunkH / 2, z], [lean, r() * 6, lean]);
-      // main boughs reaching up and out into the crown
-      const nb = far ? 3 : 3 + (r() * 2 | 0);
-      for (let i = 0; i < nb; i++) {
-        const a = i / nb * 6.28 + r(), out = 1.2 * s, len = 3.2 * s;
-        trunks.add(new THREE.CylinderGeometry(0.1 * s, 0.2 * s, len, far ? 4 : 6, 1, far), 0x4e3e2c,
-          [x + Math.cos(a) * out * 0.6, y + trunkH + len * 0.3, z + Math.sin(a) * out * 0.6], [Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7]);
-      }
-      // the crown: overlapping lumpy blobs, darker underneath, sunlit on top
-      const cy = y + trunkH + 3.4 * s, nBlob = far ? 6 + (r() * 2 | 0) : 7 + (r() * 4 | 0);
-      for (let i = 0; i < nBlob; i++) {
-        const a = r() * 6.28, d = (i === 0 ? 0 : 1.5 + r() * 1.6) * s, rad = (2.1 + r() * 1.2) * s;
-        const g = new THREE.IcosahedronGeometry(rad, far ? 0 : 1), p = g.attributes.position;
-        const nz = noise2(400 + leaves.length);
-        for (let j = 0; j < p.count; j++) { const vx = p.getX(j), vy = p.getY(j), vz = p.getZ(j), b = 0.82 + nz(vx * 0.9 + 5, vz * 0.9 + vy) * 0.36; p.setXYZ(j, vx * b, vy * b * 0.92, vz * b); }
-        g.translate(x + Math.cos(a) * d, cy + (i === 0 ? 0.6 * s : (r() - 0.45) * 3.4 * s), z + Math.sin(a) * d);
-        leaves.push(g);
-      }
+      // (use up the random numbers the old blob trees drew, so the woods stand where they always did)
+      const isFar = Math.hypot(x, z) > 150; r(); r();
+      const nb = isFar ? 3 : 3 + (r() * 2 | 0); for (let i = 0; i < nb; i++) r();
+      const nBlob = isFar ? 6 + (r() * 2 | 0) : 7 + (r() * 4 | 0); for (let i = 0; i < nBlob; i++) { r(); r(); if (i) { r(); r(); } }
+      (isFar ? far : near).push({ x, y: groundHeight(x, z) - 0.15, z, s });
       if (Math.hypot(x, z) < G.world.bounds + 5) G.world.blockers.push({ x, z, r: 0.6 * s });
     };
     // copses of trees, and some lone trees standing out in the grass
@@ -350,7 +330,9 @@ export default class Stonehenge {
       const g = new THREE.IcosahedronGeometry(rad, 0); g.scale(1.3, 0.55 + r() * 0.2, 1.3);
       g.translate(p.x, groundHeight(p.x, p.z) + rad * 0.35, p.z); leaves.push(g);
     }
-    // colour the leaves vertex by vertex (shade and sun), then merge into one mesh
+    this.root.add(grove(deciduousTree, near, { detail: 'mid', height: 12, seed: 31, variants: 5 }).group);
+    this.root.add(grove(deciduousTree, far, { detail: 'low', height: 12, seed: 37, variants: 4 }).group);
+    // colour the far woodland vertex by vertex (shade and sun), then merge into one mesh
     const lk = new Kit();
     for (const g of leaves) {
       g.computeBoundingBox(); const bb = g.boundingBox, h = bb.max.y - bb.min.y;
@@ -362,7 +344,7 @@ export default class Stonehenge {
         c.setXYZ(j, tmp.r, tmp.g, tmp.b);
       }
     }
-    this.root.add(trunks.mesh(), lk.mesh());
+    this.root.add(lk.mesh());
   }
 
   buildMovingStone() {
