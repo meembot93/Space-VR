@@ -18,6 +18,19 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
 import { rng, noise2, roughStone } from '../shapes.js';
 import { grove, deciduousTree, grassTuft } from '../trees.js';
+import { loadProps } from '../props.js';
+
+// Meem's stones, houses and sledge. The circle's ~110 stones use the simplified (_lo, ~600 triangle)
+// stones; the one the builders raise uses the full one. Missing models fall back to the code stones.
+const PROPS = await loadProps(['sarsen_stone', 'sarsen_stone_lo', 'sarsen_lintel', 'sarsen_lintel_lo', 'bluestone_lo', 'roundhouse', 'stone_sledge'],
+  { stone_sledge: { z: 4 } });
+// A single (not instanced) mesh of one of the models, stretched to w x h x d (for the moving stone,
+// the waiting lintels and the sledge, which the story moves)
+function propMesh(name, w, h, d) {
+  const M = PROPS.models[name]; if (!M) return null;
+  const g = M.geometry.clone(); g.scale(w / M.size.x, h / M.size.y, d / M.size.z);
+  return new THREE.Mesh(g, M.material);
+}
 
 const AXIS = 50;                 // midsummer sunrise bearing, degrees from north
 const WINTER = 130;              // midwinter sunrise bearing
@@ -221,11 +234,14 @@ export default class Stonehenge {
   }
 
   buildStones() {
-    const k = new Kit(), G = this.G, r = rng(7);
+    const k = new Kit(), G = this.G, r = rng(7), P = PROPS.fresh();
     const SARSEN = 0xa59f90, BLUE = 0x7c8590;
-    const place = (geo, color, pos, yaw, block) => {
-      geo.rotateY(yaw); geo.translate(pos.x, pos.y + groundHeight(pos.x, pos.z) - 0.05, pos.z);
-      k.add(geo, color);
+    // Each stone keeps its exact place and size: Meem's model (name) stretched to it if it loaded,
+    // else the code stone. (geo is the code stone: a roughStone(w, h, d), standing on y = 0.)
+    const place = (geo, color, pos, yaw, block, name) => {
+      geo.computeBoundingBox(); const b = geo.boundingBox, y = pos.y + groundHeight(pos.x, pos.z) - 0.05;
+      if (name && P.add(name, pos.x, y, pos.z, yaw, { w: b.max.x - b.min.x, h: b.max.y - b.min.y, d: b.max.z - b.min.z, tilt: geo.userData.tilt })) geo.dispose();
+      else { geo.rotateY(yaw); geo.translate(pos.x, y, pos.z); k.add(geo, color); }
       if (block) G.world.blockers.push({ x: pos.x, z: pos.z, r: block });
     };
     // The sarsen circle: 30 uprights (one missing: the last one, still on its sledge) and lintels
@@ -234,7 +250,7 @@ export default class Stonehenge {
       const az = SLOT + i * (360 - 12.8) / 29; this.sarsenAz.push(az);
       if (i === 0) continue; // the missing one
       const pos = at(az, R_SARSEN);
-      place(roughStone(2.1 + r() * 0.3, 4.1 + r() * 0.3, 1.05, 100 + i), SARSEN, pos, -az * D2R, 0.9);
+      place(roughStone(2.1 + r() * 0.3, 4.1 + r() * 0.3, 1.05, 100 + i), SARSEN, pos, -az * D2R, 0.9, 'sarsen_stone_lo');
     }
     // Lintels: a ring on top, each spanning two uprights (the two that rest on the missing stone wait)
     for (let i = 0; i < 30; i++) {
@@ -244,16 +260,20 @@ export default class Stonehenge {
       const mid = (a1 + a2) / 2, pos = at(mid, R_SARSEN, 4.3);
       const len = 2 * R_SARSEN * Math.sin((a2 - a1) / 2 * D2R) + 0.4;
       const geo = roughStone(len, 0.8, 1.0, 300 + i, [4, 1, 1]);
-      place(geo, SARSEN, pos, -mid * D2R, 0);
+      place(geo, SARSEN, pos, -mid * D2R, 0, 'sarsen_lintel_lo');
     }
     // The two lintels that will sit on the last stone, ready to be lowered in when it stands
     this.waitingLintels = [];
     for (const [i, j] of [[29, 0], [0, 1]]) {
       const a1 = this.sarsenAz[i], a2 = this.sarsenAz[j] + (j < i ? 360 : 0), mid = (a1 + a2) / 2;
       const len = 2 * R_SARSEN * Math.sin((a2 - a1) / 2 * D2R) + 0.4;
-      const lk = new Kit(); lk.add(roughStone(len, 0.8, 1.0, 400 + i, [4, 1, 1]), SARSEN);
-      const geo = lk.geometry(); tintStones(geo, SARSEN, 9);
-      const m = new THREE.Mesh(geo, FLAT); m.rotation.y = -mid * D2R;
+      let m = propMesh('sarsen_lintel', len, 0.8, 1.0);
+      if (!m) {
+        const lk = new Kit(); lk.add(roughStone(len, 0.8, 1.0, 400 + i, [4, 1, 1]), SARSEN);
+        const geo = lk.geometry(); tintStones(geo, SARSEN, 9);
+        m = new THREE.Mesh(geo, FLAT);
+      }
+      m.rotation.y = -mid * D2R;
       const pos = at(mid, R_SARSEN, 4.3); m.position.copy(pos);
       m.userData.home = pos.clone(); m.visible = false;
       this.root.add(m); this.waitingLintels.push(m);
@@ -264,36 +284,39 @@ export default class Stonehenge {
       const az = AXIS + rel, c = at(az, rad), tan = new THREE.Vector3(Math.cos(az * D2R), 0, Math.sin(az * D2R));
       for (const s of [-1, 1]) {
         const pos = c.clone().addScaledVector(tan, s * 1.35);
-        place(roughStone(2.2, ht, 1.3, 500 + n * 2 + s, [3, 7, 2]), SARSEN, pos, -az * D2R, 1.05);
+        place(roughStone(2.2, ht, 1.3, 500 + n * 2 + s, [3, 7, 2]), SARSEN, pos, -az * D2R, 1.05, 'sarsen_stone_lo');
       }
-      place(roughStone(5.0, 1.0, 1.2, 520 + n, [4, 1, 1]), SARSEN, c.clone().setY(ht), -az * D2R, 0);
+      place(roughStone(5.0, 1.0, 1.2, 520 + n, [4, 1, 1]), SARSEN, c.clone().setY(ht), -az * D2R, 0, 'sarsen_lintel_lo');
     });
     // Bluestones: smaller, darker stones in a circle inside the sarsens (with gaps to walk through)
     for (let i = 0; i < 44; i++) {
       const az = AXIS + 6 + i * 360 / 44 + (r() - 0.5) * 2;
       const rel = ((az - AXIS + 540) % 360) - 180;
       if (Math.abs(rel) < 9 || i % 6 === 3) continue; // keep the entrance and a few walkways clear
-      place(roughStone(0.8 + r() * 0.4, 1.6 + r() * 0.7, 0.6, 700 + i, [2, 4, 2]), BLUE, at(az, 12.2), -az * D2R, 0.45);
+      place(roughStone(0.8 + r() * 0.4, 1.6 + r() * 0.7, 0.6, 700 + i, [2, 4, 2]), BLUE, at(az, 12.2), -az * D2R, 0.45, 'bluestone_lo');
     }
     // The Altar Stone, lying in the middle of the horseshoe
-    place(roughStone(4.8, 0.5, 1.0, 800, [4, 1, 2]), 0x8a7a70, at(AXIS + 180, 4.2), -(AXIS + 90) * D2R, 0);
+    place(roughStone(4.8, 0.5, 1.0, 800, [4, 1, 2]), 0x8a7a70, at(AXIS + 180, 4.2), -(AXIS + 90) * D2R, 0, 'sarsen_lintel_lo');
     // The Heel Stone out on the axis, and the Station Stones
-    place(roughStone(2.4, 4.7, 2.0, 801, [3, 6, 3]).rotateZ(-0.12), SARSEN, at(AXIS + 1.6, 77), -AXIS * D2R, 1.3);
-    for (const az of [AXIS + 90 + 28, AXIS - 90 - 28, AXIS + 90 - 28 + 180, AXIS - 90 + 28 + 180]) place(roughStone(1.0, 2.0, 0.8, 810 + az, [2, 3, 2]), SARSEN, at(az, 41), -az * D2R, 0.6);
-    const geo = k.geometry(); tintStones(geo, SARSEN, 3);
-    this.stones = new THREE.Mesh(geo, FLAT); this.root.add(this.stones);
+    const heel = roughStone(2.4, 4.7, 2.0, 801, [3, 6, 3]); heel.userData.tilt = [0, -0.12];
+    place(heel, SARSEN, at(AXIS + 1.6, 77), -AXIS * D2R, 1.3, 'sarsen_stone_lo');
+    for (const az of [AXIS + 90 + 28, AXIS - 90 - 28, AXIS + 90 - 28 + 180, AXIS - 90 + 28 + 180]) place(roughStone(1.0, 2.0, 0.8, 810 + az, [2, 3, 2]), SARSEN, at(az, 41), -az * D2R, 0.6, 'sarsen_stone_lo');
+    if (k.parts.length) { const geo = k.geometry(); tintStones(geo, SARSEN, 3); this.stones = new THREE.Mesh(geo, FLAT); this.root.add(this.stones); }
+    this.root.add(P.build());
   }
 
   buildVillage() {
-    const k = new Kit(), r = rng(13), center = at(150, 165), G = this.G;
-    // Round houses: wattle-and-daub walls, tall thatched cone roofs, a dark doorway
+    const k = new Kit(), r = rng(13), center = at(150, 165), G = this.G, P = PROPS.fresh();
+    // Round houses: wattle-and-daub walls, tall thatched cone roofs, a dark doorway (toward the stones)
     for (let i = 0; i < 9; i++) {
       const a = r() * 6.28, d = 8 + r() * 26, x = center.x + Math.cos(a) * d, z = center.z + Math.sin(a) * d, y = groundHeight(x, z);
       const rad = 3.2 + r() * 1.6, wall = 1.5 + r() * 0.3;
-      k.cyl(rad, rad, wall, 22, 0xb8a07a, [x, y + wall / 2, z]);
-      k.cyl(0.05, rad + 0.6, rad * 1.15, 22, 0xc2a35a, [x, y + wall + rad * 0.55, z]);
       const toC = Math.atan2(-x, -z);
-      k.box(0.9, 1.2, 0.3, 0x3a2a1a, [x + Math.sin(toC) * rad, y + 0.6, z + Math.cos(toC) * rad], [0, toC, 0]);
+      if (!P.add('roundhouse', x, y - 0.1, z, toC, { w: (rad + 0.6) * 2, d: (rad + 0.6) * 2, h: wall + rad * 1.15 + 0.1 })) {
+        k.cyl(rad, rad, wall, 22, 0xb8a07a, [x, y + wall / 2, z]);
+        k.cyl(0.05, rad + 0.6, rad * 1.15, 22, 0xc2a35a, [x, y + wall + rad * 0.55, z]);
+        k.box(0.9, 1.2, 0.3, 0x3a2a1a, [x + Math.sin(toC) * rad, y + 0.6, z + Math.cos(toC) * rad], [0, toC, 0]);
+      }
       G.world.blockers.push({ x, z, r: rad + 0.3 });
       (this.chimneys ||= []).push(new THREE.Vector3(x, y + wall + rad * 1.1, z));
     }
@@ -301,9 +324,12 @@ export default class Stonehenge {
     // Wooden sledges, spare rollers and rope coils left near the circle
     for (let i = 0; i < 5; i++) {
       const p = at(AXIS + 30 + i * 9, 27 + r() * 4); p.y = groundHeight(p.x, p.z);
-      k.cyl(0.14, 0.14, 2.8, 6, 0x7a5a38, [p.x, p.y + 0.14, p.z], [Math.PI / 2, 0, r() * 3]);
+      const yaw = r() * 3;
+      // two spare sledges among the rollers
+      if (i % 2 === 0 && P.add('stone_sledge', p.x, p.y, p.z, yaw + 1.2, { w: 1.9, d: 5.0, h: 0.42 })) continue;
+      k.cyl(0.14, 0.14, 2.8, 6, 0x7a5a38, [p.x, p.y + 0.14, p.z], [Math.PI / 2, 0, yaw]);
     }
-    this.root.add(k.mesh());
+    this.root.add(k.mesh(), P.build());
     this.buildTrees();
     // Smoke rising from the roofs (a handful of soft sprites per house)
     this.smoke = [];
@@ -370,18 +396,25 @@ export default class Stonehenge {
   buildMovingStone() {
     const u = at(SLOT, 1); this.u = u;              // outward along the slot's radius
     // The stone, built standing with its foot at the origin
-    const k = new Kit(); k.add(roughStone(2.15, STONE_LEN, 1.05, 999), 0xa59f90);
-    const geo = k.geometry(); tintStones(geo, 0xa59f90, 4); geo.translate(0, 0, 0);
-    this.big = new THREE.Mesh(geo, FLAT);
+    this.big = propMesh('sarsen_stone', 2.15, STONE_LEN, 1.05);
+    if (!this.big) {
+      const k = new Kit(); k.add(roughStone(2.15, STONE_LEN, 1.05, 999), 0xa59f90);
+      const geo = k.geometry(); tintStones(geo, 0xa59f90, 4);
+      this.big = new THREE.Mesh(geo, FLAT);
+    }
     this.pivot = new THREE.Group(); this.pivot.add(this.big); this.root.add(this.pivot);
     this.qLying = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), u);
     this.qStanding = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -SLOT * D2R);
     this.qLying.multiply(this.qStanding);
     // Its wooden sledge, and the rollers laid along the ground in front of it
-    const sk = new Kit();
-    for (const s of [-1, 1]) sk.box(0.22, 0.25, 5.6, 0x6e4e2e, [s * 0.75, 0.12, 0]);
-    for (let i = 0; i < 6; i++) sk.box(1.9, 0.12, 0.2, 0x7e5a36, [0, 0.3, -2.5 + i]);
-    this.sledge = sk.mesh(); this.root.add(this.sledge);
+    this.sledge = propMesh('stone_sledge', 1.9, 0.44, 5.6);
+    if (!this.sledge) {
+      const sk = new Kit();
+      for (const s of [-1, 1]) sk.box(0.22, 0.25, 5.6, 0x6e4e2e, [s * 0.75, 0.12, 0]);
+      for (let i = 0; i < 6; i++) sk.box(1.9, 0.12, 0.2, 0x7e5a36, [0, 0.3, -2.5 + i]);
+      this.sledge = sk.mesh();
+    }
+    this.root.add(this.sledge);
     const rk = new Kit();
     for (let d = PULL_TO - 0.5; d < PULL_FROM + 6; d += 1.1) {
       const p = at(SLOT, d); p.y = groundHeight(p.x, p.z);
