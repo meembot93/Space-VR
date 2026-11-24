@@ -36,6 +36,17 @@ Address-bar options for testing: `?fast` (placeholder lines and timelines run qu
 `?chapter=2`, `?labels` (tags every stand-in model "PLACEHOLDER"), `?autostart` (desktop),
 `?gfx=standard` or `?gfx=high` (graphics level), `?sharp=1.6` (pixels per eye in VR).
 
+## Your place, the pause menu and fast forward
+
+The title page remembers where you got to on this headset: finished chapters get a tick, and it
+picks up at the chapter you were in (or the next one). "Start from the beginning" goes back to
+Chapter 1. Starting at Chapter 1 plays a short opening among the stars first (js/opening.js).
+
+Press **A or X** to pause. The host gets a menu: Carry on, Restart this chapter, Skip to the next
+chapter, Back to the chapter before, Fast forward (for reviewing: the story runs 4x faster and each
+line is cut short) and Back to the title page. Thumbstick up/down to choose, trigger to pick
+(desktop: P, arrow keys, Enter). Test: `node tools/test/menu-test.js`.
+
 ## Controls
 
 **Quest** (same as Broadside VR): left stick walk, right stick snap turn (45°) or smooth turn,

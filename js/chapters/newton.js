@@ -406,7 +406,7 @@ export default class Newton {
       if (Math.hypot(x - KEPSPOT.x, z - KEPSPOT.z) < 2.5 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 2.5) continue;
       tree(x, z, 0.8 + r() * 0.35);
     }
-    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6 }); this.root.add(g.group); }
+    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6, height: 4.6, trunkExtra: 0.7 }); this.root.add(g.group); }   // height + trunkExtra: tall enough to read as trees, not bushes (Meem)
     // a wooden ladder against one tree and a basket of picked apples beside it
     const lt = this.trees[3] || TREE;
     k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z - 0.25], [0, 0, 0.3]); k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z + 0.25], [0, 0, 0.3]);

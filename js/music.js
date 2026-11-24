@@ -23,10 +23,12 @@ const MOMENTS = {
   ch8: { line: 'ch8_04', at: 'put it in the middle' },      // Copernicus puts the Sun in the middle
   ch9: { line: 'ch9_01', at: 'and stops' },                 // Tycho sees the new star
   ch10: { line: 'ch10_05', at: 'he found it' },             // Kepler finds the ellipse
-  ch11: { when: (ch) => ch.s?.phase === 'moon' && ch.s?.scope === 1 }, // the moment you look through the telescope at the Moon (Meem's model moment)
-  ch12: { when: (ch) => ch.s?.phase === 'cannon' && ch.s?.mtn === 1 }, // Newton's cannon on the tall mountain appears (Meem's pick)
+  // hold: keeps playing (looping the track if it runs out) right through to the end of the chapter,
+  // turned well down while anyone is talking (Meem: these moments are too epic to stop)
+  ch11: { when: (ch) => ch.s?.phase === 'moon' && ch.s?.scope === 1, hold: true }, // the moment you look through the telescope at the Moon (Meem's model moment)
+  ch12: { line: 'ch12_03', at: 'Something must be pulling', hold: true },   // Newton puts it together: something pulls the apple down
   ch13: { line: 'ch13_01', at: 'how do you get there' },  // right at the start, dreaming of space (Meem's pick); none for Goddard or the V-2
-  ch14: { when: (ch) => ch.s?.phase === 'liftoff', file: 'sputnik_launch.mp3', vol: 0.95 }, // the instant the countdown ends and the rocket lifts off (Meem's pick)
+  ch14: { when: (ch) => ch.s?.phase === 'liftoff', file: 'sputnik_launch.mp3', vol: 0.95, hold: true, then: 'sputnik.mp3' }, // the instant the countdown ends and the rocket lifts off (Meem's pick), on to the end
 };
 const SCORE_SECS = 50; // how long the generated score plays at a moment (when there's no music file)
 
@@ -66,6 +68,9 @@ export class Music {
   constructor(G) {
     this.G = G; this.files = {}; this.cur = null; this.duck = 1;
     this.ready = fetch(DIR + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then((j) => { this.files = j || {}; }).catch(() => {});
+    // Note the moment's line the instant the story asks for it, so the music still starts even if
+    // the line is skipped or cut short before a frame sees it playing
+    G.events.on('say', ({ id }) => { if (this.armed && this.armed.line === id) this.armed.seen = true; });
   }
 
   // A chapter starts: no music yet, just get ready for its moment
@@ -77,21 +82,28 @@ export class Music {
   }
 
   // The moment: play the chapter's music once
-  async moment(name, vol = 0.55, file = null) {
+  async moment(name, vol = 0.55, file = null, hold = false, then = null) {
     const A = this.G.audio; if (!A.ctx) return;
     this.stop(1.5);
     await this.ready;
     const ctx = A.ctx, out = ctx.createGain(); out.gain.value = 0.0001; out.connect(A.master);
-    const cur = this.cur = { out, vol, nodes: [], name, t0: this.G.t + 3 };
+    const cur = this.cur = { out, vol, nodes: [], name, t0: this.G.t + 3, hold };
     file ||= this.files[name];
     if (file) {
       const buf = await this.preload(file);
       if (this.cur !== cur) return;
       if (buf) {
         out.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 1);
-        const src = ctx.createBufferSource(); src.buffer = buf; src.connect(out); src.start();
+        // hold: loop it to the end of the chapter, or (with `then`) carry on into that track, looped
+        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = !!hold && !then; src.connect(out); src.start();
         cur.nodes.push(src); cur.end = this.G.t + buf.duration;
-        src.onended = () => { if (this.cur === cur) { this.cur = null; out.disconnect(); } };
+        if (hold && then) this.preload(then);
+        src.onended = async () => {
+          if (this.cur !== cur) return;
+          const nb = hold && then ? await this.preload(then) : null;
+          if (nb && this.cur === cur) { const s2 = ctx.createBufferSource(); s2.buffer = nb; s2.loop = true; s2.connect(out); s2.start(); cur.nodes.push(s2); return; }
+          this.cur = null; out.disconnect();
+        };
         return;
       }
       console.warn('Music file failed, using the generated score');
@@ -238,10 +250,10 @@ export class Music {
         if (typeof f === 'string') { const txt = LINES[c.id] || ''; const i = txt.indexOf(f); f = i < 0 ? 0 : i / Math.max(1, txt.length); }
         go = G.narration.progress() >= f;
       } else go = !!a.seen; // the line ended early (skipped): start now anyway
-      if (go) { this.armed = null; this.moment(a.name, a.vol, a.file); }
+      if (go) { this.armed = null; this.moment(a.name, a.vol, a.file, a.hold, a.then); }
     }
     const c = this.cur; if (!c || !G.audio.ctx) return;
-    const S = this.stingCur, talking = S ? S.duck : G.narration.cur ? 0.7 : 1;
+    const S = this.stingCur, talking = S ? S.duck : G.narration.cur ? (c.hold ? 0.35 : 0.7) : 1;
     this.duck += (talking - this.duck) * Math.min(1, dt * (S ? 1.5 / S.fade : 2));
     if (c.out.gain.value > 0.01 && G.t > c.t0) c.out.gain.setTargetAtTime(c.vol * this.duck * (G.paused ? 0.35 : 1), G.audio.ctx.currentTime, 0.3);
   }

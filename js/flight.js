@@ -21,7 +21,7 @@ export const PLACES = {
   3: { year: 'about 2500 BC', place: 'The Nile, Egypt' },
   4: { year: 'about 700 BC', place: 'Babylon' },
   5: { year: 'about 350 BC', place: 'Athens, Greece' },
-  6: { year: '1901 AD', place: 'Antikythera, Greece' },
+  6: { year: '1900 AD', place: 'Antikythera, Greece' },
   7: { year: 'about 150 AD', place: 'Alexandria, Egypt' },
   8: { year: '1543', place: 'Frombork, Poland' },
   9: { year: '1572', place: 'Denmark' },
@@ -153,6 +153,9 @@ export class Flight {
     this.fade = 1; this.active = true; this.chimed = false;
     this.setupDiorama(to);
     G.soundscape?.setLevel(0);
+    // the flight's own music, if Meem's track is listed in sounds/music/index.json ("flight", and
+    // "flight_era" for the flight into a new era); it fades as the next chapter starts
+    G.music.ready.then(() => { const f = (newEra && G.music.files.flight_era) || G.music.files.flight; if (f && this.active) G.music.sting(f, 0.7); });
     const A = G.audio;
     if (A.ctx) {
       // a soft rushing sound for the glide, and a warm swell

@@ -133,9 +133,18 @@ export class Player {
         const it = this.nearest(h);
         if (it !== h.hover) { h.hover = it; if (it) { this.haptic(h, 0.15, 15); if (it.hint && !it.hinted) { it.hinted = true; this.G.ui.showHint(it.hint, 5); } } }
       }
-      if (sq && !h.sq) this.grab(h);
-      if (!sq && h.sq) this.release(h);
-      if (trig && !h.trig) this.touch(h);
+      const menu = this.G.paused && this.G.ui.menu;
+      if (menu) {
+        // the pause menu: thumbstick up/down moves, trigger picks
+        const my = h.gp ? (ax.length >= 4 ? ax[3] : ax[1] || 0) : 0;
+        if (Math.abs(my) > 0.6 && !h.menuLatch) { h.menuLatch = true; this.G.ui.menuMove(my > 0 ? 1 : -1); this.haptic(h, 0.2, 20); }
+        else if (Math.abs(my) < 0.3) h.menuLatch = false;
+        if (trig && !h.trig) { h.trig = true; this.G.ui.menuChoose(); }
+      } else {
+        if (sq && !h.sq) this.grab(h);
+        if (!sq && h.sq) this.release(h);
+        if (trig && !h.trig) this.touch(h);
+      }
       h.trig = trig; h.sq = sq;
       if (h.held) h.held.onHold?.(h, dt);
       // A or X: pause / carry on
@@ -236,6 +245,12 @@ export class Player {
       this.keys[e.code] = true;
       if (e.code === 'KeyM') this.G.net?.voice.setMuted(!this.G.net.voice.muted);
       if (e.code === 'KeyP') this.G.togglePause?.();
+      if (this.G.paused && this.G.ui.menu) {
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') this.G.ui.menuMove(-1);
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') this.G.ui.menuMove(1);
+        if (e.code === 'Enter' || e.code === 'Space') this.G.ui.menuChoose();
+        return;
+      }
       if (e.code === 'KeyN' && this.G.debug) this.G.narration.skip();
       if (e.code === 'KeyE') { const it = this.deskTarget(); if (it?.onTouch) it.onTouch(this.deskHand); else if (it?.onKey) it.onKey(this.deskHand); }
     });

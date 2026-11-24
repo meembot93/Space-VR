@@ -1,4 +1,4 @@
-// Chapter 6: Diving for the Antikythera machine. Off the island of Antikythera, 1901.
+// Chapter 6: Diving for the Antikythera machine. Off the island of Antikythera, 1900.
 //
 // You start on the deck of a Greek sponge-diving boat sheltering after a storm. The diver in his
 // brass helmet climbs down the ladder, and you follow him to the seafloor 45 m down: bronze and

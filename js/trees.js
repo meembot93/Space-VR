@@ -19,6 +19,7 @@
 //   t.apples     every apple on the tree: [{ pos, r }] (local); t.reserved: apples NOT built, so
 //                the chapter can hang its own makeApple() there and drop it from a real branch
 //   orchardTree({ seed: 5, height: 4, apples: 18 })                       smaller fruit trees
+//                (trunkExtra: 0.7 makes the trunk longer, lifting the crown: taller, less bush-like)
 //   deciduousTree({ seed: 7, height: 12, shape: 'oak' })                   summer oak ('elm' = vase-shaped)
 //   bareTree({ seed: 9, height: 10, snow: true })                         winter, fine twigs, snow on the tops
 //   conifer({ seed: 2, height: 11, type: 'spruce', snow: true })          'spruce' tiers, or 'pine' (tall bare trunk)
@@ -523,7 +524,7 @@ const scaleP = (P, k) => {
 function appleParams(o, hero) {
   const d = o.detail, k = o.height / (hero ? 6 : 4.2);
   return scaleP({
-    trunk: { len: hero ? 2.1 : 1.6, rad: hero ? 0.2 : 0.15, sections: pick(d, [3, 5, 9, 14]), sides: pick(d, [5, 7, 11, 16]), gnarl: 0.32, taper: 0.55, flare: 0.55, lobes: 5, bumps: 0.09, lean: 0.2 },
+    trunk: { len: (hero ? 2.1 : 1.6) + (o.trunkExtra || 0), rad: hero ? 0.2 : 0.15, sections: pick(d, [3, 5, 9, 14]), sides: pick(d, [5, 7, 11, 16]), gnarl: 0.32, taper: 0.55, flare: 0.55, lobes: 5, bumps: 0.09, lean: 0.2 },
     levels: [
       { n: pick(d, [4, 5, 5, 6]), start: 0.55, end: 1, angle: 1.0, angleVar: 0.25, lenRatio: 1.35, shrink: 0.15, radRatio: 0.72, sections: pick(d, [3, 4, 7, 9]), sides: pick(d, [4, 5, 8, 10]), gnarl: 0.4, up: 0.03, taper: 0.75 },
       { n: pick(d, [3, 5, 6, 7]), start: 0.25, end: 1, angle: 0.85, angleVar: 0.4, lenRatio: 0.55, shrink: 0.4, radRatio: 0.62, sections: pick(d, [2, 3, 4, 6]), sides: pick(d, [3, 4, 5, 7]), gnarl: 0.45, up: -0.02, taper: 0.8 },

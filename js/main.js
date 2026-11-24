@@ -15,6 +15,7 @@ import { Music } from './music.js';
 import { Stargazing } from './stargazing.js';
 import { Soundscape } from './soundscape.js';
 import { Flight } from './flight.js';
+import { Opening } from './opening.js';
 import { Atmosphere } from './atmosphere.js';
 import { VERSION } from './version.js';
 import { Extras } from './extras.js';
@@ -58,6 +59,7 @@ G.music = new Music(G);
 G.stargazing = new Stargazing(G);
 G.soundscape = new Soundscape(G);
 G.flight = new Flight(G);
+G.opening = new Opening(G);
 G.atmosphere = new Atmosphere(G);
 G.skyFigures = new SkyFigures(G);
 G.extras = new Extras(G);
@@ -101,8 +103,18 @@ choice('gfx', 'gfx', params.get('gfx') || detectLevel(), (v) => {
 });
 choice('subs', 'subs', 'on', (v) => { G.ui.subsOn = v === 'on'; G.ui.subtitle(G.ui.subText || ''); });
 
+// ---------- Your place in the story (remembered on this headset) ----------
+// Every chapter you finish gets a tick on the title page, and the title page picks up where you
+// left off: the chapter you were in the middle of, or the next one after the last you finished.
+const progress = {
+  done: new Set(String(store.get('done', '')).split(',').map(Number).filter(Boolean)),
+  resume: Number(store.get('resume', 0)) || 0,
+  save() { store.set('done', [...this.done].sort((a, b) => a - b).join(',')); store.set('resume', String(this.resume)); },
+};
+const readyN = (n) => CHAPTERS.find((c) => c.n === n && c.ready)?.n || 0;
+
 // Chapter list, one group per era: only chapters that are built can be picked
-let chapterPick = Number(params.get('chapter')) || CHAPTERS.find((c) => c.ready).n;
+let chapterPick = Number(params.get('chapter')) || readyN(progress.resume) || CHAPTERS.find((c) => c.ready).n;
 const chapList = document.getElementById('chapters');
 const chapButtons = [];
 const pickChapter = (n) => { chapterPick = n; for (const o of chapButtons) o.classList.toggle('on', Number(o.dataset.n) === n); showEra(); };
@@ -125,6 +137,18 @@ for (const c of CHAPTERS) {
   b.addEventListener('click', () => { if (G.isHost) pickChapter(c.n); });
   chapList.appendChild(b); chapButtons.push(b);
 }
+// ticks on the chapters you've finished, and "Start from the beginning" once you've begun
+const startOver = document.createElement('button'); startOver.className = 'startOver'; startOver.textContent = 'Start from the beginning';
+startOver.addEventListener('click', () => { if (G.isHost) pickChapter(CHAPTERS.find((c) => c.ready).n); });
+chapList.appendChild(startOver);
+function showTicks() {
+  for (const b of chapButtons) {
+    const n = Number(b.dataset.n); let t = b.querySelector('.tick');
+    if (progress.done.has(n) && !t) { t = document.createElement('span'); t.className = 'tick'; t.textContent = '\u2713'; t.title = 'Finished'; b.appendChild(t); }
+  }
+  startOver.style.display = progress.done.size || progress.resume > 1 ? 'block' : 'none';
+}
+showTicks();
 showEra();
 
 // ---------- Actions: everything a player does to the story goes through here ----------
@@ -169,6 +193,65 @@ function setPaused(on, fromHost) {
   if (G.isHost && !fromHost) G.events.emit('pause', { on });
 }
 G.setPaused = (on) => setPaused(on);
+
+// The pause menu (host only; a friend's pause card just says how to carry on). Chapter jumps are
+// left out while the story is between chapters (the flight), so nothing starts twice.
+let between = false, jumping = false;
+G.pauseMenu = () => {
+  if (!G.isHost) return null;
+  const n = G.director.n, items = [{ key: 'resume', label: 'Carry on' }];
+  if (!between && !jumping && !G.flight.active) {
+    items.push({ key: 'restart', label: 'Restart this chapter' });
+    if (readyN(n + 1)) items.push({ key: 'next', label: 'Skip to the next chapter' });
+    if (readyN(n - 1)) items.push({ key: 'prev', label: 'Back to the chapter before' });
+  }
+  items.push({ key: 'ff', label: G.ff ? 'Fast forward: ON (turn off)' : 'Fast forward (for reviewing)' });
+  if (!between && !jumping && !G.flight.active) items.push({ key: 'title', label: 'Back to the title page' });
+  return items;
+};
+G.menuPick = (key) => {
+  const n = G.director.n;
+  if (key === 'resume') setPaused(false);
+  else if (key === 'restart') jumpTo(n);
+  else if (key === 'next') jumpTo(readyN(n + 1));
+  else if (key === 'prev') jumpTo(readyN(n - 1));
+  else if (key === 'ff') { setFastForward(!G.ff); setPaused(false); }
+  else if (key === 'title') toTitle();
+};
+// Fast forward: the story runs four times faster and each line of narration is cut short after a
+// moment (its subtitle still flashes up), so you can whizz through a chapter to check things
+G.ff = false;
+function setFastForward(on) {
+  G.ff = !!on;
+  G.ui.showHint(G.ff ? '\u23E9 Fast forward on (pause to turn it off)' : 'Normal speed', 3);
+}
+// Go straight to chapter n (restart, skip on or back)
+async function jumpTo(n) {
+  if (!n || jumping) return;
+  jumping = true;
+  setPaused(false);
+  G.director.stop(); G.music.stop(1);
+  await G.ui.fadeOut(0.8);
+  G.ui.subtitle(''); G.ui.showHint('');
+  pickChapter(n);
+  try { await G.director.load(n); } catch (e) { console.error(e); }
+  jumping = false;
+  G.director.play();
+}
+// Back to the title page, keeping your place (you can carry on from this chapter later)
+async function toTitle() {
+  setPaused(false); setFastForward(false); G.ui.showHint('');
+  G.director.stop(); G.music.stop(1);
+  await G.ui.fadeOut(0.8);
+  G.ui.subtitle('');
+  G.started = false;
+  const s = renderer.xr.getSession(); if (s) s.end().catch(() => {});
+  G.mode = null; overlay.style.display = 'flex';
+  document.getElementById('crosshair').style.display = 'none';
+  document.exitPointerLock?.();
+  endCard.style.display = 'block'; endCard.textContent = `Paused at ${chapterLabel(chapterPick)}. Press Enter VR to start it again.`;
+  loading = G.director.load(chapterPick);
+}
 G.togglePause = () => {
   if (!G.started || !G.director.chapter) return;
   if (G.isHost) setPaused(!G.paused); else G.net.sendAction({ type: 'pause' });
@@ -200,6 +283,10 @@ const overlay = document.getElementById('overlay');
 const vrBtn = document.getElementById('vrBtn'), deskBtn = document.getElementById('deskBtn'), note = document.getElementById('note');
 const endCard = document.getElementById('endCard');
 document.getElementById('version').textContent = `Version ${VERSION}`;
+if (!params.get('chapter') && readyN(progress.resume) > 1) {
+  endCard.style.display = 'block';
+  endCard.textContent = `Welcome back! Carrying on from ${chapterLabel(chapterPick)}, ${CHAPTERS.find((c) => c.n === chapterPick).title}.`;
+}
 
 if (navigator.xr && navigator.xr.isSessionSupported) {
   navigator.xr.isSessionSupported('immersive-vr').then((ok) => {
@@ -226,6 +313,8 @@ async function begin() {
   }
   await loading;
   if (G.director.n !== chapterPick) await G.director.load(chapterPick);
+  // the opening among the stars, before the very first chapter (js/opening.js)
+  if (chapterPick === CHAPTERS.find((c) => c.ready).n && !G.net.mode && (!params.has('chapter') || params.has('opening'))) { between = true; await G.opening.play(); between = false; }
   G.director.play();
 }
 
@@ -254,6 +343,7 @@ if (params.has('autostart')) deskBtn.click(); // testing
 // End of a chapter: straight on to the next one if it's built, otherwise a card and back to the title
 function chapterEnded() {
   const n = G.director.n, next = CHAPTERS.find((c) => c.n === n + 1 && c.ready);
+  between = true;
   if (next) {
     const crossing = next.era !== CHAPTERS.find((c) => c.n === n)?.era;
     if (crossing) G.ui.subtitle(`The end of Era 1: ${ERAS[1].title}`, `Next: Era ${next.era}, ${ERAS[next.era].title}`);
@@ -278,7 +368,7 @@ function chapterEnded() {
   setTimeout(async () => {
     await G.ui.fadeOut(1.5);
     G.ui.subtitle('');
-    G.started = false;
+    G.started = false; between = false; G.ff = false;
     const s = renderer.xr.getSession(); if (s) s.end().catch(() => {});
     G.mode = null; overlay.style.display = 'flex';
     endCard.style.display = 'block'; endCard.textContent = `You finished ${chapterLabel(n)}. Press Enter VR to play it again.`;
@@ -287,7 +377,13 @@ function chapterEnded() {
   }, 6000);
 }
 G.events.on('chapterEnd', chapterEnded);
-G.events.on('chapterStart', (d) => { G.music.play('ch' + d.n); G.gfx.reset(); });
+G.events.on('chapterStart', (d) => { if (!G.isHost) return; progress.resume = d.n; progress.save(); });
+G.events.on('chapterEnd', (d) => {
+  if (!G.isHost) return;
+  const n = d?.n || G.director.n; progress.done.add(n);
+  progress.resume = readyN(n + 1); progress.save(); showTicks();   // after the very last chapter, back to the start
+});
+G.events.on('chapterStart', (d) => { between = false; G.music.play('ch' + d.n); G.gfx.reset(); });
 G.events.on('chapterEnd', () => G.music.stop(5));
 
 // ---------- Play with friends ----------
@@ -399,7 +495,10 @@ function tick() {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   G.t += dt;
   if (G.mode) G.player.update(dt);
-  if (!G.paused) { G.director.update(dt); G.extras.update(dt, G.t); G.skyFigures.update(dt); }
+  if (!G.paused) {
+    // fast forward: the story takes four steps for every frame
+    for (let i = 0, k = G.ff ? 4 : 1; i < k; i++) { if (i) G.t += dt; G.director.update(dt); G.extras.update(dt, G.t); G.skyFigures.update(dt); }
+  }
   G.narration.update(dt);
   G.music.update(dt);
   G.soundscape.update(dt);
@@ -413,8 +512,9 @@ function tick() {
   if (G.mode) G.stargazing.update(dt);
   camera.getWorldDirection(_b); _c.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(_q));
   G.audio.setListener(_a, _b, _c, G.t);
-  G.flight.update(dt);
-  const view = G.flight.active ? G.flight.scene : scene;
+  G.flight.update(G.ff ? dt * 4 : dt);
+  G.opening.update(dt);
+  const view = G.opening.active ? G.opening.scene : G.flight.active ? G.flight.scene : scene;
   G.gfx.beforeRender(view, camera, dt);
   renderer.render(view, camera);
   G.gfx.afterRender();

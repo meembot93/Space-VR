@@ -70,6 +70,11 @@ export class UI {
     this.pauseCard = makeCard(1100, 260, 0.9, { size: 52 });
     this.pauseCard.renderOrder = 995; G.scene.add(this.pauseCard);
     this.paused = false; this.dimV = 0;
+    // The pause menu (host): a list you move through with a thumbstick and pick with the trigger.
+    // G.pauseMenu() (js/main.js) says which items there are; G.menuPick(key) does them.
+    this.menuCard = makeCard(1100, 640, 0.9, { size: 50 });
+    this.menuCard.renderOrder = 995; G.scene.add(this.menuCard);
+    this.menu = null; this.menuSel = 0;
     this.domSub = document.getElementById('dsub');
     this.domHint = document.getElementById('dhint');
   }
@@ -95,9 +100,31 @@ export class UI {
   setPaused(on) {
     this.paused = on;
     const vr = this.G.mode !== 'desktop';
+    this.menu = on ? this.G.pauseMenu?.() || null : null; this.menuSel = 0;
+    if (on) this.placed = false;   // the pause card appears straight in front of you
+    if (this.menu) { this.pauseCard.userData.set(''); this.drawMenu(); return; }
+    this.menuCard.userData.set('');
     this.pauseCard.userData.set(on ? 'Paused' : '', on ? (vr ? 'A or X: carry on.  Hold a thumbstick in: reset height' : 'Press P to carry on') : '');
     if (this.domHint) { this.domHint.textContent = on ? 'Paused. Press P to carry on.' : ''; this.domHint.style.display = on && !vr ? 'block' : 'none'; }
   }
+
+  // The menu's words, with the chosen item marked
+  drawMenu() {
+    const m = this.menu; if (!m) return;
+    const vr = this.G.mode !== 'desktop';
+    const lines = m.map((it, i) => (i === this.menuSel ? '\u25B6  ' + it.label + '  \u25C0' : it.label));
+    this.menuCard.userData.set('Paused\n\n' + lines.join('\n'), vr ? 'Thumbstick up/down to choose, trigger to pick.  A or X: carry on' : 'Arrow keys to choose, Enter to pick.  P: carry on');
+    if (this.domHint) {
+      this.domHint.textContent = 'Paused:  ' + m.map((it, i) => (i === this.menuSel ? '[' + it.label + ']' : it.label)).join('  \u00B7  ') + '   (arrows + Enter, P to carry on)';
+      this.domHint.style.display = vr ? 'none' : 'block';
+    }
+  }
+  menuMove(d) {
+    if (!this.menu) return;
+    this.menuSel = (this.menuSel + d + this.menu.length) % this.menu.length; this.drawMenu();
+    this.G.audio.ctx && this.G.audio.tick?.();
+  }
+  menuChoose() { const it = this.menu?.[this.menuSel]; if (it) this.G.menuPick?.(it.key); }
 
   update(dt) {
     const G = this.G, cam = G.camera;
@@ -120,13 +147,14 @@ export class UI {
     if (Math.abs(dy) > 0.35) this.subYaw += dy * (1 - Math.exp(-dt * 3));
     const fx = Math.sin(this.subYaw), fz = Math.cos(this.subYaw);
     const desk = G.mode === 'desktop';
-    for (const [card, dist, drop] of [[this.sub, 1.6, 0.42], [this.hint, 1.5, 0.08], [this.pauseCard, 1.3, -0.05]]) {
+    for (const [card, dist, drop] of [[this.sub, 1.6, 0.42], [this.hint, 1.5, 0.08], [this.pauseCard, 1.3, -0.05], [this.menuCard, 1.3, -0.02]]) {
       card.position.set(_a.x + fx * dist, _a.y - drop, _a.z + fz * dist);
       card.lookAt(_a.x, card.position.y, _a.z);
       if (desk) card.visible = false; // the page shows them instead
       else if (card === this.sub) card.visible = !!(this.subsOn && this.subText);
       else if (card === this.hint) card.visible = this.hintT > 0 && !this.paused;
-      else card.visible = this.paused;
+      else if (card === this.menuCard) card.visible = this.paused && !!this.menu;
+      else card.visible = this.paused && !this.menu;
     }
   }
 }

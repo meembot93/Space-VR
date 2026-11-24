@@ -41,6 +41,29 @@ function moonFor(night) {
   return { phase: k, az: 236 - 112 * k, el: 16 + 24 * Math.sin(Math.PI * Math.min(1, k * 1.15)) };
 }
 
+// The tally bone's shape: a flat, slightly curved strip of rib bone with uneven, broken-off ends
+// (like the real Lebombo and Ishango bones), not a round rod. 34 cm long, about 4 cm wide.
+function boneGeo() {
+  const L = 0.34, sh = new THREE.Shape(), top = [], bot = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16, x = (t - 0.5) * L, w = 0.021 * (0.78 + 0.22 * Math.sin(t * Math.PI)) * (1 + 0.06 * Math.sin(t * 23));
+    top.push([x, w]); bot.push([x, -w * (0.9 + 0.1 * Math.cos(t * 17))]);
+  }
+  // broken, slanted ends
+  sh.moveTo(top[0][0] + 0.006, top[0][1]);
+  for (const [x, y] of top.slice(1, -1)) sh.lineTo(x, y);
+  sh.lineTo(top[16][0] - 0.004, top[16][1]); sh.lineTo(top[16][0] + 0.003, 0.004); sh.lineTo(bot[16][0] - 0.006, bot[16][1]);
+  for (const [x, y] of bot.slice(1, -1).reverse()) sh.lineTo(x, y);
+  sh.lineTo(bot[0][0] - 0.002, bot[0][1]); sh.lineTo(top[0][0] - 0.004, -0.003); sh.closePath();
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 2, curveSegments: 4 });
+  geo.translate(0, 0, -0.004);
+  // a gentle bow along its length, like a rib
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const t = p.getX(i) / L + 0.5; p.setY(i, p.getY(i) + Math.sin(t * Math.PI) * 0.025); }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 export default class Campfire {
   constructor(G) {
     this.G = G;
@@ -234,10 +257,9 @@ export default class Campfire {
     const finds = [['Border Cave, South Africa', -0.5, 0], ['Ishango, Congo', 0, 0.2], ['Abri Blanchard, France', 0.5, 0]];
     this.echoMats = [];
     for (const [name, x, y] of finds) {
-      const k = new Kit(), curve = [];
-      for (let i = 0; i <= 6; i++) { const t = i / 6; curve.push([(t - 0.5) * 0.3, Math.sin(t * Math.PI) * 0.02, 0]); }
-      k.tube(curve, 0.018, 0xfff0c8, 8);
-      for (let i = 0; i < 14; i++) k.box(0.004, 0.026, 0.004, 0x6a4a20, [(-0.12 + i * 0.018), 0.012 + Math.sin((0.1 + i / 16) * Math.PI) * 0.02, 0.017]);
+      const k = new Kit();
+      k.add(boneGeo(), 0xfff0c8);
+      for (let i = 0; i < 14; i++) k.box(0.004, 0.026, 0.004, 0x6a4a20, [(-0.12 + i * 0.018), 0.004 + Math.sin((0.1 + i / 16) * Math.PI) * 0.025, 0.008]);
       const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, fog: false });
       const b = k.mesh(m); this.echoMats.push(m);
       const tex = canvasTex(512, 72, (g, w, h) => { g.font = 'bold 34px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(255,236,200,1)'; g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 8; g.fillText(name, w / 2, h / 2); });
@@ -267,10 +289,7 @@ export default class Campfire {
   buildBone() {
     const g = new THREE.Group();
     const k = new Kit();
-    const curve = [];
-    for (let i = 0; i <= 8; i++) { const t = i / 8; curve.push([(t - 0.5) * 0.34, Math.sin(t * Math.PI) * 0.025, 0]); }
-    k.tube(curve, 0.022, 0xe6dcc2, 10);
-    k.ball(0.032, 1, 0xdcd0b2, curve[0], 0, [1, 0.8, 0.8]); k.ball(0.03, 1, 0xdcd0b2, curve[8], 0, [1, 0.8, 0.8]);
+    k.add(boneGeo(), 0xe6dcc2);
     g.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 })));
     // the flint, resting beside it
     const fk = new Kit(); fk.add(roughStone(0.05, 0.09, 0.025, 77, [2, 2, 1]), 0x5a5048); const flint = fk.mesh(); fk.add(roughStone(0.05, 0.09, 0.025, 77, [2, 2, 1]), 0x5a5048); flint.position.set(0.24, -0.06, 0.02); flint.rotation.z = 0.6; g.add(flint);
@@ -280,7 +299,7 @@ export default class Campfire {
     for (let i = 0; i < MARKS + 1; i++) {
       const t = 0.08 + i / MARKS * 0.84, x = (t - 0.5) * 0.34, y = Math.sin(t * Math.PI) * 0.025;
       const n = new THREE.Mesh(new THREE.BoxGeometry(0.0035, 0.03, 0.006), nm.clone());
-      n.position.set(x, y + 0.004, 0.019); n.rotation.z = (Math.random() - 0.5) * 0.2; n.visible = false;
+      n.position.set(x, y + 0.004, 0.008); n.rotation.z = (Math.random() - 0.5) * 0.2; n.visible = false;
       g.add(n); this.notches.push(n);
     }
     // a warm outline so it's easy to find
@@ -289,7 +308,7 @@ export default class Campfire {
     g.visible = false;
     this.bone = g; this.root.add(g);
     // the storyteller's own bone and flint, to hold up while ch1_05 is told
-    const tk = new Kit(); tk.tube(curve, 0.022, 0xe6dcc2, 8); const tb = tk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 }));
+    const tk = new Kit(); tk.add(boneGeo(), 0xe6dcc2); const tb = tk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 }));
     tb.rotation.z = Math.PI / 2; tb.scale.setScalar(1.5); this.tellerBone = new THREE.Group(); this.tellerBone.add(tb);
     this.tellerFlint = new THREE.Group(); const ff = fk.mesh(); ff.rotation.z = 0.4; this.tellerFlint.add(ff);
   }
