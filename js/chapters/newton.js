@@ -477,16 +477,8 @@ export default class Newton {
     const bk = new Kit(); bk.box(0.16, 0.025, 0.22, 0x5a2a1a, [0, 0, 0]); bk.box(0.15, 0.03, 0.21, 0xece0c0, [0.004, 0, 0]);
     this.smallBook = bk.mesh(); holdProp(this.nw, this.smallBook, 'Right', [0, 0.08, 0.04]);
     this.G.world.blockers.push(this.nwBlk = { x: SIT.x, z: SIT.z, r: 0.4 });
-    // his mother, Hannah, at the door with a lantern; later calling him in
-    // (no model of a 1660s countrywoman yet: a dressed stand-in in a long skirt, apron, collar and coif)
-    this.hannah = add(null, this.doorPos.clone().setY(groundHeight(this.doorPos.x, this.doorPos.z)), { tunic: 0x4a3a46, skin: 0xd8b49a, hair: 0x4a3a2a, height: 1.62 });
-    { const hk = new Kit(), WH = 0xe4ddc8;
-      hk.cyl(0.19, 0.37, 0.98, 12, 0x3e3240, [0, 0.49, 0]);                       // the skirt, to the ground
-      hk.box(0.32, 0.62, 0.02, WH, [0, 0.62, 0.285], [-0.16, 0, 0]);               // the apron
-      hk.cyl(0.215, 0.215, 0.05, 12, WH, [0, 0.97, 0]);                            // its band
-      hk.cyl(0.13, 0.25, 0.12, 12, WH, [0, 1.39, 0]);                              // the falling collar
-      hk.ball(0.145, 1, WH, [0, 1.67, -0.04], 0, [1.02, 0.92, 1.08]);             // the linen coif
-      this.hannah.inner.add(hk.mesh()); }
+    // his mother, Hannah, at the door with a lantern; later calling him in (Meem's model: bonnet, bodice, apron)
+    this.hannah = add('hannah_newton', this.doorPos.clone().setY(groundHeight(this.doorPos.x, this.doorPos.z)), { tunic: 0x4a3a46, skin: 0xd8b49a, hair: 0x4a3a2a });
     this.hannah.g.rotation.y = this.houseYaw;
     this.hannahLamp = makeTorch({ len: 0.3, color: 0xffc070, size: 0.6 }); holdProp(this.hannah, this.hannahLamp, 'Right', [0, 0.02, 0.02]);
     this.hannah.routine = [{ x: this.doorPos.x, z: this.doorPos.z, pose: 'idle', secs: 14, look: this.nw.g.position.clone().setY(1) }, { x: this.doorPos.x + 3, z: this.doorPos.z + 2, pose: 'work', secs: 8 }, { x: this.doorPos.x - 2, z: this.doorPos.z + 3, pose: 'idle', secs: 6 }];
@@ -496,7 +488,7 @@ export default class Newton {
     const staff = new Kit(); staff.cyl(0.02, 0.02, 1.6, 5, 0x5a4028, [0, 0.8, 0]); holdProp(this.shep, staff.mesh(), 'Right', [0, 0.05, 0.02]);
     this.shep.routine = [at(132, 40), at(110, 46), at(80, 40), at(60, 52), at(100, 58), at(118, 52)].map((p, i) => ({ x: p.x, z: p.z, pose: i % 3 === 2 ? 'beckon' : 'idle', secs: 4 + (i % 3) * 3, speed: 0.6 }));
     const hp = new THREE.Vector3(9.23, 0, -25.3);
-    this.hand = add('rheticus', hp.setY(groundHeight(hp.x, hp.z)), { tunic: 0x6a5a40, hair: 0x2a1a10, height: 1.74 });
+    this.hand = add('townsman_1600', hp.setY(groundHeight(hp.x, hp.z)), { tunic: 0x6a5a40, hair: 0x2a1a10 });   // a farmhand in doublet and cap
     const fork = new Kit(); fork.cyl(0.018, 0.018, 1.5, 5, 0x6a4a2e, [0, 0.75, 0]); for (const ox of [-0.05, 0, 0.05]) fork.cyl(0.006, 0.006, 0.25, 4, 0x5a5a5a, [ox, 1.6, 0]); holdProp(this.hand, fork.mesh(), 'Right', [0, 0.05, 0.02]);
     // (he forks hay from the haystack by the manor's gable end and loads the cart, walking round the
     // front corner of the house both ways, never through it)

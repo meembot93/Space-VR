@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp } from '../people.js';
 import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
+import { dress } from '../dress.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { glowPoints, textSprite, shatter, rumble, whoosh, awe, shimmer } from '../wow/fx.js';
@@ -39,6 +40,19 @@ function skyHit(w, d) {   // where a line from w along d meets the sky's arc (a 
 // ---------- the ground in each place ----------
 function fieldsHeight(x, z) {
   return (N1(x / 120, z / 120) - 0.5) * 6 * clamp((Math.hypot(x, z) - 30) / 80, 0, 1) + (N2(x / 8, z / 8) - 0.5) * 0.25;
+}
+// The fields' ground as its mesh really is (buildAbbey: a 2000 m grid of 150 x 150 squares, pulled
+// in toward the middle, heights from fieldsHeight at the corners): between the corners the mesh is
+// flat, so out where the squares are big, feet placed with fieldsHeight float or sink.
+const FS = 2000, FN = 150, FR = FS / 2;
+function fieldsGround(x, z) {
+  const r1 = Math.hypot(x, z); if (r1 < 1e-6) return fieldsHeight(0, 0);
+  const r0 = FR * Math.pow(Math.min(1, r1 / FR), 1 / 1.7), u = x * r0 / r1, v = z * r0 / r1;   // undo the pull
+  const gx = clamp((u + FR) / FS * FN, 0, FN - 1e-6), gz = clamp((v + FR) / FS * FN, 0, FN - 1e-6);
+  const ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz;
+  const h = (i, j) => { const uu = (i / FN) * FS - FR, vv = (j / FN) * FS - FR, q = Math.hypot(uu, vv), k = q > 0 ? Math.pow(q / FR, 1.7) * FR / q : 0; return fieldsHeight(uu * k, vv * k); };
+  const a = h(ix, iz), b = h(ix, iz + 1), c = h(ix + 1, iz + 1), d = h(ix + 1, iz);   // PlaneGeometry's two triangles: (a, b, d) and (b, c, d)
+  return fx + fz <= 1 ? a + fx * (d - a) + fz * (b - a) : c + (1 - fx) * (b - c) + (1 - fz) * (d - c);
 }
 function hvenHeight(x, z) {
   const r = Math.hypot(x, z * 1.25), edge = 260 + Math.sin(Math.atan2(z, x) * 5) * 25;
@@ -337,19 +351,24 @@ export default class Tycho {
     const add = (parent, model, pos, look = {}) => { const P = makePerson({ model, seed: 7 + parent.children.length * 3, ...look }); P.g.position.copy(pos); parent.add(P.g); return P; };
     // Herrevad: Tycho walks home; two farm folk come out with a lantern
     this.tycho = add(this.A, 'tycho', new THREE.Vector3(26, 0, 3), { tunic: 0x1a1a1a, hair: 0x9a5a2a, height: 1.78 });
-    this.folk = [add(this.A, 'sailor', new THREE.Vector3(34, fieldsHeight(34, 22.5), 22.5), { height: 1.68 }), add(this.A, null, new THREE.Vector3(37, fieldsHeight(37, 23), 23), { height: 1.6, tunic: 0x6a4a3a, hair: 0x5a3a20 })];
+    // (the farmer with the lantern and his wife: their feet on the ground mesh itself, see fieldsGround)
+    this.folk = [add(this.A, 'townsman_1600', new THREE.Vector3(34, fieldsGround(34, 22.5), 22.5)), add(this.A, 'townswoman_1600', new THREE.Vector3(37, fieldsGround(37, 23), 23))];
     this.folkLamp = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(this.folk[0], this.folkLamp, 'Right', [0, 0.02, 0.02]);
     this.folkLight = new THREE.PointLight(0xffb060, 1.4, 8, 1.8); this.folk[0].g.add(this.folkLight); this.folkLight.position.set(0.3, 1.2, 0.2);
     // Hven: Tycho, a helper at the sight, a timekeeper with the clock, a scribe at the book table
+    // (every one a different person, none of them a famous face; the timekeeper wears other clothes
+    // than the Herrevad farmer, who is the same model)
     this.tychoB = add(this.B, 'tycho', new THREE.Vector3(0.6, 0, -2.4), { tunic: 0x1a1a1a, hair: 0x9a5a2a, height: 1.78 });
-    this.observer = add(this.B, 'rheticus', new THREE.Vector3(QUAD.x + 0.7, 0, QUAD.z + 0.3), {});
-    this.timer = add(this.B, 'instrument_maker', new THREE.Vector3(2.6, 0, -1.4), {});
+    this.observer = add(this.B, 'townsman', new THREE.Vector3(QUAD.x + 0.7, 0, QUAD.z + 0.3), {});
+    this.timer = dress(add(this.B, 'townsman_1600', new THREE.Vector3(2.6, 0, -1.4), {}), { hue: 0.55, sat: 0.5, val: 0.75, hair: 0x6a4a2a });
     this.scribe = add(this.B, 'canon', new THREE.Vector3(1.6, 0, 0.1), {});
     this.helpers = [];
-    // two lantern-carriers going round the garden's circular path (one of each person, none through the castle)
+    // two lantern-carriers going round the garden's circular path (a maid, and the old steward in
+    // his long gown; none through the castle)
     for (let i = 0; i < 2; i++) {
       const at24 = (a) => ({ x: CASTLE.x + Math.cos(a) * 24, z: CASTLE.z + Math.sin(a) * 24 });
-      const a0 = i ? 0.4 : 2.4, P = add(this.B, i ? null : 'townsman', new THREE.Vector3(at24(a0).x, 0, at24(a0).z), { height: 1.66, tunic: i ? 0x3a3a4a : 0x5a4a32, hair: 0x3a2a18 });
+      const a0 = i ? 0.4 : 2.4, P = add(this.B, i ? 'venetian_senator' : 'townswoman_1600', new THREE.Vector3(at24(a0).x, 0, at24(a0).z), {});
+      if (i) dress(P, { hue: 0.93, sat: 0.5, val: 0.5, build: 0.96 });   // a dull brown gown, not a senator's red
       P.routine = [0, 1, 2, 3, 4, 5].map((k) => ({ ...at24(a0 + k * 0.55 * (i ? 1 : -1)), pose: k % 3 ? 'idle' : 'talk', secs: k % 3 ? 0.5 : 5 }));
       const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; this.helpers.push(P);
     }
@@ -577,7 +596,7 @@ export default class Tycho {
       else { T.pose = 'idle'; T.look = look.clone(); }
       animatePerson(T, t, dt);
       this.folk.forEach((P, i) => {
-        if (s.folk) { if (walkToward(P, 5.5 + i * 1.2, 0.6 - i * 0.8, dt, { speed: 1.2, height: fieldsHeight })) { P.pose = i ? 'gasp' : 'point'; P.pointAt.copy(look); P.look = look.clone(); } }
+        if (s.folk) { if (walkToward(P, 5.5 + i * 1.2, 0.6 - i * 0.8, dt, { speed: 1.2, height: fieldsGround })) { P.pose = i ? 'gasp' : 'point'; P.pointAt.copy(look); P.look = look.clone(); } }
         else { P.pose = 'idle'; }
         animatePerson(P, t, dt);
       });

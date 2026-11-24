@@ -23,6 +23,7 @@ import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp } from '../people.js';
 import { makeHerd, makeSmoke, makeTorch, Life } from '../life.js';
+import { dress } from '../dress.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { grove, deciduousTree, conifer, bush } from '../trees.js';
@@ -540,11 +541,13 @@ export default class Kepler {
     const lk = new Kit(); lk.box(0.3, 0.07, 0.4, 0x5a2a1a, [0, 0, 0]); lk.box(0.28, 0.055, 0.005, 0xe8dcbc, [0, 0, 0.2]); lk.box(0.31, 0.074, 0.03, 0x3a1a10, [0, 0, -0.19]);
     this.ledger = lk.mesh(); holdProp(this.tyc, this.ledger, 'Right', [0, 0.06, 0.1]);
     this.G.world.blockers.push(this.tycBlk = { x: -0.55, z: -1.05, r: 0.3 });
-    // in the street below, walking up to the square and back: each one a different person (two with lanterns)
+    // in the street below, walking up to the square and back: each one a different person (two with
+    // lanterns): a townsman in his long coat, a man and a woman of 1600 Prague, an old burgher in a black gown
     this.walkers = [];
-    const who = [['townsman', 1.7, -12], ['instrument_maker', 1.68, -60], ['sailor', 1.72, -35], [null, 1.66, -82]];
+    const who = [['townsman', 1.7, -12], ['townsman_1600', 1.75, -60], ['townswoman_1600', 1.75, -35], ['venetian_senator', 1.75, -82]];
     who.forEach(([model, height, z0], i) => {
       const x = (i % 2 ? 1.6 : -1.6), P = add(model, new THREE.Vector3(x, groundHeight(x, z0), z0), { height, seed: 40 + i });
+      if (model === 'venetian_senator') dress(P, { sat: 0.06, val: 0.36, build: 1.05 });   // the senator's red robe dyed a burgher's black
       P.routine = [{ x, z: -92, pose: 'idle', secs: 3 + i }, { x: SQ.x - 14 + i * 6, z: SQ.z + 14, pose: i % 2 ? 'talk' : 'idle', secs: 6 }, { x: -x, z: -24 - i * 6, pose: 'idle', secs: 4 }];
       if (i % 2 === 0) { const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; }
       this.walkers.push(P);

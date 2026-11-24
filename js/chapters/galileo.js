@@ -25,6 +25,7 @@ import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp } from '../people.js';
 import { makeHerd, makeFlock, makeSmoke, makeTorch, makeCloth, Life } from '../life.js';
+import { dress } from '../dress.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { cypress, poplar, conifer, orchardTree, grove } from '../trees.js';
 import { rng, noise2 } from '../shapes.js';
@@ -269,11 +270,25 @@ export default class Galileo {
     const gl = this.life.add(makeFlock({ n: 12, center: new THREE.Vector3(80, 30, 200), r: 120, height: 14, color: 0xe8ecef, size: 1.2, seed: 9, speed: 7 })); gl.scene = 'venice';
     const gl2 = this.life.add(makeFlock({ n: 6, center: new THREE.Vector3(30, TOPA + 8, 30), r: 30, height: 6, color: 0xe8ecef, size: 1.1, seed: 12, speed: 6 })); gl2.scene = 'venice';
     for (const sm of [[-300, 24, -200], [150, 22, -150], [-500, 20, 220], [400, 20, -300]]) { const s = this.life.add(makeSmoke(new THREE.Vector3(...sm), { n: 6, rise: 12, size: 2, opacity: 0.12, color: 0xc0b8b0 })); s.scene = 'venice'; }
+    // the people in the Piazza, far below. Graphics High (Quest 3, PCs): Meem's townsman and townswoman
+    // of 1600, each copy in its own clothes (dress.js) and keeping to its own stretch of the square, so
+    // twins stay 18 m apart (sd: the standard textures, they're far off). Standard (Quest 2): the
+    // belfry and the city already use most of its triangles, so the crowd stays light clay figures.
+    const MEN = [null, { hue: 0.55, sat: 0.6, val: 0.9 }, { hue: 0.08, sat: 1.1, val: 0.85, build: 1.04 }, { sat: 0.2, val: 0.55, build: 0.97 }, { hue: 0.3, sat: 0.6, val: 0.8 }];
+    const WOMEN = [null, { hue: 0.45, sat: 0.9, val: 0.9 }, { hue: 0.6, sat: 0.6, val: 0.85, build: 1.04 }, { hue: 0.5, sat: 0.8, val: 0.8 }, { sat: 0.3, val: 0.7, build: 0.97 }];
+    const real = !!this.G.gfx?.high, NC = real ? 10 : 16;
     this.crowd = [];
-    for (let i = 0; i < 16; i++) {
-      const x = -150 + r() * 160, z = -35 + r() * 45, P = makePerson({ seed: 60 + i, tunic: [0x5a2a2a, 0x2a2a3a, 0x6a5a3a, 0x1a1a1a, 0xa82a20, 0x3a4a2a][i % 6], hair: 0x2a1a10, height: 1.6 + r() * 0.2 });
+    for (let i = 0; i < NC; i++) {
+      let x, z = -35 + r() * 45, P, wx = 10;
+      if (real) {
+        x = -150 + i * 14; P = makePerson({ model: i % 2 ? 'townswoman_1600' : 'townsman_1600', sd: true, seed: 60 + i });
+        const look = (i % 2 ? WOMEN : MEN)[i >> 1]; if (look) dress(P, look);
+      } else {
+        x = -150 + r() * 126; wx = 40;
+        P = makePerson({ seed: 60 + i, tunic: [0x5a2a2a, 0x2a2a3a, 0x6a5a3a, 0x1a1a1a, 0xa82a20, 0x3a4a2a][i % 6], hair: 0x2a1a10, height: 1.6 + r() * 0.2 });
+      }
       P.g.position.set(x, 1.2, z); A.add(P.g);
-      P.routine = [{ x: x + (r() - 0.5) * 40, z: clamp(z + (r() - 0.5) * 30, -38, 8), pose: r() < 0.5 ? 'talk' : 'idle', secs: 4 + r() * 6 }, { x: x + (r() - 0.5) * 40, z: clamp(z + (r() - 0.5) * 30, -38, 8), pose: 'idle', secs: 3 + r() * 5 }];
+      P.routine = [{ x: x + (r() - 0.5) * wx, z: clamp(z + (r() - 0.5) * 30, -38, 8), pose: r() < 0.5 ? 'talk' : 'idle', secs: 4 + r() * 6 }, { x: x + (r() - 0.5) * wx, z: clamp(z + (r() - 0.5) * 30, -38, 8), pose: 'idle', secs: 3 + r() * 5 }];
       this.crowd.push(P);
     }
   }
@@ -576,17 +591,24 @@ export default class Galileo {
     const tk = new Kit(); tk.cyl(0.03, 0.04, 0.9, 12, 0x7a2a1a, [0, 0.45, 0]); tk.cyl(0.045, 0.045, 0.03, 12, 0xd0a050, [0, 0.88, 0]); tk.cyl(0.036, 0.036, 0.03, 12, 0xd0a050, [0, 0.02, 0]);
     this.spyTube = tk.mesh(); this.spyglass = new THREE.Group(); this.spyglass.add(this.spyTube); this.spyLen = 0.55; this.spyTube.scale.set(1, this.spyLen, 1);
     holdProp(this.galA, this.spyglass, 'Right', [0, 0.05, 0.03]);
-    // (every senator a different person: one model each, none of them Galileo's own face)
-    const SEN = ['canon', 'ptolemy', 'instrument_maker', 'rheticus'];
-    this.senators = [[3.3, 3.0, 2.3], [2.0, -2.3, 1.2], [4.1, -2.0, 1.4], [-2.6, 3.4, 2.4]].map(([x, z, yaw], i) => { const P = add(this.A, SEN[i], new THREE.Vector3(x, TOPA, z), { tunic: 0x8a1a1a, hair: 0x5a5a5a, height: 1.7 + i * 0.03 }); P.g.rotation.y = yaw; P.glance = true; return P; });
+    // Three senators, Meem's Venetian senator model in three robes (red, black, violet), standing well
+    // apart in the belfry so they read as three men, not triplets; no famous faces among them
+    const SEN = [{ build: 1.0 }, { sat: 0.06, val: 0.38, build: 1.07 }, { hue: 0.2, sat: 0.6, val: 0.6, build: 0.95 }];
+    this.senators = [[3.3, 3.0, 2.3], [4.1, -2.0, 1.4], [-2.6, 3.4, 2.4]].map(([x, z, yaw], i) => { const P = add(this.A, 'venetian_senator', new THREE.Vector3(x, TOPA, z), { height: 1.72 + i * 0.03 }); if (i) dress(P, SEN[i]); P.g.rotation.y = yaw; P.glance = true; return P; });
     // Padua: Galileo at his telescope; two craftsmen in the garden workshop; people in the street
     this.galB = add(this.B, 'galileo', new THREE.Vector3(1.35, TOPB, -0.55), { tunic: 0x1a1a1a, hair: 0x6a3a1a, beard: true, height: 1.7 });
     { const [x, z] = this.scopeStance(dirFromAzEl(MOON.az, MOON.el - 3, new THREE.Vector3())); this.galB.g.position.set(x, TOPB, z); }   // ready at his telescope
     this.galB.g.rotation.y = 2.3;
-    this.workers = [[-9.6, -31.8, Math.PI], [-7.3, -30.95, Math.PI]].map(([x, z, yaw], i) => { const P = add(this.B, i ? 'builder' : 'instrument_maker', new THREE.Vector3(x, 0, z), { height: 1.65 }); P.g.rotation.y = yaw; P.pose = 'work'; P.phase = i * 2; return P; });
+    // (the two craftsmen: a man in a doublet and cap and an older one in a long coat)
+    this.workers = [[-9.6, -31.8, Math.PI], [-7.3, -30.95, Math.PI]].map(([x, z, yaw], i) => { const P = add(this.B, i ? 'townsman' : 'townsman_1600', new THREE.Vector3(x, 0, z), { height: 1.7 }); P.g.rotation.y = yaw; P.pose = 'work'; P.phase = i * 2; return P; });
+    // in the street: a woman, a priest, a professor in his black gown, a man and a woman in other clothes
+    // than the craftsman and the first woman (each copy at least 40 m from its twin)
+    const WALK = [['townswoman_1600'], ['canon'], ['venetian_senator', { sat: 0.06, val: 0.36, build: 1.05 }], ['townsman_1600', { hue: 0.08, sat: 1.1, val: 0.85, build: 1.04 }], ['townswoman_1600', { hue: 0.45, sat: 0.9, val: 0.9 }]];
+    // (the last two only on Graphics High: Standard's triangles are mostly spent on the town)
     this.walkers = [];
-    for (let i = 0; i < 5; i++) {
-      const x = -50 + i * 22, z = 12 + (i % 2) * 3, P = add(this.B, ['rheticus', 'eratosthenes'][i] ?? null, new THREE.Vector3(x, 0, z), { tunic: [0x3a2a2a, 0x2a2a3a, 0x4a3a2a, 0x1a1a1a, 0x5a2a2a][i], hair: 0x2a1a10, height: 1.62 + (i % 3) * 0.06 });
+    for (let i = 0, NW = this.G.gfx?.high ? 5 : 3; i < NW; i++) {
+      const x = -50 + i * 22, z = 12 + (i % 2) * 3, P = add(this.B, WALK[i][0], new THREE.Vector3(x, 0, z), { height: 1.7 + (i % 3) * 0.03 });
+      if (WALK[i][1]) dress(P, WALK[i][1]);
       P.routine = [{ x: x + 30, z: 12 + (i % 2) * 3, pose: 'idle', secs: 3 + i }, { x: x - 20, z: 13, pose: i % 2 ? 'talk' : 'idle', secs: 4 }];
       if (i % 2 === 0) { const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; }
       this.walkers.push(P);
