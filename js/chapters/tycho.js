@@ -327,7 +327,7 @@ export default class Tycho {
     this.lampB = new THREE.PointLight(0xffa860, 3, 10, 1.6); this.lampB.position.set(1.6, 1.4, -0.6); Bg.add(this.lampB);
     this.lampFlame = glow(0xffb050, 0.15); this.lampFlame.position.set(1.95, 1.0, -0.7); Bg.add(this.lampFlame);
     this.books = tk; // (kept for clarity)
-    this.elk = this.life.add(makeHerd('reindeer', { n: 1, area: { x: 6, z: -12, r: 5 }, height: hvenHeight, seed: 12, scale: 1.45 }));
+    this.elk = this.life.add(makeHerd('moose', { n: 1, area: { x: 6, z: -12, r: 5 }, height: hvenHeight, seed: 12 }));   // Tycho's tame elk (a moose)
     this.B.add(this.elk.group);
     this.sheep = this.life.add(makeHerd('sheep', { n: 8, area: { x: -70, z: 40, r: 14 }, height: hvenHeight, seed: 3 })); this.B.add(this.sheep.group);
     this.gulls = this.life.add(makeFlock({ n: 8, center: new THREE.Vector3(-150, 20, 120), r: 70, height: 8, color: 0xd8dce0, size: 1.2, seed: 2, speed: 6 })); this.B.add(this.gulls.group);

@@ -38,3 +38,10 @@ export async function loadModel(name, { sd = false } = {}) {   // sd: skip the H
   if (info.turn) scene.rotation.y = info.turn * Math.PI / 180;
   return { scene, animations: gltf.animations, info };
 }
+
+// A GLB straight from models/ by file name (e.g. 'herd/sheep.glb'), not listed in index.json, loaded once
+// and shared: resolves with the GLTF itself (clone its scene before use), or null if it isn't there.
+export function loadGLB(file) {
+  if (!cache.has(file)) cache.set(file, loader.loadAsync(DIR + file).catch((e) => { console.warn('Model failed', file, e); return null; }));
+  return cache.get(file);
+}
