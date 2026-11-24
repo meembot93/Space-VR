@@ -241,5 +241,8 @@
   "file": "sputnik.glb",
   "height": 0.58,
   "turn": 0
+ },
+ "glove": {
+  "file": "glove.glb"
  }
 }
