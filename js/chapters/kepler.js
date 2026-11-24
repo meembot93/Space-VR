@@ -25,6 +25,7 @@ import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp }
 import { makeHerd, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
+import { grove, deciduousTree, conifer, bush } from '../trees.js';
 import { glowPoints, shatter, awe, shimmer } from '../wow/fx.js';
 import { ease, clamp01, sunAt, house, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
@@ -55,6 +56,7 @@ function castleHill(x, z) {
 export function groundHeight(x, z) { return (N2(x / 9, z / 9) - 0.5) * 0.2 + (z < -450 ? castleHill(x, z) : 0); }
 const RIVER = (z) => -330 + Math.sin(z / 260) * 50;      // the Vltava's middle (x), running north-south
 const SQ = { x: 18, z: -128, r: 34 };                    // the Old Town Square
+const GD = { x: 30, z: -34 };                            // a walled garden behind the houses, below the east arch
 
 // Town windows as flat panes (2 triangles each, and only the ones facing our way): a share glow
 // warm with a cross of glazing bars, the rest are dark glass. Like era2/common.js windows(), lighter.
@@ -148,6 +150,7 @@ export default class Kepler {
       if (Math.abs(x) < 12 && z > -14) continue;                              // right under our windows
       if (Math.abs(x) < 5 && z < 0 && z > -100) continue;                     // the street north to the square
       if (Math.hypot(x - SQ.x, z - SQ.z) < SQ.r) continue;                    // the square
+      if (Math.abs(x - GD.x) < 15 && Math.abs(z - GD.z) < 13) continue;     // a walled garden
       if ((Math.abs(x - 32) < 22 && z < -150 && z > -222) || (x > -48 && x < -10 && z > -120 && z < -100)) continue;   // the Týn church, the Town Hall
       if (Math.abs(x - RIVER(z)) < 80) continue;
       if (roll < 0.08) continue;
@@ -168,6 +171,16 @@ export default class Kepler {
     k.box(RX * 2 + 0.9, 0.3, RZ * 2 + 0.9, 0xb8a888, [0, TOP - 0.2, 0]);
     k.add(gableRoof(RX * 2 + 0.6, RZ * 2 + 0.6, 3.2, 0.35), 0x7a3020, [0, TOP + 3.4, 0]);
     this.buildSquare(k, wins);
+    // the walled garden: a low stone wall with a gate, two old trees turning gold, bushes, a bench
+    for (const [w, d, ox, oz] of [[22, 0.5, 0, -9], [22, 0.5, 0, 9], [0.5, 18, -11, 0], [0.5, 18, 11, 0]]) {
+      if (oz === 9) { for (const sx of [-1, 1]) k.box(9.5, 1.6, 0.5, 0x8a8070, [GD.x + sx * 6.25, 0.8, GD.z + oz]); k.box(0.6, 2.2, 0.6, 0x7a7060, [GD.x - 1.5, 1.1, GD.z + oz]); k.box(0.6, 2.2, 0.6, 0x7a7060, [GD.x + 1.5, 1.1, GD.z + oz]); continue; }
+      k.box(w, 1.6, d, 0x8a8070, [GD.x + ox, 0.8, GD.z + oz]); k.box(w + 0.2, 0.15, d + 0.2, 0x9a9080, [GD.x + ox, 1.67, GD.z + oz]);
+    }
+    k.box(1.8, 0.08, 0.45, 0x5a3a22, [GD.x + 4, 0.45, GD.z + 6]); for (const sx of [-0.8, 0.8]) k.box(0.1, 0.45, 0.4, 0x3a2a1a, [GD.x + 4 + sx, 0.22, GD.z + 6]);
+    k.box(8, 0.04, 1.4, 0x6a6052, [GD.x, 0.02, GD.z + 4.5]);
+    const gt = [[-4, -3, 9.5, 2], [5, -4, 8.5, 5]].map(([ox, oz, h, sd]) => { const t = deciduousTree({ seed: sd, height: h, detail: 'mid', leafColors: [0xffd27a, 0xf2b25a, 0xe8c878, 0xffe0a0] }); t.group.position.set(GD.x + ox, groundHeight(GD.x + ox, GD.z + oz) - 0.1, GD.z + oz); t.group.rotation.y = sd; this.root.add(t.group); return t.tris; });
+    const gb = grove(bush, [[-9, -7], [-8.5, 6], [8.5, 7], [9, -1], [0, -7.5]].map(([ox, oz], i) => ({ x: GD.x + ox, y: 0, z: GD.z + oz, s: 0.9 + (i % 3) * 0.2 })), { detail: 'mid', variants: 2, seed: 6, leafColors: [0xd8e0a0, 0xe8c878] });
+    this.root.add(gb.group); this.gardenTris = gt[0] + gt[1] + gb.tris;
     this.buildCastle(k, wins);
     this.root.add(k.mesh());
     this.root.add(winQuads(wins, { lit: 0.35, seed: 3 }));
@@ -285,13 +298,16 @@ export default class Kepler {
     k.cyl(0.001, 2.6, 26, 8, SLT, P(15, 47, -25));                                   // the little spire over the crossing
     // St George's basilica: two slim white towers
     for (const lx of [55, 63]) { box(6, 30, 6, 0xe8dcc8, lx, 15, -55); k.cyl(0.001, 4.4, 9, 4, RF, P(lx, 34.5, -55), [0, Math.PI / 4, 0]); }
-    // trees on the hill below the walls
-    const r = rng(77);
-    for (let i = 0; i < 260 && cw.length; i++) {
-      const lx = (r() - 0.5) * 520, lz = 48 + r() * 150, x = cx + lx * c + lz * s, z = cz - lx * s + lz * c;
-      if (Math.abs(x - RIVER(z)) < 80) continue;
-      k.ball(3 + r() * 3, 1, [0x24301e, 0x1e2a1a, 0x2a3422][i % 3], [x, groundHeight(x, z) + 3.5, z]);
-    }
+    // trees in their autumn colours (late October), with pines among them: a fringe on the slope just
+    // below the curtain wall, and the wooded hill rising to the west of the palace (from the study the
+    // rest of the hill, and the river banks, are hidden behind the Old Town's roofs)
+    const r = rng(77), leafy = [], pines = [];
+    const plant = (lx, lz, sc) => { const x = cx + lx * c + lz * s, z = cz - lx * s + lz * c; if (Math.abs(x - RIVER(z)) < 80) return; (r() < 0.25 ? pines : leafy).push({ x, y: groundHeight(x, z) - 0.3, z, s: sc }); };
+    for (let i = 0; i < 46; i++) plant(-150 + i * 6.6 + (r() - 0.5) * 4, 47 + r() * 14, 0.9 + r() * 0.4);
+    for (let i = 0; i < 30; i++) plant(-158 - r() * 160, -100 + r() * 150, 0.9 + r() * 0.5);
+    const autumn = grove(deciduousTree, leafy, { height: 17, detail: 'low', variants: 5, seed: 3, leafColors: [0xffd27a, 0xf2b25a, 0xe8c878, 0xd8d890, 0xffe0a0] });
+    const pine = grove(conifer, pines, { height: 16, type: 'pine', detail: 'low', variants: 3, seed: 4 });
+    this.root.add(autumn.group, pine.group); this.treeTris = autumn.tris + pine.tris;
     this.root.add(winQuads(cw, { lit: 0.5, w: 1.4, h: 2.4, seed: 9 }));
   }
 
