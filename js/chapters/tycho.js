@@ -337,7 +337,7 @@ export default class Tycho {
     const add = (parent, model, pos, look = {}) => { const P = makePerson({ model, seed: 7 + parent.children.length * 3, ...look }); P.g.position.copy(pos); parent.add(P.g); return P; };
     // Herrevad: Tycho walks home; two farm folk come out with a lantern
     this.tycho = add(this.A, 'tycho', new THREE.Vector3(26, 0, 3), { tunic: 0x1a1a1a, hair: 0x9a5a2a, height: 1.78 });
-    this.folk = [add(this.A, 'sailor', new THREE.Vector3(34, 0, 22.5), { height: 1.68 }), add(this.A, null, new THREE.Vector3(37, 0, 23), { height: 1.6, tunic: 0x6a4a3a, hair: 0x5a3a20 })];
+    this.folk = [add(this.A, 'sailor', new THREE.Vector3(34, fieldsHeight(34, 22.5), 22.5), { height: 1.68 }), add(this.A, null, new THREE.Vector3(37, fieldsHeight(37, 23), 23), { height: 1.6, tunic: 0x6a4a3a, hair: 0x5a3a20 })];
     this.folkLamp = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(this.folk[0], this.folkLamp, 'Right', [0, 0.02, 0.02]);
     this.folkLight = new THREE.PointLight(0xffb060, 1.4, 8, 1.8); this.folk[0].g.add(this.folkLight); this.folkLight.position.set(0.3, 1.2, 0.2);
     // Hven: Tycho, a helper at the sight, a timekeeper with the clock, a scribe at the book table
