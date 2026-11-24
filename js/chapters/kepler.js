@@ -28,6 +28,9 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { grove, deciduousTree, conifer, bush } from '../trees.js';
 import { glowPoints, shatter, awe, shimmer } from '../wow/fx.js';
+import { loadProps } from '../props.js';
+// Meem's brick town house with its stepped gable (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_north', 'house_north_lo', 'book_set', 'lantern']);
 import { ease, clamp01, sunAt, house, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const TOP = 13, LAT = 50.09, SUNLON = 205;
@@ -128,7 +131,7 @@ export default class Kepler {
 
   // ---------- Prague by night ----------
   buildCity() {
-    const k = new Kit(), r = rng(8), wins = [];
+    const k = new Kit(), r = rng(8), wins = [], TP = PROPS.fresh();
     const SIZE = 3000, SEG = 140, g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI / 2);
     const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color(), cob = new THREE.Color(0x5a544c), grass = new THREE.Color(0x3a4a2e), sq = new THREE.Color(0x6a6258);
     for (let i = 0; i < p.count; i++) {
@@ -159,12 +162,14 @@ export default class Kepler {
       const w = 8 + wr * 4, h = near ? 6 + hr * 2.4 : 8 + hr * 6;
       if (street && Math.abs(x) < 16) x = Math.sign(x) * 8.6;                // line the street up: fronts 4 m from its middle
       const yaw = street ? (x > 0 ? -Math.PI / 2 : Math.PI / 2) : Math.round(rr * 4) * Math.PI / 2;
-      house(k, { x, y: groundHeight(x, z), z, w, d: 9, h, roof: near ? 3.4 + hr * 1.2 : undefined, yaw, wall: WALLS[Math.floor(wall * WALLS.length)], roofCol: ROOFS[Math.floor(roofC * ROOFS.length)], gableFront: gf < 0.6, stepped: st < 0.08, timber: tb < 0.15 ? 0x3a2a1c : null }, wins);
+      // Meem's house model within 150 m (simplified past 50 m); the plain shapes further out
+      const dist = Math.hypot(x, z), model = dist < 50 ? 'house_north' : dist < 150 ? 'house_north_lo' : null;
+      house(k, { x, y: groundHeight(x, z), z, w, d: 9, h, roof: near ? 3.4 + hr * 1.2 : undefined, yaw, wall: WALLS[Math.floor(wall * WALLS.length)], roofCol: ROOFS[Math.floor(roofC * ROOFS.length)], gableFront: gf < 0.6, stepped: st < 0.08, timber: tb < 0.15 ? 0x3a2a1c : null, props: model && TP, model }, wins);
     }
     // lanterns on iron brackets along the street, so you can see the people walking below
     for (let i = 0; i < 6; i++) {
       const z = -20 - i * 14, sx = i % 2 ? 1 : -1, x = sx * 3.3;
-      k.box(0.7, 0.05, 0.05, 0x1a1a1a, [x - sx * 0.35, 3.6, z]); k.box(0.22, 0.3, 0.22, 0x2a2418, [x - sx * 0.6, 3.4, z]);
+      k.box(0.7, 0.05, 0.05, 0x1a1a1a, [x - sx * 0.35, 3.6, z]); if (!TP.add('lantern', x - sx * 0.6, 3.6 - PROPS.size('lantern').y * 1.4, z, 0, { s: 1.4 })) k.box(0.22, 0.3, 0.22, 0x2a2418, [x - sx * 0.6, 3.4, z]);
       const gl = glow(0xffc070, 2.2, 0.9); gl.position.set(x - sx * 0.6, 3.35, z); this.root.add(gl);
     }
     // the house we're in: tall plastered walls under the study, with a cornice
@@ -183,7 +188,7 @@ export default class Kepler {
     const gb = grove(bush, [[-9, -7], [-8.5, 6], [8.5, 7], [9, -1], [0, -7.5]].map(([ox, oz], i) => ({ x: GD.x + ox, y: 0, z: GD.z + oz, s: 0.9 + (i % 3) * 0.2 })), { detail: 'mid', variants: 2, seed: 6, leafColors: [0xd8e0a0, 0xe8c878] });
     this.root.add(gb.group); this.gardenTris = gt[0] + gt[1] + gb.tris;
     this.buildCastle(k, wins);
-    this.root.add(k.mesh());
+    this.root.add(k.mesh(), TP.build({ glow: 0x231c16 }));
     this.root.add(winQuads(wins, { lit: 0.35, seed: 3 }));
     // smoke from chimneys, bells, a few horses in the square
     this.smokes = [[40, 14, -40], [-60, 20, -80], [20, 22, 60], [-120, 18, -200]].map((q) => this.life.add(makeSmoke(new THREE.Vector3(...q), { n: 6, rise: 9, size: 1.4, opacity: 0.12, color: 0x8a90a0 })));

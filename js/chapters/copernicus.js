@@ -25,6 +25,9 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2, roughStone } from '../shapes.js';
 import { glowPoints } from '../wow/fx.js';
 import { grove, deciduousTree, bareTree, conifer } from '../trees.js';
+import { loadProps } from '../props.js';
+// Meem's brick town house with its stepped gable, a barrel and a small boat (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_north', 'house_north_lo', 'boat_small', 'barrel', 'crate_basket_set']);
 import { D2R, ease, clamp01, at, sunAt, house, windows, steppedGable, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 54.36, YEAR = 1540, SUNLON = 215;     // Frombork, early November
@@ -363,11 +366,11 @@ export default class Copernicus {
     }
     // the canons' houses (curias) inside and just outside the close
     this.closeWins = [];
-    const hr = rng(5);
+    const hr = rng(5), closeP = PROPS.fresh();
     for (const [x, z, yaw] of [[14, 44, 0], [24, 46, 0], [70, 46, 0], [82, 45, 0], [94, 46, 0], [10, 10, Math.PI / 2], [104, 12, -Math.PI / 2], [104, 30, -Math.PI / 2], [30, 70, Math.PI], [46, 72, Math.PI], [66, 70, Math.PI], [86, 71, Math.PI]]) {
-      house(k, { x, y: groundHeight(x, z), z, w: 8 + hr() * 3, d: 7, h: 6 + hr() * 2, yaw, wall: [0xd6c4a2, 0xc8b08a, 0x9a4a32][Math.floor(hr() * 3)], roofCol: ROOF, gableFront: hr() < 0.4, timber: hr() < 0.35 ? 0x3a2a1c : null }, this.closeWins);
+      house(k, { x, y: groundHeight(x, z), z, w: 8 + hr() * 3, d: 7, h: 6 + hr() * 2, yaw, wall: [0xd6c4a2, 0xc8b08a, 0x9a4a32][Math.floor(hr() * 3)], roofCol: ROOF, gableFront: hr() < 0.4, timber: hr() < 0.35 ? 0x3a2a1c : null, props: closeP, model: 'house_north' }, this.closeWins);
     }
-    this.root.add(k.mesh(), kb.mesh(BRICK), kt.mesh(TILES));
+    this.root.add(k.mesh(), kb.mesh(BRICK), kt.mesh(TILES), closeP.build({ glow: 0x231c16 }));
     const wl = windows(this.cathWins.map((w) => ({ p: w.p, yaw: w.yaw })), { lit: 0.35, w: 1.5, h: 9, warm: 0xc0803a, seed: 9 });
     this.root.add(wl);
     this.root.add(windows(this.closeWins, { lit: 0.5, seed: 4 }));
@@ -376,7 +379,7 @@ export default class Copernicus {
   // The town of Frombork down the hill: lanes of tall narrow houses with their gables to the street,
   // a market square with the town hall, St Nicholas's church, the harbour and its fishing boats.
   buildTown() {
-    const k = new Kit(), r = rng(12), wins = [];
+    const k = new Kit(), r = rng(12), wins = [], TP = PROPS.fresh();
     const ROOFS = [0x8a3424, 0x9a4028, 0x7a3020, 0x5a4a44], WALLS = [0xe0d2b0, 0xd4c094, 0xc8a878, 0xb8b0a0, 0x9a4a32, 0xd8c8b8];
     this.chimneys = [];
     const street = (x0, z0, x1, z1, side) => {
@@ -384,7 +387,7 @@ export default class Copernicus {
       for (let d = 2; d < len - 3;) {
         const w = 5 + r() * 3, x = x0 + dx * (d + w / 2) + side * -dz * 6.5, z = z0 + dz * (d + w / 2) + side * dx * 6.5;
         const y = groundHeight(x, z);
-        house(k, { x, y: y - 0.3, z, w, d: 9, h: 6 + r() * 4, yaw, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], gableFront: r() < 0.75, stepped: r() < 0.2, timber: r() < 0.3 ? 0x3a2a1c : null }, wins);
+        house(k, { x, y: y - 0.3, z, w, d: 9, h: 6 + r() * 4, yaw, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], gableFront: r() < 0.75, stepped: r() < 0.2, timber: r() < 0.3 ? 0x3a2a1c : null, props: TP, model: 'house_north_lo' }, wins);
         if (r() < 0.25) this.chimneys.push(new THREE.Vector3(x, y + 13, z));
         d += w + 0.3;
       }
@@ -406,7 +409,13 @@ export default class Copernicus {
     for (let i = 0; i < 12; i++) k.cyl(0.18, 0.18, 3, 5, 0x3a2a1c, [-42 + (i % 2) * 4, WATER - 0.6, -158 - Math.floor(i / 2) * 10]);
     this.boats = [];
     for (let i = 0; i < 6; i++) {
-      const bk = new Kit(), L = 7 + r() * 4;
+      const L = 7 + r() * 4;
+      if (PROPS.has('boat_small')) {   // Meem's fishing boat (one each, so they can bob on their own)
+        const bp = PROPS.fresh(); bp.add('boat_small', 0, -0.55, 0, 0, { s: L / 5 });
+        const b = bp.build(); b.position.set(-48 + (i % 2) * 16 + r() * 2, WATER + 0.25, -170 - i * 9); b.rotation.y = (r() - 0.5) * 0.3; b.userData.ph = r() * 6;
+        this.root.add(b); this.boats.push(b); continue;
+      }
+      const bk = new Kit();
       bk.cyl(0.9, 0.7, L, 8, 0x4a3420, [0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.45]);
       bk.box(1.4, 0.15, L * 0.8, 0x6a5038, [0, 0.38, 0]);
       bk.cyl(0.06, 0.08, 7, 5, 0x3a2a1c, [0, 3.6, L * 0.1]);
@@ -414,7 +423,7 @@ export default class Copernicus {
       const b = bk.mesh(); b.position.set(-48 + (i % 2) * 16 + r() * 2, WATER + 0.25, -170 - i * 9); b.rotation.y = (r() - 0.5) * 0.3; b.userData.ph = r() * 6;
       this.root.add(b); this.boats.push(b);
     }
-    this.root.add(k.mesh());
+    this.root.add(k.mesh(), TP.build({ glow: 0x231c16 }));
     this.root.add(windows(wins, { lit: 0.33, seed: 8 }));
   }
 
@@ -462,7 +471,14 @@ export default class Copernicus {
       k.box(1.8, 0.12, 0.12, DARK, [wx, wy + 1.85, wz]); k.cyl(0.08, 0.08, 1.5, 8, WOOD, [wx, wy + 1.6, wz], [0, 0, Math.PI / 2]);
       kt.add(gableRoof(1.9, 1.4, 0.6, 0.15), 0x7a2e22, [wx, wy + 1.95, wz]);
       k.cyl(0.16, 0.13, 0.3, 8, 0x5a3e26, [wx + 0.45, wy + 0.95, wz + 0.1]); }
-    for (const [x, z] of [[4.0, 4.3], [4.5, 5.0], [3.9, 5.1]]) { const y = groundHeight(x, z); k.cyl(0.3, 0.26, 0.85, 10, 0x5a3e26, [x, y + 0.425, z]); for (const h of [0.15, 0.7]) k.cyl(0.31, 0.31, 0.04, 10, IRON, [x, y + h, z]); }
+    { const fp = PROPS.fresh();   // Meem's barrels, and a crate, basket and sack beside them
+      for (const [x, z] of [[4.0, 4.3], [4.5, 5.0], [3.9, 5.1]]) {
+        const y = groundHeight(x, z);
+        if (fp.add('barrel', x, y, z, x * 3, { s: 0.9 })) continue;
+        k.cyl(0.3, 0.26, 0.85, 10, 0x5a3e26, [x, y + 0.425, z]); for (const h of [0.15, 0.7]) k.cyl(0.31, 0.31, 0.04, 10, IRON, [x, y + h, z]);
+      }
+      fp.add('crate_basket_set', 5.6, groundHeight(5.6, 4.9), 4.9, -0.4);
+      this.root.add(fp.build()); }
     { const y = groundHeight(-0.5, 4.2);
       for (let i = 0; i < 24; i++) k.cyl(0.09, 0.09, 1.0, 6, i % 4 ? 0x7a5a3a : 0x8a6a44, [-1.6 + (i % 8) * 0.19, y + 0.1 + Math.floor(i / 8) * 0.18, 4.0], [Math.PI / 2, 0, 0]);
       for (const x of [-1.8, 0.0]) k.box(0.1, 1.5, 0.1, DARK, [x, y + 0.75, 4.6]);

@@ -7,6 +7,9 @@ import * as THREE from 'three';
 import { Kit } from '../kit.js';
 import { rng, noise2 } from '../shapes.js';
 import { canvasTex } from '../util.js';
+import { loadProps } from '../props.js';
+// Meem's whitewashed Greek house (simplified: the nearest is 44 m away), waited for before the chapter builds
+const PROPS = await loadProps(['house_greek_lo']);
 
 const TILE = 0xa8583a, TILE2 = 0x9a4a30, STONE = 0x9a8c72, BRICK = 0xc8b692, WHITE = [0xe4dac4, 0xdcceb2, 0xd2c09e, 0xe8e0cc, 0xcfc2a8];
 const N = noise2(77);
@@ -36,6 +39,8 @@ function roof(k, w, d, rise, color, p, yaw) {
 // a whitewashed house with a tiled roof (some with a second floor or a courtyard wing)
 function house(k, x, y, z, w, d, h, yaw, r) {
   const c = Math.cos(yaw), s = Math.sin(yaw), wall = WHITE[Math.floor(r() * WHITE.length)];
+  // within 100 m: Meem's model (it has its own roof, door and windows); past that, these simple shapes
+  if (k.P && Math.hypot(x, z) < 100 && k.P.add('house_greek_lo', x, y, z, yaw, { w, d, h: h + 2 })) { r(); r(); return; }
   k.box(w, h + 1.5, d, wall, [x, y + (h - 1.5) / 2, z], [0, yaw, 0]);
   roof(k, w + 0.5, d + 0.7, d * 0.28, r() < 0.5 ? TILE : TILE2, [x, y + h, z], yaw);
   // door and a small dark window on the street side
@@ -235,6 +240,7 @@ export function buildAthens({ H, temple, colonnade, avoid }) {
   const grid = new Map(), cell = 11, GY = 0.22;
   const cg = Math.cos(GY), sg = Math.sin(GY);
   let placed = 0;
+  city.P = PROPS.fresh();
   for (let tries = 0; tries < 9000 && placed < 520; tries++) {
     // stand on a street grid, turned a little, with streets every 3 blocks
     const gi = Math.floor((r() - 0.5) * 44), gj = Math.floor((r() - 0.5) * 70) - 14;
@@ -275,6 +281,7 @@ export function buildAthens({ H, temple, colonnade, avoid }) {
   const cityG = city.geometry(), wallG = walls.geometry();
   group.add(new THREE.Mesh(mergeG([cityG, wallG]), stoneMat));
   group.add(new THREE.Mesh(mergeG(marble), marbleMat));
+  group.add(city.P.build({ glow: 0x2a2620 }));
   const torchPts = cloud(torches, 7), winPts = cloud(windows, 2.6);
   group.add(torchPts, winPts);
   return { group, torches: torchPts, windows: winPts, blockers, acropolis: new THREE.Vector3(AC.x, AY + RH + 12, AC.z), gate: new THREE.Vector3(gp[0], H(...gp), gp[1]) };

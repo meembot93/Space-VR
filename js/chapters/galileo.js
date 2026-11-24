@@ -33,6 +33,9 @@ import { moonFields } from '../moontex.js';
 import { dirFromAzEl } from '../sky.js';
 import { eqVec } from '../stars.js';
 import { glowPoints, shatter, whoosh, awe, shimmer } from '../wow/fx.js';
+import { loadProps } from '../props.js';
+// Meem's Italian town house, lantern and books (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_italian', 'house_italian_lo']);
 import { D2R, ease, clamp01, at, sunAt, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 45.42;
@@ -236,17 +239,18 @@ export default class Galileo {
     const WALLS = [0xe0c8a0, 0xd89a78, 0xc8705a, 0xe8dcc8, 0xd8b880, 0xb85a48, 0xe0b0a0, 0xd8c0a8];
     const ROOFS = [0xa84a30, 0x9a4028, 0xb85a3a, 0x8a3a28];
     const free = (x, z, h) => veniceLand(x, z) && veniceLand(x + h, z + h) && veniceLand(x - h, z - h) && veniceLand(x + h, z - h) && veniceLand(x - h, z + h) && !canalAt(x, z) && !(x > -190 && x < 112 && z > -62 && z < 100) && Math.hypot(x, z) > 9;
+    const VP = PROPS.fresh();   // Meem's house model for the town within 100 m of the tower
     for (let gx = -900; gx <= 900; gx += 13) for (let gz = -900; gz <= 470; gz += 13) {
       const d = Math.hypot(gx, gz); if (d > 1000) continue;
       if (Math.abs(gx % 39) < 1 || r() < 0.08) continue;   // lanes
       const near = d < 300; if (!near && (Math.abs(gx) % 26 > 1 || Math.abs(gz) % 26 > 1)) continue;
       const x = gx + (r() - 0.5) * 2, z = gz + (r() - 0.5) * 2, w = near ? 10 + r() * 3 : 22, dd = near ? 10 + r() * 2 : 22;
       if (!free(x, z, w / 2)) continue;
-      house(near ? k : far, { x, y: 1.2, z, w, d: dd, shut: d < 170, h: 9 + r() * 9, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)] }, wins, r, near);
+      house(near ? k : far, { x, y: 1.2, z, w, d: dd, shut: d < 170, h: 9 + r() * 9, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], props: d < 100 ? VP : null, model: 'house_italian_lo' }, wins, r, near);
     }
     // bell towers rising out of the roofs here and there
     for (const [x, z, h] of [[-330, -260, 50], [160, -220, 46], [-620, 200, 40], [480, -60, 44], [-120, -520, 48], [700, -400, 42]]) { k.box(6, h, 6, 0xb86a50, [x, 1.2 + h / 2, z]); k.box(6.6, 4, 6.6, 0xe8e0d0, [x, h - 1, z]); k.cyl(0.001, 3.6, 9, 4, 0x6a8a7a, [x, h + 5.5, z], [0, Math.PI / 4, 0]); }
-    A.add(k.mesh()); if (far.parts.length) A.add(far.mesh());
+    A.add(k.mesh(), VP.build()); if (far.parts.length) A.add(far.mesh());
     A.add(panes(wins, { lit: 0.12, seed: 4, glint: true }));
     // ---- boats: anchored ships in the basin, the ship far out at sea, gondolas ----
     this.boats = [];
@@ -421,12 +425,14 @@ export default class Galileo {
     // ---- the city: houses with porticoes on the streets, lit windows ----
     const WALLS = [0xd8c0a0, 0xc89a78, 0xb8705a, 0xe0d4bc, 0xc8a878, 0xa86a50, 0xd8b0a0];
     const ROOFS = [0x8a3a28, 0x9a4028, 0x7a3424, 0x8a4a34];
-    // our street (Borgo dei Vignali) south of the house: rows of houses both sides
+    // our street (Borgo dei Vignali) south of the house: rows of houses both sides (Meem's house
+    // model on our side; the far side keeps its porticoes, which the model doesn't have)
+    const PP = PROPS.fresh();
     for (const side of [-1, 1]) for (let x = -70; x < 80;) {
       const w = 7 + r() * 5;
       if (side < 0 && x + w > -9 && x < 9) { x = 9; continue; }
       const zz = side < 0 ? 1 - 4.5 : 22 + 5;
-      house(k, { x: x + w / 2, y: 0, z: zz, w, d: 9, h: 8 + r() * 5, yaw: side < 0 ? 0 : Math.PI, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], portico: side > 0, shut: true, tiles: true }, wins, r, true);
+      house(k, { x: x + w / 2, y: 0, z: zz, w, d: 9, h: 8 + r() * 5, yaw: side < 0 ? 0 : Math.PI, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], portico: side > 0, shut: true, tiles: true, props: side < 0 ? PP : null, model: Math.abs(x) < 30 ? 'house_italian' : 'house_italian_lo' }, wins, r, true);
       x += w + 0.2;
     }
     for (let gx = -900; gx <= 900; gx += 15) for (let gz = -900; gz <= 900; gz += 15) {
@@ -438,7 +444,7 @@ export default class Galileo {
       if (Math.abs(gx % 60) < 2 || Math.abs(gz % 75) < 2 || r() < 0.1) continue;
       const near = d < 280; if (!near && r() < 0.6) continue;
       const x = gx + (r() - 0.5) * 2, z = gz + (r() - 0.5) * 2;
-      house(near ? k : far, { x, y: 0, z, shut: d < 150, tiles: d < 70, w: 10 + r() * 4, d: 10 + r() * 3, h: 7 + r() * 8, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)] }, wins, r, near);
+      house(near ? k : far, { x, y: 0, z, shut: d < 150, tiles: d < 70, w: 10 + r() * 4, d: 10 + r() * 3, h: 7 + r() * 8, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], props: d < 110 ? PP : null, model: 'house_italian_lo' }, wins, r, near);
     }
     // the Basilica of St Anthony (Il Santo): a brick church crowned with domes, a cone and minarets
     const sx = 262, sz = 183, B = 0x9a5a40;
@@ -467,7 +473,7 @@ export default class Galileo {
     for (let i = 0; i < 12; i++) { const a = 200 + i * 6 + r() * 4, d = 11000 + r() * 6000; const q = at(a, d); far.ball(1400 + r() * 1400, 2, 0x10161a, [q.x, -200, q.z], 0, [1, 0.3 + r() * 0.15, 1]); }
     // a few bell towers among the roofs
     for (const [x, z, h] of [[-180, 140, 38], [120, -260, 34], [-300, -120, 36], [400, -200, 32], [-60, 380, 34]]) { k.box(5, h, 5, 0xa8604a, [x, h / 2, z]); k.box(5.6, 3, 5.6, 0xd8ccb8, [x, h - 1.5, z]); k.cyl(0.001, 3.2, 8, 4, 0x6a4a3a, [x, h + 4, z], [0, Math.PI / 4, 0]); }
-    Bg.add(k.mesh()); Bg.add(far.mesh());
+    Bg.add(k.mesh()); Bg.add(far.mesh()); Bg.add(PP.build({ glow: 0x1c1712 }));
     this.paduaWins = panes(wins, { lit: 0.42, seed: 11 }); Bg.add(this.paduaWins);
     // smoke from chimneys, bats round the roofs, a dog in the garden, horses in a stable yard
     for (const sm of [[30, 16, 30], [-40, 15, -30], [70, 15, -10], [-80, 17, 40], [10, 14, -90]]) { const s = this.life.add(makeSmoke(new THREE.Vector3(...sm), { n: 6, rise: 9, size: 1.4, opacity: 0.1, color: 0x8a90a0 })); s.scene = 'padua'; }
@@ -1247,6 +1253,13 @@ function house(k, o, wins, r, near = true) {
   const { x, y, z, w, d, h, yaw = 0, wall, roofCol } = o, c = Math.cos(yaw), s = Math.sin(yaw);
   const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
   const rh = Math.min(w, d) * 0.2;
+  // o.props + o.model: Meem's Italian house model in this footprint (with its own shutters and
+  // chimney); only lit window panes are added on its street face, for the candlelight at night
+  if (o.props?.add(o.model, x, y, z, yaw, { w, d, h: h + rh + 1 })) {
+    const floors = Math.max(1, Math.floor((h - 1) / 3.2)), cols = Math.max(1, Math.floor(w / 3.2));
+    for (let f = 1; f < floors; f++) for (let i = 0; i < cols; i++) wins.push({ p: new THREE.Vector3(...P(-w / 2 + (i + 0.5) * w / cols, 2.1 + f * 3.2, d / 2 + 0.06)), yaw, opt: true });
+    return;
+  }
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.add(gableRoof(w, d, rh, 0.35), roofCol, P(0, h, 0), [0, yaw, 0]);
   if (!near) return;
@@ -1272,6 +1285,7 @@ function panes(list, { lit = 0.4, seed = 3, glint = false } = {}) {
   const k = new Kit(), r = rng(seed), c = new THREE.Color();
   for (const it of list) {
     const on = it.on || r() < lit, w = it.big ? 1.6 : 0.7, h = it.big ? 5 : 1.1;
+    if (it.opt && !on) continue;   // on a house model: only the lit ones (it has its own windows painted on)
     const west = glint && Math.sin(it.yaw) < -0.7;
     c.setHex(west && r() < 0.8 ? 0xffc070 : on ? 0xffb45a : 0x1a1a22); if (on) c.multiplyScalar(0.7 + r() * 0.5);
     k.add(new THREE.PlaneGeometry(w, h), c.getHex(), it.p.toArray(), [0, it.yaw, 0]);

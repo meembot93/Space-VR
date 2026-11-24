@@ -85,6 +85,13 @@ export function house(k, o, win = []) {
   const roof = o.roof ?? (gableFront ? w : d) * 0.85;
   const c = Math.cos(yaw), s = Math.sin(yaw);
   const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
+  // o.props + o.model: Meem's house model (js/props.js) in this footprint instead of the shapes below.
+  // Its window panes are still added on the street face, so the town keeps its lit windows at night.
+  if (o.props?.add(o.model, x, y, z, yaw, { w, d, h: h + roof * 0.9 })) {
+    const floors = Math.max(1, Math.round(h / 3)), cols = Math.max(1, Math.floor(w / 2.2)), fz = d / 2 + 0.05;
+    for (let f = 1; f < floors; f++) for (let i = 0; i < cols; i++) win.push({ p: new THREE.Vector3(...P(-w / 2 + (i + 0.5) * w / cols, 1.6 + f * 3, fz)), yaw });
+    return win;
+  }
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.box(w + 0.1, 0.35, d + 0.1, 0x6a6058, P(0, 0.17, 0), [0, yaw, 0]);          // stone footing
   if (gableFront) {

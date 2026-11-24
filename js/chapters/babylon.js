@@ -20,6 +20,9 @@ import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng } from '../shapes.js';
 import { moonFaceTexture } from '../moontex.js';
+import { loadProps } from '../props.js';
+// Meem's mud-brick house (simplified: the city is all 25 m below you) waited for before the chapter builds
+const PROPS = await loadProps(['house_mudbrick_lo']);
 import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
@@ -257,9 +260,15 @@ export default class Babylon {
       if (Math.hypot(x - 0, z - 170) < 55 || Math.hypot(x + 85, z + 300) < 70) continue; // the big temple and the palace
       const w = 8 + r() * 5, d = 8 + r() * 5, h = 3.2 + r() * (r() < 0.25 ? 5 : 2.5), col = MUD[r() * 5 | 0];
       const yaw = (r() - 0.5) * 0.12;
-      k.box(w, h, d, col, [x, BASE + h / 2, z], [0, yaw, 0]);
-      if (r() < 0.6) k.box(w * 0.35, 1.8, d * 0.35, col, [x + (r() - 0.5) * w * 0.4, BASE + h + 0.9, z + (r() - 0.5) * d * 0.4], [0, yaw, 0]); // a roof room
-      k.box(1.1, 1.9, 0.2, 0x2a2018, [x, BASE + 0.95, z + d / 2 + 0.05], [0, yaw, 0]); // door
+      if (PROPS.has('house_mudbrick_lo') && Math.hypot(x, z - ZIG_Z) < 175) {
+        // nearer houses: Meem's mud-brick house (it has its own roof room and door, facing +z)
+        PROPS.add('house_mudbrick_lo', x, BASE, z, yaw, { w, d, h: h + 1.2 });
+        r();
+      } else {
+        k.box(w, h, d, col, [x, BASE + h / 2, z], [0, yaw, 0]);
+        if (r() < 0.6) k.box(w * 0.35, 1.8, d * 0.35, col, [x + (r() - 0.5) * w * 0.4, BASE + h + 0.9, z + (r() - 0.5) * d * 0.4], [0, yaw, 0]); // a roof room
+        k.box(1.1, 1.9, 0.2, 0x2a2018, [x, BASE + 0.95, z + d / 2 + 0.05], [0, yaw, 0]); // door
+      }
       if (r() < 0.33) lights.push(x + (r() - 0.5) * 2, BASE + 1.3, z + d / 2 + 0.4);   // a lamp in the doorway
       if (r() < 0.12) lights.push(x, BASE + h + 0.6, z);                               // a fire on the roof
     }
@@ -274,7 +283,8 @@ export default class Babylon {
     for (let i = 0; i < 40; i++) {
       const side = i % 4, t = -90 + (i / 4 | 0) * 18 + r() * 4, x = side < 2 ? t : (side === 2 ? -92 : 92), z = side < 2 ? (side ? 92 : -92) : t;
       if (Math.abs(x) < 12 && z > 0) continue;
-      k.box(12, 5, 9, 0xa08866, [x, BASE + 2.5, ZIG_Z + z]);
+      // facing in, toward the tower
+      if (!PROPS.add('house_mudbrick_lo', x, BASE, ZIG_Z + z, Math.atan2(-x, -z), { w: 12, d: 9, h: 5.5 })) k.box(12, 5, 9, 0xa08866, [x, BASE + 2.5, ZIG_Z + z]);
     }
     // Esagila, the great temple of Marduk, south of the tower
     k.box(70, 10, 60, 0x9e8664, [0, BASE + 5, 170]);
@@ -297,6 +307,7 @@ export default class Babylon {
     // Torches along the Processional Way, the broad street east of the courtyard
     for (let z = -420; z <= 420; z += 14) for (const sx of [-1, 1]) torches.push(112 + sx * 6.5, BASE + 2.2, z);
     this.root.add(k.mesh());
+    this.root.add(PROPS.build());
 
     // Ground: paved courtyard, dusty streets, green fields by the river, desert beyond the walls
     const g = new THREE.PlaneGeometry(2600, 2600, 130, 130); g.rotateX(-Math.PI / 2);

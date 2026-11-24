@@ -23,6 +23,9 @@ import { makeHerd, makeFlock, makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
+import { loadProps } from '../props.js';
+// Meem's mud-brick house, reed boat stand-in and jars (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'amphora', 'crate_basket_set']);
 import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
@@ -386,8 +389,22 @@ export default class Nile {
     const MUDB = [0xa88a64, 0x9a7c58, 0xb4986e, 0x8e7452], WHITE = 0xe4dccb, DARK = 0x231a12;
     this.lampSpots = [];
     this.roofSpots = [];
+    const P = PROPS;
     const house = (x, z, w, d, hgt, yaw = 0) => {
       const y = groundHeight(x, z) - 0.3, col = MUDB[(r() * 4) | 0], top = y + hgt;
+      // within 120 m: Meem's mud-brick house model (its door turned to the side the lamps are on; the
+      // simplified one past 40 m); further out, plain blocks (hundreds of them, too far to tell)
+      const dist = Math.hypot(x, z), hm = dist < 40 ? 'house_mudbrick' : 'house_mudbrick_lo';
+      if (P.has(hm) && dist < 120) {
+        const side = (r() * 4) | 0, a = yaw + side * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), half = side % 2 ? w / 2 : d / 2;
+        P.add(hm, x, y, z, a, side % 2 ? { w: d, d: w, h: hgt + 0.3 } : { w, d, h: hgt + 0.3 });
+        this.lampSpots.push(new THREE.Vector3(x + sa * (half + 0.4), y + 1.6, z + ca * (half + 0.4)));
+        // water jars by the door, and now and then baskets and a sack
+        if (dist < 60 && r() < 0.6) P.add('amphora', x + sa * (half + 0.45) + ca * 1.3, y + 0.3, z + ca * (half + 0.45) - sa * 1.3, r() * 6, { s: 0.7 + r() * 0.3 });
+        if (dist < 60 && r() < 0.25) P.add('crate_basket_set', x + sa * (half + 0.8) - ca * 1.6, y + 0.3, z + ca * (half + 0.8) + sa * 1.6, a + 2.8);
+        this.roofSpots.push(new THREE.Vector3(x, top, z));
+        return;
+      }
       k.box(w, hgt + 0.3, d, col, [x, y + (hgt + 0.3) / 2, z], [0, yaw, 0]);
       // a low lip round the roof
       const lip = 0.45;
@@ -440,6 +457,7 @@ export default class Nile {
       k.add(b, 0xb79a5a, [x, y + 0.35, z], [0, Math.PI / 2 + (r() - 0.5) * 0.4, 0]);
     }
     this.village = k.mesh(); this.egypt.add(this.village);
+    this.egypt.add(P.build());
   }
 
   // Date palms along the river and round the village (none in the line of sight to Sirius)

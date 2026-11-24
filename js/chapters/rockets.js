@@ -32,6 +32,9 @@ import { rng, noise2 } from '../shapes.js';
 import { bareTree, conifer, grove } from '../trees.js';
 import { glowPoints, rumble, whoosh, awe, shimmer, beeps } from '../wow/fx.js';
 import { Space, lonLat } from '../wow/space.js';
+import { loadProps } from '../props.js';
+// Meem's snowy log house, barrel and crates (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_log', 'house_log_lo', 'barrel', 'crate_basket_set']);
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(131), N2 = noise2(133), N3 = noise2(137);
@@ -544,14 +547,18 @@ export default class Rockets {
     k.box(0.9, 0.05, 2.9, 0xeef2f8, [-15.3, kalugaHeight(-15, -10) + 0.98, -11.5]);
     const wy = kalugaHeight(-6, -7); k.cyl(0.6, 0.6, 0.8, 8, 0x6a5a48, [-6, wy + 0.4, -7]); k.box(0.08, 1.6, 0.08, 0x4a3a2a, [-6.6, wy + 0.8, -7]); k.box(0.08, 1.6, 0.08, 0x4a3a2a, [-5.4, wy + 0.8, -7]); k.add(gableRoof(1.6, 1.2, 0.5, 0.1), 0xeef2f8, [-6, wy + 1.6, -7]);
     k.box(0.5, 0.25, 1.4, 0x6a4a2a, [-3.5, kalugaHeight(-3.5, -4) + 0.2, -4], [0, 0.4, 0]);
+    PROPS.add('barrel', -7.3, kalugaHeight(-7.3, -6.3) - 0.05, -6.3, 0.5); PROPS.add('crate_basket_set', -15, kalugaHeight(-15, -9.4) - 0.05, -9.4, 0.3);   // Meem's barrel by the well, crates by the woodpile
     // the street of log houses (gables to the street, snow on the roofs), and more down the slope
     const WALLS = [0x6a4a30, 0x5a3e28, 0x4a6a8a, 0x5a7a5a, 0x7a5a3a, 0x8a7a5a];
+    // Meem's log house within 90 m (simplified past 35 m); plain shapes further out
+    const KP = PROPS.fresh(), logM = (x, z) => { const d = Math.hypot(x, z); return d < 35 ? 'house_log' : d < 90 ? 'house_log_lo' : null; };
+    const kp = (x, z) => (logM(x, z) ? { props: KP, model: logM(x, z) } : {});
     for (let x = -200; x <= 200; x += 15 + r() * 4) {
       if (Math.abs(x) < 3) continue;
-      house(k, { x, y: kalugaHeight(x, -46), z: -46, w: 7 + r() * 2, d: 9, h: 3.4 + r() * 0.8, yaw: 0, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: 0xdfe6ee, gableFront: true }, wins);
-      if (Math.abs(x) > 22) house(k, { x, y: kalugaHeight(x, -18), z: -18, w: 7 + r() * 2, d: 9, h: 3.4, yaw: Math.PI, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: 0xdfe6ee, gableFront: true }, wins);
+      house(k, { x, y: kalugaHeight(x, -46), z: -46, w: 7 + r() * 2, d: 9, h: 3.4 + r() * 0.8, yaw: 0, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: 0xdfe6ee, gableFront: true, ...kp(x, -46) }, wins);
+      if (Math.abs(x) > 22) house(k, { x, y: kalugaHeight(x, -18), z: -18, w: 7 + r() * 2, d: 9, h: 3.4, yaw: Math.PI, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: 0xdfe6ee, gableFront: true, ...kp(x, -18) }, wins);
     }
-    for (let i = 0; i < 70; i++) { const x = (r() - 0.5) * 520, z = -70 - r() * 170; if (Math.hypot(x - 90, z + 130) < 30) continue; house(k, { x, y: kalugaHeight(x, z), z, w: 6 + r() * 3, d: 8, h: 3.2, yaw: Math.round(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: 0xdfe6ee, gableFront: r() < 0.7 }, wins);
+    for (let i = 0; i < 70; i++) { const x = (r() - 0.5) * 520, z = -70 - r() * 170; if (Math.hypot(x - 90, z + 130) < 30) continue; house(k, { x, y: kalugaHeight(x, z), z, w: 6 + r() * 3, d: 8, h: 3.2, yaw: Math.round(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: 0xdfe6ee, gableFront: r() < 0.7, ...kp(x, z) }, wins);
     }
     // carved white window frames round every window
     for (const w of wins) { const n = _a.set(Math.sin(w.yaw), 0, Math.cos(w.yaw)); k.box(0.8, 1.05, 0.03, 0xe8e2d6, w.p.clone().addScaledVector(n, -0.01).toArray(), [0, w.yaw, 0]); k.box(0.95, 0.12, 0.05, 0xe8e2d6, w.p.clone().addScaledVector(n, 0.01).add(_b.set(0, 0.6, 0)).toArray(), [0, w.yaw, 0]); }
@@ -572,7 +579,7 @@ export default class Rockets {
       A.add(grove(conifer, pines, { type: 'pine', height: 15, snow: true, detail: 'low', variants: 4, seed: 5 }).group);
       A.add(grove(conifer, spruces, { type: 'spruce', height: 12, snow: true, detail: 'low', variants: 3, seed: 6 }).group);
     }
-    A.add(k.mesh());
+    A.add(k.mesh(), KP.build({ glow: 0x231c16 }), PROPS.build({ glow: 0x231c16 }));
     A.add(windows(wins, { lit: 0.6, seed: 4, warm: 0xffb85a }));
     this.smokesK = [[-30, 9, -48], [24, 9, -48], [60, 9, -48], [-75, 9, -48], [-45, 2, -120], [30, -5, -170]].map(([x, y, z]) => { const sm = makeSmoke(V3(x, kalugaHeight(x, z) + y, z), { n: 6, rise: 9, size: 1.3, opacity: 0.13, color: 0x9aa0b0, wind: [0.5, 0.1] }); A.add(sm.group); return sm; });
     // snow falling outside (not in the room)

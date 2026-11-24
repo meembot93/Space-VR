@@ -24,6 +24,9 @@ import { makeCard } from '../ui.js';
 import { rng, noise2 } from '../shapes.js';
 import { grove, grassTuft, palm as palmTree, olive as oliveTree, cypress as cypressTree } from '../trees.js';
 import { buildAthens } from './athens.js';
+import { loadProps } from '../props.js';
+// Meem's houses and the Greek ship (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'house_greek_lo', 'ship_ancient', 'amphora', 'oil_lamp', 'table_stool']);
 import { moonFaceTexture } from '../moontex.js';
 
 const D2R = Math.PI / 180;
@@ -251,7 +254,14 @@ function doricTemple({ L = 31.8, W = 13.7, nL = 13, nW = 6, colH = 5.7, colD = 1
 }
 
 // A flat-roofed mud-brick or whitewashed house
+// (k.P, if set, is a PropSet: then it's Meem's house model instead, mud-brick or, for white walls,
+// the whitewashed Greek one; simplified past 40 m from the middle of the place)
 function house(k, x, z, w, d, h, yaw, wall, y = 0) {
+  if (k.P) {
+    const far = Math.hypot(x, z) > 40, kind = wall === 0xe8dcc0 ? 'house_greek' : 'house_mudbrick';
+    const name = far || kind === 'house_greek' ? kind + '_lo' : kind;
+    if (k.P.add(name, x, y - 0.1, z, yaw, { w, d, h: h + (kind === 'house_greek' ? 1.6 : 0.5) })) return;
+  }
   k.box(w, h, d, wall, [x, y + h / 2, z], [0, yaw, 0]);
   k.box(w + 0.2, 0.15, d + 0.2, 0x8a7458, [x, y + h + 0.07, z], [0, yaw, 0]);
   const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -531,8 +541,12 @@ export default class Greece {
     const LX = 0.62, LZ = -3.05, LY = 1.22;
     this.lampPos = new THREE.Vector3(LX, LY + 0.06, LZ);
     k.cyl(0.015, 0.02, LY - 0.03, 6, 0x6a5030, [LX, (LY - 0.03) / 2, LZ]); k.cyl(0.14, 0.16, 0.03, 8, 0x6a5030, [LX, 0.015, LZ]); k.cyl(0.07, 0.04, 0.03, 8, 0x6a5030, [LX, LY - 0.02, LZ]);
-    k.ball(0.06, 1, 0xa0603a, [LX, LY + 0.02, LZ], 0, [1.2, 0.5, 0.9]);
-    k.cyl(0.018, 0.022, 0.05, 6, 0x8a5030, [LX - 0.06, LY + 0.04, LZ], [0, 0, -1.1]);
+    const FP = PROPS.fresh();   // Meem's clay oil lamp on the stand; jars, a table and stool along the wall
+    if (!FP.add('oil_lamp', LX, LY - 0.005, LZ, 0)) { k.ball(0.06, 1, 0xa0603a, [LX, LY + 0.02, LZ], 0, [1.2, 0.5, 0.9]); k.cyl(0.018, 0.022, 0.05, 6, 0x8a5030, [LX - 0.06, LY + 0.04, LZ], [0, 0, -1.1]); }
+    // (jars to the right of the lamp, out of the shadows' way; the table round the east side of the house)
+    FP.add('amphora', 1.05, 0, this.wallZ + 0.35, 2); FP.add('amphora', 1.5, 0, this.wallZ + 0.4, 1); FP.add('amphora', 3.75, 0, this.wallZ - 0.3, 0.4);
+    if (FP.add('table_stool', 4.1, 0, this.wallZ - 1.7, -Math.PI / 2)) S.blockers.push({ x: 4.1, z: this.wallZ - 1.7, r: 0.9 });
+    this.farmProps = FP.build();
     S.blockers.push({ x: LX, z: LZ, r: 0.12 });
     // a low dry-stone terrace wall and a few big jars
     for (let i = 0; i < 26; i++) { const x = -14 + i * 1.1; k.box(1.1, 0.5 + r() * 0.2, 0.6, 0x8a8068, [x, 0.25 + H(x, 9) * 0.9, 9 + Math.sin(i) * 0.3], [0, r() * 0.2, 0]); }
@@ -574,7 +588,7 @@ export default class Greece {
       k.cyl(0.06, 0.06, 0.6, 5, 0xeee6d2, [x + 0.25, y + 2.0, z], [0, 0, 0.6]);
       S.blockers.push({ x, z, r: 0.7 });
     }
-    g.add(k.mesh(), grove(cypressTree, cyp, { detail: 'high', height: 11, seed: 5, variants: 5 }).group);
+    g.add(k.mesh(), this.farmProps, grove(cypressTree, cyp, { detail: 'high', height: 11, seed: 5, variants: 5 }).group);
     const nearOl = trunks.filter((p) => Math.hypot(p.x, p.z) < 18), farOl = trunks.filter((p) => Math.hypot(p.x, p.z) >= 18);
     if (nearOl.length) g.add(grove(oliveTree, nearOl, { detail: 'high', height: 4.6, seed: 7, variants: 5 }).group);
     if (farOl.length) g.add(grove(oliveTree, farOl, { detail: 'mid', height: 4.6, seed: 9, variants: 5 }).group);
@@ -622,10 +636,15 @@ export default class Greece {
       -l[3] * P[0], -l[3] * P[1], -l[3] * P[2], d - l[3] * P[3]);
 
     // The ship far out at sea
-    const sk = new Kit();
-    sk.box(3, 1.6, 12, 0x5a3a22, [0, 0.4, 0]); sk.box(2.4, 0.3, 11, 0x7a5432, [0, 1.25, 0]);
-    sk.cyl(0.15, 0.18, 10, 6, 0x5a3a22, [0, 6, 0]); sk.box(7, 6, 0.1, 0xe8dcc0, [0, 7, 0.3]);
-    this.ship = sk.mesh(); g.add(this.ship);
+    const sp = PROPS.fresh();
+    if (sp.add('ship_ancient', 0, -0.8, 0, 0)) this.ship = sp.build();   // Meem's Greek merchant ship
+    else {
+      const sk = new Kit();
+      sk.box(3, 1.6, 12, 0x5a3a22, [0, 0.4, 0]); sk.box(2.4, 0.3, 11, 0x7a5432, [0, 1.25, 0]);
+      sk.cyl(0.15, 0.18, 10, 6, 0x5a3a22, [0, 6, 0]); sk.box(7, 6, 0.1, 0xe8dcc0, [0, 7, 0.3]);
+      this.ship = sk.mesh();
+    }
+    g.add(this.ship);
     this.shipLamp = new THREE.Sprite(glowMat('rgba(255,190,110,1)')); this.shipLamp.scale.setScalar(5); g.add(this.shipLamp);
 
     // The Moon (our own, so we can draw Earth's shadow on it)
@@ -668,6 +687,7 @@ export default class Greece {
     this.buildWell(S.g, k, W);
     S.blockers.push({ x: W.x, z: W.z, r: 1.3 }, { x: W.x - 1.9, z: W.z + 1.5, r: 0.7 });
     // Mud-brick houses, palms along the river, rocks
+    k.P = PROPS.fresh();
     for (let i = 0; i < 16; i++) {
       const x = 12 + r() * 16, z = -40 + i * 5 + r() * 2;
       house(k, x, z, 4 + r() * 2, 4 + r() * 2, 2.6 + r() * 0.8, (r() - 0.5) * 0.3 - Math.PI / 2, 0xb89068, H(x, z)); S.blockers.push({ x, z, r: 2.6 });
@@ -676,8 +696,12 @@ export default class Greece {
     for (let i = 0; i < 6; i++) { const x = -8 + r() * 6, z = -14 + r() * 24; palm(k, x, H(x, z), z, 6 + r() * 3, 400 + i); S.blockers.push({ x, z, r: 0.4 }); }
     for (let i = 0; i < 30; i++) { const a = r() * 360, d = 8 + r() * 60, p = at(a, d); k.ball(0.3 + r() * 0.8, 0, 0x9a7650, [p.x, H(p.x, p.z), p.z], [r(), r(), r()], [1.3, 0.6, 1]); }
     // a few boats with triangular sails on the Nile
-    for (let i = 0; i < 3; i++) { const z = -60 + i * 50; k.box(1.4, 0.5, 6, 0x6a4a2a, [52, -0.7, z]); k.cyl(0.06, 0.06, 6, 5, 0x5a3a22, [52, 2.3, z]); k.add(new THREE.CircleGeometry(2.4, 3), 0xe8dcc0, [52.05, 3, z], [0, Math.PI / 2, 0]); }
-    S.g.add(k.mesh()); addPalms(S.g, k);
+    for (let i = 0; i < 3; i++) {
+      const z = -60 + i * 50;
+      if (k.P.add('ship_ancient', 52, -1.2, z, 0.2 * i, { s: 0.5 })) continue;
+      k.box(1.4, 0.5, 6, 0x6a4a2a, [52, -0.7, z]); k.cyl(0.06, 0.06, 6, 5, 0x5a3a22, [52, 2.3, z]); k.add(new THREE.CircleGeometry(2.4, 3), 0xe8dcc0, [52.05, 3, z], [0, Math.PI / 2, 0]);
+    }
+    S.g.add(k.mesh(), k.P.build()); addPalms(S.g, k);
     S.g.add(tufts(900, 23, (r2, p) => { at(r2() * 360, 4 + Math.pow(r2(), 1.2) * 60, 0, p); p.y = H(p.x, p.z); }, 0x8a8a4a, 0xb8a060, 0.22));
     this.stickS = this.makeStick(S.g); this.stickS.userData.home = [W.x + 1.6, 0.04, W.z + 1.4, ...new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0.4)).toArray()];
     this.ringS = [W.x + 1.5, W.z - 0.2];
@@ -785,6 +809,7 @@ export default class Greece {
     S.blockers.push({ x: -7, z: 7, r: 0.9 }, { x: 7, z: 7, r: 2.2 });
     for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [11, 12]]) { palm(k, x, 0, z, 6 + r() * 2, 500 + x); S.blockers.push({ x, z, r: 0.35 }); }
     // The city around: rows of houses, and the lighthouse (the Pharos) on its island
+    k.P = PROPS.fresh();
     for (let i = 0; i < 70; i++) {
       const a = r() * 360, d = 35 + r() * 110, p = at(a, d); if (a > 330 || a < 30) continue;
       house(k, p.x, p.z, 6 + r() * 5, 6 + r() * 5, 4 + r() * 5, r() * 0.3, r() > 0.5 ? 0xe8dcc0 : 0xd0b890);
@@ -792,7 +817,7 @@ export default class Greece {
     const ph = at(345, 650);
     k.box(30, 4, 30, 0xc8bca0, [ph.x, 1, ph.z]); k.box(18, 55, 18, 0xe8e0cc, [ph.x, 30, ph.z]); k.cyl(6, 8, 28, 8, 0xe8e0cc, [ph.x, 71, ph.z]);
     k.cyl(3.5, 4, 14, 12, 0xe0d8c4, [ph.x, 92, ph.z]); k.ball(3, 1, 0xd8b050, [ph.x, 101, ph.z]);
-    S.g.add(k.mesh()); addPalms(S.g, k);
+    S.g.add(k.mesh(), k.P.build()); addPalms(S.g, k);
     S.g.add(tufts(300, 31, (r2, p) => { at(r2() * 360, 20 + r2() * 40, 0, p); }, 0x8a8a4a, 0xa8a060, 0.25));
     this.stickA = this.makeStick(S.g); this.stickA.userData.home = [1.1, 0.04, -1.0, ...new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0.9)).toArray()];
     this.ringA = [0, -2.2];

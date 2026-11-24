@@ -29,6 +29,9 @@ import { rng, noise2 } from '../shapes.js';
 import { glowPoints, whoosh, awe, shimmer, rumble } from '../wow/fx.js';
 import { Space, lonLat } from '../wow/space.js';
 import { dirFromAzEl } from '../sky.js';
+import { loadProps } from '../props.js';
+// Meem's English cottage (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_english', 'house_english_lo', 'barrel', 'lantern']);
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 52.81, LON = -0.63, YEAR = 1666, SUNLON = 150;   // Woolsthorpe, late August
@@ -307,6 +310,10 @@ export default class Newton {
       k.box(4.2, 0.35, 0.3, 0x4a3828, Q(2.5, 4.05, fz + 0.06), [0, yw, 0]);
       for (const sx of [-1, 1]) k.box(0.25, 4.0, 0.2, 0x4a3828, Q(2.5 + sx * 1.92, 2.0, fz + 0.06), [0, yw, 0]);
       for (const lx of [-6.5, -4.6, -2.7, 5.6, 7.2]) for (const ly of [1.6, 3.4]) k.box(0.12, 0.7, 0.06, 0x14100c, Q(lx, ly, fz + 0.01), [0, yw, 0]);
+      // Meem's barrels beside the barn doors, a lantern standing on one
+      { const B = PROPS.fresh(), p1 = Q(5.0, 0.2, fz + 0.7), p2 = Q(5.85, 0.2, fz + 0.55);
+        B.add('barrel', p1[0], p1[1], p1[2], yw); B.add('barrel', p2[0], p2[1], p2[2], yw + 1); B.add('lantern', p1[0], p1[1] + PROPS.size('barrel').y, p1[2], yw + 0.4);
+        this.barnProps = B.build(); }
       for (const sx of [-1, 1]) for (let i = 0; i < 9; i++) k.box(i % 2 ? 0.35 : 0.6, 0.5, 0.06, 0xd2c6a6, Q(sx * (8 - (i % 2 ? 0.175 : 0.3) + 0.03), 0.45 + i * 0.52, fz + 0.02), [0, yw, 0]);
     }
     const out = at(15, 34); house(k, { x: out.x, y: groundHeight(out.x, out.z) - 0.2, z: out.z, w: 7, d: 5, h: 3, roof: 3, yaw: Math.atan2(-out.x, -out.z) + 0.3, wall: 0xc8b898, roofCol: 0x8a5a3a }, wins);
@@ -356,7 +363,7 @@ export default class Newton {
       const x = -10 + (i % 15) * 7 + r() * 1.5, z = 38 + Math.floor(i / 15) * 9 + r() * 1.5, y = groundHeight(x, z);
       k.cyl(0.001, 0.45, 1.1, 6, 0xc8a85a, [x, y + 0.5, z], [0, r(), (r() - 0.5) * 0.2]); k.cyl(0.25, 0.35, 0.3, 6, 0xb89850, [x, y + 0.15, z]);
     }
-    this.root.add(k.mesh());
+    this.root.add(k.mesh(), this.barnProps);
     this.root.add(windows(wins, { lit: 0.2, seed: 11 }));
   }
 
@@ -461,11 +468,12 @@ export default class Newton {
     for (const [ox, oz] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) k.cyl(0.001, 0.9, 5, 4, 0xa89a7a, [CHURCH.x + ox, cy + 30.5, CHURCH.z + oz]);
     k.box(9.6, 1, 9.6, 0x9a8e70, [CHURCH.x, cy + 28, CHURCH.z]);
     this.churchBell = new THREE.Vector3(CHURCH.x, cy + 22, CHURCH.z);
+    const VP = PROPS.fresh();   // the village's cottages: Meem's model (simplified past 40 m)
     for (let i = 0; i < 26; i++) {
       const p = at(85 + r() * 30, 690 + r() * 160), y = groundHeight(p.x, p.z);
-      house(k, { x: p.x, y: y - 0.3, z: p.z, w: 7 + r() * 4, d: 6, h: 4 + r() * 2, yaw: Math.atan2(-p.x, -p.z) + (r() - 0.5) * 0.6, wall: [0xc8ba98, 0xb8aa88, 0xd0c4a4][Math.floor(r() * 3)], roofCol: [0x6a645a, 0x8a7a50, 0x7a4a30][Math.floor(r() * 3)] }, wins);
+      house(k, { x: p.x, y: y - 0.3, z: p.z, w: 7 + r() * 4, d: 6, h: 4 + r() * 2, yaw: Math.atan2(-p.x, -p.z) + (r() - 0.5) * 0.6, wall: [0xc8ba98, 0xb8aa88, 0xd0c4a4][Math.floor(r() * 3)], roofCol: [0x6a645a, 0x8a7a50, 0x7a4a30][Math.floor(r() * 3)], props: VP, model: Math.hypot(p.x, p.z) < 40 ? 'house_english' : 'house_english_lo' }, wins);
     }
-    this.root.add(k.mesh());
+    this.root.add(k.mesh(), VP.build({ glow: 0x231c16 }));
     this.root.add(windows(wins, { lit: 0.4, w: 0.9, h: 1.1, seed: 19 }));
   }
 

@@ -22,6 +22,9 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { glowPoints, textSprite, shatter, rumble, whoosh, awe, shimmer } from '../wow/fx.js';
 import { grove, bareTree, orchardTree, bush } from '../trees.js';
+import { loadProps } from '../props.js';
+// Meem's English cottage (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_english', 'house_english_lo', 'lantern', 'book_set']);
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(91), N2 = noise2(93);
@@ -290,11 +293,12 @@ export default class Tycho {
     // Stjerneborg: the half-underground observatory nearby, its little domes just above the ground
     for (const [dx, dz] of [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]]) k.ball(dx || dz ? 1.8 : 2.4, 1, 0x7a5a3a, [70 + dx, -0.5, -80 + dz], 0, [1, 0.7, 1]);
     // fields, farms and the village of Tuna
-    for (let i = 0; i < 14; i++) { const q = at(120 + r() * 120, 120 + r() * 100); house(k, { x: q.x, y: hvenHeight(q.x, q.z), z: q.z, w: 9, d: 6, h: 3.2, yaw: r() * 6, wall: 0xd8c8a8, roofCol: 0x8a7a40, timber: 0x3a2a1c }, wins); }
+    const VP = PROPS.fresh();   // Tuna village: Meem's cottage, simplified (it's 120 m+ away)
+    for (let i = 0; i < 14; i++) { const q = at(120 + r() * 120, 120 + r() * 100); house(k, { x: q.x, y: hvenHeight(q.x, q.z), z: q.z, w: 9, d: 6, h: 3.2, yaw: r() * 6, wall: 0xd8c8a8, roofCol: 0x8a7a40, timber: 0x3a2a1c, props: VP, model: 'house_english_lo' }, wins); }
     // The terrace where you stand, and the great mural quadrant on its wall
     k.box(12, 0.25, 9, 0x8a8478, [0, -0.11, 0]);   // top at the people's feet
     k.box(0.6, 3.4, 4.2, RB, [QUAD.x - 0.35, 1.7, QUAD.z - 0.4]); k.box(0.7, 0.3, 4.4, SS, [QUAD.x - 0.35, 3.5, QUAD.z - 0.4]);
-    Bg.add(k.mesh());
+    Bg.add(k.mesh(), VP.build({ glow: 0x231c16 }));
     Bg.add(windows(wins, { lit: 0.6, seed: 6 }));
     for (const L of this.gateLamps || []) Bg.add(L);
     // the quadrant: a brass quarter circle (radius 1.9 m) on the wall, centred at its top corner
@@ -335,9 +339,11 @@ export default class Tycho {
     this.readLab2.position.set(QUAD.x + 0.25, 3.2, QUAD.z - 1.3); Bg.add(this.readLab2);
     // lanterns and a table of logbooks on the terrace
     const tk = new Kit(); tk.box(1.4, 0.05, 0.8, 0x5a3a22, [1.6, 0.85, -0.6]); for (const [ox, oz] of [[-0.6, -0.3], [0.6, -0.3], [-0.6, 0.3], [0.6, 0.3]]) tk.box(0.05, 0.85, 0.05, 0x2a1a10, [1.6 + ox, 0.42, -0.6 + oz]);
-    for (let i = 0; i < 4; i++) tk.box(0.24, 0.07, 0.32, [0x5a2a1a, 0x2a3a2a, 0x4a3a1a, 0x3a2a3a][i], [1.3 + (i % 2) * 0.05, 0.91 + i * 0.07, -0.6]);
+    const TT = PROPS.fresh();   // Meem's lantern and logbooks on the table (code boxes if they're missing)
+    TT.add('lantern', 1.95, 0.875, -0.75, 0.3);
+    if (!TT.add('book_set', 1.32, 0.875, -0.6, -0.2, { s: 1.4 })) for (let i = 0; i < 4; i++) tk.box(0.24, 0.07, 0.32, [0x5a2a1a, 0x2a3a2a, 0x4a3a1a, 0x3a2a3a][i], [1.3 + (i % 2) * 0.05, 0.91 + i * 0.07, -0.6]);
     tk.box(0.36, 0.02, 0.28, 0xece0c0, [1.85, 0.885, -0.55]);
-    Bg.add(tk.mesh());
+    Bg.add(tk.mesh(), TT.build());
     this.lampB = new THREE.PointLight(0xffa860, 3, 10, 1.6); this.lampB.position.set(1.6, 1.4, -0.6); Bg.add(this.lampB);
     this.lampFlame = glow(0xffb050, 0.15); this.lampFlame.position.set(1.95, 1.0, -0.7); Bg.add(this.lampFlame);
     this.books = tk; // (kept for clarity)
