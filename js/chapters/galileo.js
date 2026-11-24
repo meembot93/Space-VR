@@ -26,6 +26,7 @@ import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp } from '../people.js';
 import { makeHerd, makeFlock, makeSmoke, makeTorch, makeCloth, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
+import { cypress, poplar, conifer, orchardTree, grove } from '../trees.js';
 import { rng, noise2 } from '../shapes.js';
 import { moonFields } from '../moontex.js';
 import { dirFromAzEl } from '../sky.js';
@@ -151,7 +152,7 @@ export default class Galileo {
 
   // ======================= 1. VENICE =======================
   buildVenice() {
-    const A = this.A, k = new Kit(), far = new Kit(), r = rng(7), wins = [];
+    const A = this.A, k = new Kit(), far = new Kit(), r = rng(7), wins = [], lido = [];
     // the lagoon and the sea
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshPhongMaterial({ color: 0x1c3a4a, specular: 0xffd8a0, shininess: 40, emissive: 0x030a10 }));
     sea.rotation.x = -Math.PI / 2; A.add(sea);
@@ -179,7 +180,8 @@ export default class Galileo {
     for (let x = -170; x < 25; x += 12) k.box(0.4, 0.04, 80, 0xe8e0d0, [x, 1.23, -15]);
     for (let z = -40; z < 14; z += 12) k.box(195, 0.04, 0.4, 0xe8e0d0, [-72, 1.23, z]);
     // the Lido: a long low sandbar with pines, the open Adriatic beyond
-    for (let z = -4000; z < 5000; z += 250) { k.box(380, 3, 255, 0x8a8a62, [LIDO(z) + 190, 0.5, z], [0, 0.2, 0]); for (let j = 0; j < 4; j++) { const tz = z + r() * 250, tx = LIDO(tz) + 60 + r() * 260, h = 8 + r() * 6; far.cyl(0.5, 4 + r() * 2, h, 5, 0x2a3a26, [tx, 2 + h / 2, tz]); } }
+    for (let z = -4000; z < 5000; z += 250) { k.box(380, 3, 255, 0x8a8a62, [LIDO(z) + 190, 0.5, z], [0, 0.2, 0]); for (let j = 0; j < 4; j++) { const tz = z + r() * 250, tx = LIDO(tz) + 60 + r() * 260, h = 8 + r() * 6; r(); if (j < 2) lido.push({ x: tx, y: 2, z: tz, s: h / 11 }); } }
+    { const g = grove(conifer, lido, { type: 'pine', height: 11, detail: 'low', variants: 3, seed: 5 }); A.add(g.group); }   // the Lido's umbrella pines
     // ---- the Piazza's buildings ----
     const W = 0xe8dcc4;
     const facade = (tex, w, h, pos, yaw, rep) => { const t = tex(); t.wrapS = THREE.RepeatWrapping; t.repeat.set(rep, 1); const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: t })); m.position.set(...pos); m.rotation.y = yaw; A.add(m); };
@@ -243,7 +245,7 @@ export default class Galileo {
     }
     // bell towers rising out of the roofs here and there
     for (const [x, z, h] of [[-330, -260, 50], [160, -220, 46], [-620, 200, 40], [480, -60, 44], [-120, -520, 48], [700, -400, 42]]) { k.box(6, h, 6, 0xb86a50, [x, 1.2 + h / 2, z]); k.box(6.6, 4, 6.6, 0xe8e0d0, [x, h - 1, z]); k.cyl(0.001, 3.6, 9, 4, 0x6a8a7a, [x, h + 5.5, z], [0, Math.PI / 4, 0]); }
-    A.add(k.mesh()); A.add(far.mesh());
+    A.add(k.mesh()); if (far.parts.length) A.add(far.mesh());
     A.add(panes(wins, { lit: 0.12, seed: 4, glint: true }));
     // ---- boats: anchored ships in the basin, the ship far out at sea, gondolas ----
     this.boats = [];
@@ -416,6 +418,7 @@ export default class Galileo {
       if (gz > -14 && gz < 36 && Math.abs(gx) < 90) continue;
       if (gz > -75 && gz < -48) continue;                                   // the canal
       if (Math.hypot(gx - 262, gz - 183) < 85 || Math.hypot(gx + 520, gz + 340) < 55 || Math.hypot(gx + 610, gz + 500) < 50) continue;   // the Santo, the Palazzo, the Duomo
+      if (gx > -24 && gx < 24 && gz > -54 && gz < -4) continue;            // Galileo's garden (houses used to poke through its walls)
       if (Math.abs(gx % 60) < 2 || Math.abs(gz % 75) < 2 || r() < 0.1) continue;
       const near = d < 280; if (!near && r() < 0.6) continue;
       const x = gx + (r() - 0.5) * 2, z = gz + (r() - 0.5) * 2;
@@ -459,7 +462,7 @@ export default class Galileo {
 
   // Galileo's house and garden, and the altana on its roof where we stand
   buildAltana() {
-    const k = new Kit(), Bg = this.B, WOOD = 0x6a4a30, DARK = 0x3a2818, Y = TOPB, wins = [];
+    const k = new Kit(), Bg = this.B, WOOD = 0x6a4a30, DARK = 0x3a2818, Y = TOPB, wins = [], lemons = [];
     // the house: three floors, a low tiled roof just under the altana
     k.box(14, Y - 2.6, 11, 0xd8b890, [0, (Y - 2.6) / 2, 0]);
     k.add(gableRoof(14, 11, 2.0, 0.4), 0x8a3a28, [0, Y - 2.6, 0]);
@@ -515,8 +518,15 @@ export default class Galileo {
     for (const [ax, az, bx, bz] of [[-15, -6, -15, -44], [15, -6, 15, -44], [-15, -44, 15, -44]]) { const len = Math.hypot(bx - ax, bz - az); k.box(len, 2.4, 0.4, 0xb8a080, [(ax + bx) / 2, 1.2, (az + bz) / 2], [0, Math.atan2(-(bz - az), bx - ax), 0]); }
     for (let i = 0; i < 7; i++) { for (const sx of [-1, 1]) k.box(0.12, 2.4, 0.12, DARK, [sx * 1.4, 1.2, -9 - i * 3]); k.box(3, 0.08, 0.1, DARK, [0, 2.4, -9 - i * 3]); k.ball(0.9, 1, 0x2a3a1e, [(i % 2 - 0.5) * 1.6, 2.6, -9 - i * 3], 0, [1.4, 0.5, 1.6]); }
     const r = rng(23);
-    for (let i = 0; i < 8; i++) { const x = (i % 2 ? 1 : -1) * (4 + r() * 2), z = -9 - Math.floor(i / 2) * 6; k.cyl(0.35, 0.28, 0.5, 8, 0xa85a3a, [x, 0.25, z]); k.ball(0.6, 1, 0x2e4a24, [x, 1.2, z]); for (let j = 0; j < 4; j++) k.ball(0.07, 0, 0xe8d040, [x + (r() - 0.5) * 0.8, 1.1 + r() * 0.5, z + (r() - 0.5) * 0.8]); }
-    for (let i = 0; i < 6; i++) { const x = -11 + r() * 22, z = -30 - r() * 12; k.cyl(0.15, 0.22, 3, 6, 0x3a2a1c, [x, 1.5, z]); k.ball(2 + r(), 1, 0x26361e, [x, 4, z]); }
+    for (let i = 0; i < 8; i++) { const x = (i % 2 ? 1 : -1) * (4 + r() * 2), z = -9 - Math.floor(i / 2) * 6; k.cyl(0.35, 0.28, 0.5, 8, 0xa85a3a, [x, 0.25, z]); k.cyl(0.36, 0.36, 0.04, 8, 0x3a2a1c, [x, 0.49, z]); lemons.push({ x, y: 0.5, z }); for (let j = 0; j < 4; j++) k.ball(0.07, 0, 0xe8d040, [x + (r() - 0.5) * 0.8, 1.1 + r() * 0.5, z + (r() - 0.5) * 0.8]); }
+    for (let i = 0; i < 6; i++) { r(); r(); r(); }   // (keeps the rest of the garden where it was)
+    // trees from the shared library: lemon trees in the pots, fruit trees at the back of the garden
+    // (clear of the workshop, the well and the dog's patch), cypresses along the walls, poplars by the canal
+    const gr = (kind, spots, o) => { const g = grove(kind, spots, o); Bg.add(g.group); return g; };
+    gr(orchardTree, lemons, { height: 1.6, detail: 'low', apples: 0, variants: 3, seed: 3 });
+    gr(orchardTree, [[4.5, -31.5], [10, -34], [4, -39.5], [10.5, -41], [-2, -40.5]].map(([x, z], i) => ({ x, y: paduaHeight(x, z), z, s: 0.85 + i * 0.06 })), { height: 4.2, detail: 'mid', apples: 12, variants: 3, seed: 7 });
+    gr(cypress, [[-13.6, -10], [13.6, -10], [-13.6, -20], [13.6, -20], [13.6, -30], [-13.6, -42.6], [13.6, -42.6], [-3.5, -42.8]].map(([x, z], i) => ({ x, y: paduaHeight(x, z), z, s: 0.8 + (i % 3) * 0.1 })), { height: 10, detail: 'mid', variants: 3, seed: 11 });
+    { const pts = []; for (let x = -66; x <= 66; x += 11) if (Math.abs(x - 24) > 6) pts.push({ x, y: 0, z: -71.5, s: 0.85 + Math.abs(Math.sin(x)) * 0.25 }); gr(poplar, pts, { height: 16, detail: 'low', variants: 3, seed: 13 }); }
     k.cyl(0.8, 0.8, 0.9, 12, 0x8a8070, [6, 0.45, -18]); k.box(0.1, 2, 0.1, DARK, [5.3, 1, -18]); k.box(0.1, 2, 0.1, DARK, [6.7, 1, -18]); k.box(1.6, 0.1, 0.1, DARK, [6, 2, -18]);
     // the workshop: lens grinding and tube making, its door glowing
     k.box(8, 4, 6, 0xc8a880, [-9, 2, -36]); k.add(gableRoof(8, 6, 1.6, 0.3), 0x8a3a28, [-9, 4, -36]);
@@ -1207,7 +1217,7 @@ function house(k, o, wins, r, near = true) {
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.add(gableRoof(w, d, rh, 0.35), roofCol, P(0, h, 0), [0, yaw, 0]);
   if (!near) return;
-  if (o.tiles) coppi(k, P, w, d, rh, 0.35, yaw, roofCol, 0.5);
+  if (o.tiles) coppi(k, P, w, d, rh, 0.35, yaw, roofCol, 0.7);
   for (const sx of [-1, 1]) k.add(gableWall(d, rh, 0.2), wall, P(sx * (w / 2 - 0.1), h, 0), [0, yaw + Math.PI / 2, 0]);
   k.box(w + 0.3, 0.28, d + 0.3, 0xd8d0c0, P(0, h - 0.14, 0), [0, yaw, 0]);
   if (r() < 0.75) { const cx = (r() - 0.5) * w * 0.6, cz = (r() - 0.5) * d * 0.4; k.cyl(0.24, 0.24, rh + 1.6, 6, 0xb09080, P(cx, h + (rh + 1.6) / 2, cz)); k.cyl(0.6, 0.22, 0.8, 8, 0x8a5a48, P(cx, h + rh + 1.9, cz)); }
