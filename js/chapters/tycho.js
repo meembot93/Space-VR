@@ -11,7 +11,7 @@
 //    brass quarter circle on a wall, with Tycho painted inside it). Helpers sight stars and call out
 //    times; his elk wanders the garden; twenty years of nights fly by as measurements pile up on a
 //    giant star chart, and the Great Comet of 1577 smashes through a crystal sphere. At the end the
-//    measurements of Mars glow red, and an echo of Kepler (next chapter) looks them over.
+//    measurements of Mars glow red.
 // World axes: -Z north, +X east, +Y up.
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
@@ -20,7 +20,6 @@ import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { glowPoints, textSprite, shatter, rumble, whoosh, awe, shimmer } from '../wow/fx.js';
-import { Echo } from '../wow/echo.js';
 import { grove, bareTree, orchardTree, bush } from '../trees.js';
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
@@ -279,7 +278,7 @@ export default class Tycho {
     // fields, farms and the village of Tuna
     for (let i = 0; i < 14; i++) { const q = at(120 + r() * 120, 120 + r() * 100); house(k, { x: q.x, y: hvenHeight(q.x, q.z), z: q.z, w: 9, d: 6, h: 3.2, yaw: r() * 6, wall: 0xd8c8a8, roofCol: 0x8a7a40, timber: 0x3a2a1c }, wins); }
     // The terrace where you stand, and the great mural quadrant on its wall
-    k.box(12, 0.25, 9, 0x8a8478, [0, 0.12, 0]);
+    k.box(12, 0.25, 9, 0x8a8478, [0, -0.11, 0]);   // top at the people's feet
     k.box(0.6, 3.4, 4.2, RB, [QUAD.x - 0.35, 1.7, QUAD.z - 0.4]); k.box(0.7, 0.3, 4.4, SS, [QUAD.x - 0.35, 3.5, QUAD.z - 0.4]);
     Bg.add(k.mesh());
     Bg.add(windows(wins, { lit: 0.6, seed: 6 }));
@@ -338,17 +337,22 @@ export default class Tycho {
     const add = (parent, model, pos, look = {}) => { const P = makePerson({ model, seed: 7 + parent.children.length * 3, ...look }); P.g.position.copy(pos); parent.add(P.g); return P; };
     // Herrevad: Tycho walks home; two farm folk come out with a lantern
     this.tycho = add(this.A, 'tycho', new THREE.Vector3(26, 0, 3), { tunic: 0x1a1a1a, hair: 0x9a5a2a, height: 1.78 });
-    this.folk = [add(this.A, 'townsman', new THREE.Vector3(36, 0, 26), { height: 1.68 }), add(this.A, 'townsman', new THREE.Vector3(39, 0, 27), { height: 1.6, tunic: 0x6a4a3a })];
+    this.folk = [add(this.A, 'sailor', new THREE.Vector3(34, 0, 22.5), { height: 1.68 }), add(this.A, null, new THREE.Vector3(37, 0, 23), { height: 1.6, tunic: 0x6a4a3a, hair: 0x5a3a20 })];
     this.folkLamp = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(this.folk[0], this.folkLamp, 'Right', [0, 0.02, 0.02]);
     this.folkLight = new THREE.PointLight(0xffb060, 1.4, 8, 1.8); this.folk[0].g.add(this.folkLight); this.folkLight.position.set(0.3, 1.2, 0.2);
     // Hven: Tycho, a helper at the sight, a timekeeper with the clock, a scribe at the book table
     this.tychoB = add(this.B, 'tycho', new THREE.Vector3(0.6, 0, -2.4), { tunic: 0x1a1a1a, hair: 0x9a5a2a, height: 1.78 });
     this.observer = add(this.B, 'rheticus', new THREE.Vector3(QUAD.x + 0.7, 0, QUAD.z + 0.3), {});
-    this.timer = add(this.B, 'townsman', new THREE.Vector3(2.6, 0, -1.4), { tunic: 0x3a4a5a });
+    this.timer = add(this.B, 'instrument_maker', new THREE.Vector3(2.6, 0, -1.4), {});
     this.scribe = add(this.B, 'canon', new THREE.Vector3(1.6, 0, 0.1), {});
     this.helpers = [];
-    for (let i = 0; i < 4; i++) { const P = add(this.B, 'townsman', new THREE.Vector3(-6 + i * 4, 0, -20), { height: 1.65 + (i % 2) * 0.06, tunic: [0x5a4a32, 0x3a3a4a, 0x6a3a2a, 0x4a4a3a][i] }); P.routine = [{ x: -10 + i * 6, z: -20, pose: 'idle', secs: 6 + i }, { x: -8 + i * 5, z: -48, pose: 'talk', secs: 5 }, { x: 18 - i * 3, z: -14, pose: 'work', secs: 6 }]; const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; this.helpers.push(P); }
-    this.keplerEcho = new Echo(this.G, this.B, { model: 'kepler', tint: 0xa8c8ff, pos: new THREE.Vector3(2.6, 0, 0.4), face: -1.2, seed: 9 });
+    // two lantern-carriers going round the garden's circular path (one of each person, none through the castle)
+    for (let i = 0; i < 2; i++) {
+      const at24 = (a) => ({ x: CASTLE.x + Math.cos(a) * 24, z: CASTLE.z + Math.sin(a) * 24 });
+      const a0 = i ? 0.4 : 2.4, P = add(this.B, i ? null : 'townsman', new THREE.Vector3(at24(a0).x, 0, at24(a0).z), { height: 1.66, tunic: i ? 0x3a3a4a : 0x5a4a32, hair: 0x3a2a18 });
+      P.routine = [0, 1, 2, 3, 4, 5].map((k) => ({ ...at24(a0 + k * 0.55 * (i ? 1 : -1)), pose: k % 3 ? 'idle' : 'talk', secs: k % 3 ? 0.5 : 5 }));
+      const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L; this.helpers.push(P);
+    }
   }
 
   // ---------- The new star (and what it really was) ----------
@@ -589,8 +593,6 @@ export default class Tycho {
       if (this.sightDone && !this.called) { this.called = true; this.G.audio.ctx && this.G.audio.chime(Tm.g.position, 0.4); }
       for (const P of [TB, O, Tm, Sc]) animatePerson(P, t, dt);
       for (const P of this.helpers) { runRoutine(P, dt, { height: hvenHeight, speed: 0.9 }); animatePerson(P, t, dt); P.lamp.userData.flicker(t); }
-      this.keplerEcho.update(dt, t);
-      this.keplerEcho.show(s.mars === 1);
     }
   }
 
