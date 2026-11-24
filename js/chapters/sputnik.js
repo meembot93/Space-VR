@@ -1186,7 +1186,7 @@ export default class Sputnik {
     await D.cue('Each one stood'); this.name('tsiolkovsky', 'goddard', 'vonbraun');
     await l14;
     const l15 = D.sayAsync('ch14_15');
-    await D.cue('all of them'); s.allGlow = 1;
+    await D.cue('all of those dreams'); s.allGlow = 1;
     await l15;
     await D.until(() => this.launchT >= 27, fast ? 10 : 45);
     s.allGlow = 0;

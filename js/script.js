@@ -169,7 +169,7 @@ export const LINES = {
   ch14_12: "The Space Race had begun. In just twelve years, people would walk on the Moon. But that's the next part of our story.",
   ch14_13: "Look who came to watch. Everyone who ever looked up at the sky and wondered.",
   ch14_14: "The storytellers, the builders, the stargazers. Copernicus, Galileo, Newton. Each one stood on the shoulders of the ones who came before.",
-  ch14_15: "This rocket wasn't built by one person, or one country. It was built by all of them.",
+  ch14_15: "And tonight, Korolev and his team in the Soviet Union carried all of those dreams into space.",
 };
 
 // Lines spoken by someone other than Astra (a different voice in the recording)
