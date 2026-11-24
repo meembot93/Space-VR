@@ -7,10 +7,12 @@
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, holdProp, dropProp } from '../people.js';
+import { dress } from '../dress.js';
 import { makeHerd, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
 import { rng, noise2, roughStone } from '../shapes.js';
+import { grove, conifer, bareTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
 const MARKS = 29;                // nights in one round of the Moon's phases (29.5)
@@ -166,23 +168,20 @@ export default class Campfire {
     G.world.blockers.push({ x: 0, z: 0, r: 0.9 });
   }
 
-  // Snowy pines dotted along the valley and up its sides (not in front of the Moon's path)
+  // Snowy spruces dotted along the valley and up its sides, a few bare trees among them (not in
+  // front of the Moon's path). Near ones in more detail; each group is one grove (2 draw calls).
   buildTrees() {
-    const k = new Kit(), r = rng(17), G = this.G;
-    for (let i = 0; i < 70; i++) {
+    const r = rng(17), G = this.G, near = [], far = [], bare = [];
+    for (let i = 0; i < 120; i++) {
       const az = 60 + r() * 240, d = 22 + Math.pow(r(), 0.8) * 180, p = at(az, d);
       if (p.z < -10) continue;
-      const y = groundHeight(p.x, p.z) - 0.2, s = 0.8 + r() * 0.7, H = 9 * s;
-      k.cyl(0.14 * s, 0.24 * s, H * 0.35, 7, 0x3e2e22, [p.x, y + H * 0.17, p.z]);
-      for (let j = 0; j < 5; j++) {
-        const t = j / 5, rad = (1.9 - t * 1.4) * s, h = H * 0.3;
-        const yy = y + H * (0.2 + t * 0.62);
-        k.cyl(0.05, rad, h, 9, 0x233a2a, [p.x, yy + h / 2, p.z], [0, r() * 3, 0]);
-        k.cyl(0.03, rad * 0.8, h * 0.35, 9, 0xd8e0ea, [p.x, yy + h * 0.72, p.z], [0, r() * 3, 0]);
-      }
+      const s = 0.75 + r() * 0.6, spot = { x: p.x, y: groundHeight(p.x, p.z) - 0.15, z: p.z, s };
+      if (d < 75 && r() < 0.14) bare.push({ ...spot, s: s * 0.9 }); else (d < 70 ? near : far).push(spot);
       if (d < 55) G.world.blockers.push({ x: p.x, z: p.z, r: 0.5 * s });
     }
-    this.root.add(k.mesh());
+    if (near.length) this.root.add(grove(conifer, near, { detail: 'mid', height: 10, snow: true, seed: 3, variants: 5 }).group);
+    if (far.length) this.root.add(grove(conifer, far, { detail: 'low', height: 10, snow: true, seed: 5, variants: 4 }).group);
+    if (bare.length) this.root.add(grove(bareTree, bare, { detail: 'mid', height: 8, snow: true, seed: 7, variants: 3 }).group);
   }
 
   buildPeople() {
@@ -196,10 +195,11 @@ export default class Campfire {
       return P;
     };
     // the storyteller stands across the fire from you; the others listen
+    // (each one a different person: Meem's other models, their clothes dyed the browns of hide and fur)
     this.teller = add(new THREE.Vector3(0, 0, 2.2), {}, 'teller');
-    add(new THREE.Vector3(2.4, 0, 1.0), { height: 1.65 }, 'listen');
-    add(new THREE.Vector3(-2.3, 0, 0.9), { height: 1.6 }, 'listen');
-    add(new THREE.Vector3(-1.9, 0, 2.9), { height: 1.25 }, 'listen');
+    dress(add(new THREE.Vector3(2.4, 0, 1.0), { height: 1.68, model: 'builder' }, 'listen'), { hue: 0.02, sat: 0.75, val: 0.8, hair: 0x2a1c12, build: 1.06 });
+    dress(add(new THREE.Vector3(-2.3, 0, 0.9), { height: 1.6, model: 'instrument_maker' }, 'listen'), { mul: 0x8a6a4c, sat: 0.9 });
+    dress(add(new THREE.Vector3(-1.9, 0, 2.9), { height: 1.25, model: 'villager' }, 'listen'), { mul: 0x9a7a58, val: 0.9 });
   }
 
   // Life out on the frozen plain: reindeer crossing the valley, wild horses, and two hunters coming
@@ -212,7 +212,8 @@ export default class Campfire {
     this.hunters = [];
     const spear = () => { const k = new Kit(); k.cyl(0.015, 0.018, 2.1, 5, 0x6a5038, [0, 0, 0]); k.add(roughStone(0.04, 0.14, 0.015, 9, [1, 2, 1]), 0x4a4440, [0, 1.1, 0]); return k.mesh(); };
     [[160, 46, 0], [166, 50, 1]].forEach(([az, d, i]) => {
-      const P = makePerson({ model: 'storyteller', seed: 90 + i * 13, tunic: 0x6a503a, hair: 0x2a1c12, beard: !i });
+      const P = makePerson({ model: i ? 'architect' : 'sailor', seed: 90 + i * 13, tunic: 0x6a503a, hair: 0x2a1c12, beard: !i });
+      dress(P, i ? { mul: 0x7a5a3c, sat: 0.9, build: 1.04 } : { hue: 0.52, sat: 0.45, val: 0.7, build: 1.05 });   // hunters in hide
       const p = at(az, d); P.g.position.set(p.x, groundHeight(p.x, p.z), p.z); this.root.add(P.g);
       holdProp(P, spear(), 'Right', [0, 0.05, 0.02]);
       // out to look over the herd, then home to the edge of the camp, and out again

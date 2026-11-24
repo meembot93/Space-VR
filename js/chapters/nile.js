@@ -18,10 +18,12 @@
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, walkToward } from '../people.js';
+import { dress } from '../dress.js';
 import { makeHerd, makeFlock, makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
+import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
 const SILT = new THREE.Color(0x5c452c);
@@ -116,6 +118,8 @@ const isField = (x, z) => {
 };
 // The roof you stand on: the priest's two-storey house at the edge of the village, looking over the fields
 const ROOF = groundHeight(0, 0) + 7.2;
+// where the priest stands: by his sighting post, and (ch3_02) at the north wall with his merkhet
+const PRIEST_HOME = { x: 3.75, z: 1.0, yaw: -Math.PI / 2 + 0.25 }, PRIEST_NORTH = { x: 1.1, z: -3.65 };
 
 // ---------- Textures ----------
 function glowMat(color = 'rgba(255,220,140,1)', blend = THREE.AdditiveBlending) {
@@ -440,34 +444,9 @@ export default class Nile {
 
   // Date palms along the river and round the village (none in the line of sight to Sirius)
   buildPalms() {
-    const tk = new Kit(), fk = new Kit(), r = rng(23);
-    const palm = (x, z, s) => {
-      const y = groundHeight(x, z) - 0.2, h = (8 + r() * 6) * s, lean = (r() - 0.5) * 0.25, la = r() * 6.28;
-      const tx = Math.cos(la) * Math.sin(lean) * h, tz = Math.sin(la) * Math.sin(lean) * h;
-      // trunk in rings
-      for (let i = 0; i < 5; i++) {
-        const t0 = i / 5, t1 = (i + 1) / 5;
-        tk.add(new THREE.CylinderGeometry(0.17 * s, 0.22 * s, h / 5 + 0.05, 6), i % 2 ? 0x6a553c : 0x5e4a34,
-          [x + tx * (t0 + t1) / 2, y + h * (t0 + t1) / 2, z + tz * (t0 + t1) / 2], [Math.sin(la) * lean, 0, -Math.cos(la) * lean]);
-      }
-      // fronds: long drooping leaves, two-sided
-      const top = new THREE.Vector3(x + tx, y + h, z + tz), n = 9 + (r() * 4 | 0);
-      for (let i = 0; i < n; i++) {
-        const a = i / n * 6.283 + r() * 0.3, up = 0.5 - r() * 0.9, L = (3.3 + r() * 1.2) * s;
-        const pts = [], verts = [];
-        for (let j = 0; j <= 4; j++) {
-          const t = j / 4, dx = Math.cos(a) * L * t, dz = Math.sin(a) * L * t, dy = up * L * t - 1.6 * s * t * t;
-          pts.push([top.x + dx, top.y + dy, top.z + dz, (1 - t * 0.85) * 0.55 * s]);
-        }
-        for (let j = 0; j < 4; j++) {
-          const [x0, y0, z0, w0] = pts[j], [x1, y1, z1, w1] = pts[j + 1], px = -Math.sin(a), pz = Math.cos(a);
-          verts.push(x0 - px * w0, y0, z0 - pz * w0, x0 + px * w0, y0, z0 + pz * w0, x1 + px * w1, y1, z1 + pz * w1,
-            x0 - px * w0, y0, z0 - pz * w0, x1 + px * w1, y1, z1 + pz * w1, x1 - px * w1, y1, z1 - pz * w1);
-        }
-        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); g.computeVertexNormals();
-        fk.add(g, [0x3e6a2a, 0x4a7a30, 0x557f34][i % 3]);
-      }
-    };
+    const r = rng(23), near = [], far = [];
+    // real date palms (js/trees.js): ringed trunks, arching fronds; detailed near the house
+    const palm = (x, z, s) => { (Math.hypot(x, z) < 110 ? near : far).push({ x, y: groundHeight(x, z) - 0.2, z, s: s * (0.85 + r() * 0.35) }); };
     const clear = (x, z) => {
       const az = (Math.atan2(x, -z) / D2R + 360) % 360, d = Math.hypot(x, z);
       if (d < 22) return false;
@@ -485,7 +464,8 @@ export default class Nile {
       const a = r() * 6.283, rr = 0.75 + r() * 0.4, x = VX + Math.cos(a) * 165 * rr, z = Math.sin(a) * 330 * rr;
       if (clear(x, z)) { palm(x, z, 0.85 + r() * 0.35); n++; }
     }
-    this.egypt.add(tk.mesh(), fk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    if (near.length) this.egypt.add(grove(palmTree, near, { detail: 'mid', height: 11, dates: true, seed: 23, variants: 5 }).group);
+    if (far.length) this.egypt.add(grove(palmTree, far, { detail: 'low', height: 11, seed: 29, variants: 4 }).group);
   }
 
   // The pyramids of Giza on the desert edge, as they stood around 2500 BC (closer than in real life,
@@ -668,7 +648,7 @@ export default class Nile {
     this.people = [];
     // The priest-astronomer: Meem's model (`priest` in models/index.json)
     const pr = this.priest = makePerson({ model: 'priest', seed: 3, tunic: 0xeeeadc, skin: 0x9a6a46, hair: 0x1a1410 });
-    pr.g.position.set(3.75, ROOF, 1.0); pr.g.rotation.y = -Math.PI / 2 + 0.25; this.egypt.add(pr.g);
+    pr.g.position.set(PRIEST_HOME.x, ROOF, PRIEST_HOME.z); pr.g.rotation.y = PRIEST_HOME.yaw; this.egypt.add(pr.g);
     pr.blk = { x: pr.g.position.x, z: pr.g.position.z, r: 0.3 }; G.world.blockers.push(pr.blk);
     // Neighbours asleep on their roofs (people slept outside on summer nights). They sit up at the bell.
     this.sleepers = [];
@@ -686,9 +666,13 @@ export default class Nile {
     // Villagers who come out with lamps when the bell rings, and walk down toward the fields
     this.walkers = [];
     const r = rng(31);
-    for (let i = 0; i < 12; i++) {
+    // two kinds of villager (Meem's villager and the young architect's model), each in their own linen,
+    // and the same model never side by side: they set out from houses far apart
+    const LINEN = [{}, { mul: 0xd8c8a8, val: 0.95, build: 1.06 }, { mul: 0xc8b490, hair: 0x2a2420, build: 0.95 }, { mul: 0xe8dcc0, sat: 1.4, build: 1.03 }];
+    for (let i = 0; i < 8; i++) {
       const spot = this.lampSpots[(i * 7 + 3) % this.lampSpots.length];
-      const P = makePerson({ model: 'villager', seed: 50 + i * 5, tunic: [0xe8e0cc, 0xd8ccb0, 0xeee6d2][i % 3], skin: [0x8a5a3a, 0x7a4e32, 0x9a6844][i % 3], hair: 0x1a1410, beard: false });
+      const P = makePerson({ model: i % 2 ? 'architect' : 'villager', seed: 50 + i * 5, tunic: [0xe8e0cc, 0xd8ccb0, 0xeee6d2][i % 3], skin: [0x8a5a3a, 0x7a4e32, 0x9a6844][i % 3], hair: 0x1a1410, beard: false, height: 1.62 + (i % 3) * 0.06 });
+      dress(P, LINEN[(i >> 1) % 4]);
       P.g.position.set(spot.x, groundHeight(spot.x, spot.z), spot.z); P.g.visible = false;
       P.home = P.g.position.clone();
       P.goal = new THREE.Vector3(50 + r() * 70, 0, P.home.z * 0.6 + (r() - 0.5) * 60);
@@ -1108,6 +1092,14 @@ export default class Nile {
     const pr = this.priest;
     pr.pose = s.phase === 'found' ? 'cheer' : s.point ? 'point' : 'idle';
     pr.pointAt.copy(dirFromAzEl(sirAz, Math.max(sirEl, 0.5), _b)).multiplyScalar(60).add(pr.g.position).setY(pr.g.position.y + 2.2);
+    // ch3_02 (js/wow/ch3.js): he crosses to the north wall and holds his merkhet up to the stars over
+    // the pole, then goes back to his sighting post
+    const home = PRIEST_HOME, go = this.priestNorth ? PRIEST_NORTH : home;
+    if (walkToward(pr, go.x, go.z, dt, { speed: 0.9, stop: 0.08 })) {
+      let dy = (this.priestNorth ? Math.PI : home.yaw) - pr.g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      pr.g.rotation.y += dy * Math.min(1, dt * 3);
+      if (this.priestNorth) { pr.pose = 'point'; pr.pointAt.copy(dirFromAzEl(0, 38, _b)).multiplyScalar(40).add(pr.g.position); }
+    }
     if (s.phase === 'bell' || s.phase === 'sunrise') { pr.pose = 'point'; pr.pointAt.copy(this.bellPos); }
     animatePerson(pr, t, dt);
     // The bell swings and rings

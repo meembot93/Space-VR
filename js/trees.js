@@ -29,6 +29,7 @@
 //
 //   Many trees cheaply (2 draw calls, a few variants copied, each turned and sized):
 //   const g = grove(conifer, spots, { detail: 'low', variants: 4, snow: true });   spots: [{ x, y, z, s, yaw }]
+//   (a grove's leaves don't cast shadows unless you pass shadows: true; single trees' leaves do)
 //   root.add(g.group);   g.tris = triangles
 //
 // Each result: { group, bark, leaves (meshes), tris, height, crown: { center, radius } }.
@@ -853,7 +854,8 @@ const KIND_OF = new Map([[appleTree, 'appleTree'], [orchardTree, 'orchardTree'],
 
 // Many trees of one kind as 2 meshes. kind: one of the builders above (or its name).
 // spots: [{ x, y, z, s (size, x the height), yaw }]. opts: the kind's options (height, snow, ...),
-// plus detail (default 'low'), variants (how many different trees to grow, default 4), seed.
+// plus detail (default 'low'), variants (how many different trees to grow, default 4), seed,
+// shadows (true: the leaves cast shadows too; off by default, the trunks always do).
 export function grove(kind, spots, o = {}) {
   const name = typeof kind === 'string' ? kind : KIND_OF.get(kind);
   const opts = { seed: 1, ...DEFAULTS[name], detail: 'low', ...o }, nv = Math.max(1, Math.min(spots.length, opts.variants ?? 4));
@@ -870,9 +872,35 @@ export function grove(kind, spots, o = {}) {
     leaves.append(v.leaves, m, nm, tint, sc);
   });
   const out = meshes(bark, leaves, vars[0].barkStyle, vars[0].leafStyle);
+  // a whole grove's leaf cards in the shadow map cost a lot (alpha-tested, layered): off unless asked
+  if (out.leaves && !opts.shadows) out.leaves.userData.noShadow = true;
   out.count = spots.length;
   return out;
 }
 
 // Triangles of a single tree of this kind and detail (handy when planning a scene's budget)
 export function treeTris(kind, o = {}) { const name = typeof kind === 'string' ? kind : KIND_OF.get(kind); const b = BUILD[name]({ seed: 1, ...DEFAULTS[name], ...o }); return b.bark.tris + b.leaves.tris; }
+
+// ---------------------------------------------------------------------------------------------
+// A grass tuft for an InstancedMesh: thin blades that curve over, dark at the root and paler at
+// the tip (vertex colours: use a material with vertexColors: true, side: DoubleSide; instance
+// colours still tint it). blades x 3 triangles. Normals lean up, so the backs aren't black.
+//   const m = new THREE.InstancedMesh(grassTuft({ blades: 6, height: 0.3 }), new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), n);
+export function grassTuft({ blades = 6, height = 0.3, width = 0.014, seed = 3, dry = false, root: rootHex, tip: tipHex } = {}) {
+  const r = rng(seed), P = [], C = [], N = [], c = new THREE.Color();
+  const root = new THREE.Color(rootHex ?? (dry ? 0x6a5a3a : 0x3a4a22)), tip = new THREE.Color(tipHex ?? (dry ? 0xe8d8a8 : 0xc8d890));
+  for (let i = 0; i < blades; i++) {
+    const a = (i / blades) * 6.28 + r() * 0.8, h = height * (0.65 + r() * 0.6), w = width * (0.8 + r() * 0.5), bend = 0.15 + r() * 0.35;
+    const dx = Math.cos(a), dz = Math.sin(a), px = -dz * w, pz = dx * w, ox = dx * 0.03 * r(), oz = dz * 0.03 * r();
+    const mid = [ox + dx * h * bend * 0.35, h * 0.55, oz + dz * h * bend * 0.35], top = [ox + dx * h * bend, h * (0.95 - bend * 0.25), oz + dz * h * bend];
+    const v = [[ox - px, 0, oz - pz, 0], [ox + px, 0, oz + pz, 0], [mid[0] + px * 0.6, mid[1], mid[2] + pz * 0.6, 0.55], [mid[0] - px * 0.6, mid[1], mid[2] - pz * 0.6, 0.55], [top[0], top[1], top[2], 1]];
+    for (const k of [0, 1, 2, 0, 2, 3, 3, 2, 4]) {
+      const [x, y, z, t] = v[k]; P.push(x, y, z);
+      c.copy(root).lerp(tip, Math.pow(t, 0.8) * (0.7 + r() * 0.3)); C.push(c.r, c.g, c.b);
+      _v.set(dx * 0.5, 1, dz * 0.5).normalize(); N.push(_v.x, _v.y, _v.z);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  return g;
+}
