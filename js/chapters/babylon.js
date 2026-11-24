@@ -19,6 +19,7 @@ import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng } from '../shapes.js';
 import { moonFaceTexture } from '../moontex.js';
+import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
 const BASE = -24;                 // the city's ground level, below the terrace
@@ -465,23 +466,16 @@ export default class Babylon {
   }
 
   buildPalms(RIVER, riverW) {
-    const k = new Kit(), r = rng(41);
-    const palm = (x, z, s) => {
-      const h = (7 + r() * 5) * s, lean = (r() - 0.5) * 0.18, y = BASE;
-      k.add(new THREE.CylinderGeometry(0.22 * s, 0.32 * s, h, 6), 0x6b5539, [x, y + h / 2, z], [lean, 0, lean * 0.6]);
-      const tx = x + Math.sin(lean * 0.6) * h * -0.5 + lean * h * 0.3, tz = z + lean * h * 0.5, ty = y + h;
-      for (let i = 0; i < 9; i++) {
-        const a = i / 9 * 6.28 + r(), fr = new THREE.ConeGeometry(0.55 * s, 3.6 * s, 3);
-        fr.scale(1, 1, 0.18); fr.translate(0, 1.8 * s, 0);
-        k.add(fr, i % 2 ? 0x3c5a2c : 0x4a6a34, [tx, ty, tz], [Math.cos(a) * 1.9, 0, Math.sin(a) * 1.9]);
-      }
-    };
+    const r = rng(41), near = [], far = [];
+    // real date palms (js/trees.js); the ones near the ziggurat in more detail
+    const palm = (x, z, s) => { (Math.hypot(x, z - ZIG_Z) < 160 ? near : far).push({ x, y: BASE - 0.2, z, s: s * (0.8 + r() * 0.3) }); };
     for (let i = 0; i < 260; i++) {
       const side = r() < 0.5 ? -1 : 1, x = RIVER + side * (riverW + 5 + r() * 40), z = -1100 + r() * 2200;
       palm(x, z, 0.9 + r() * 0.3);
     }
     for (let i = 0; i < 40; i++) { const x = (r() - 0.5) * 180, z = ZIG_Z + (r() < 0.5 ? -1 : 1) * (60 + r() * 34); if (Math.abs(x) > 40) palm(x, z, 0.85 + r() * 0.2); }
-    this.root.add(k.mesh());
+    if (near.length) this.root.add(grove(palmTree, near, { detail: 'mid', height: 11, dates: true, seed: 41, variants: 5 }).group);
+    if (far.length) this.root.add(grove(palmTree, far, { detail: 'low', height: 11, seed: 43, variants: 4 }).group);
   }
 
   // The tablet shelves along the shrine's front wall, and the reading desk in front of them

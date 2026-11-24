@@ -22,6 +22,7 @@ import { makeHerd, makeFlock, makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
+import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
 const SILT = new THREE.Color(0x5c452c);
@@ -440,34 +441,9 @@ export default class Nile {
 
   // Date palms along the river and round the village (none in the line of sight to Sirius)
   buildPalms() {
-    const tk = new Kit(), fk = new Kit(), r = rng(23);
-    const palm = (x, z, s) => {
-      const y = groundHeight(x, z) - 0.2, h = (8 + r() * 6) * s, lean = (r() - 0.5) * 0.25, la = r() * 6.28;
-      const tx = Math.cos(la) * Math.sin(lean) * h, tz = Math.sin(la) * Math.sin(lean) * h;
-      // trunk in rings
-      for (let i = 0; i < 5; i++) {
-        const t0 = i / 5, t1 = (i + 1) / 5;
-        tk.add(new THREE.CylinderGeometry(0.17 * s, 0.22 * s, h / 5 + 0.05, 6), i % 2 ? 0x6a553c : 0x5e4a34,
-          [x + tx * (t0 + t1) / 2, y + h * (t0 + t1) / 2, z + tz * (t0 + t1) / 2], [Math.sin(la) * lean, 0, -Math.cos(la) * lean]);
-      }
-      // fronds: long drooping leaves, two-sided
-      const top = new THREE.Vector3(x + tx, y + h, z + tz), n = 9 + (r() * 4 | 0);
-      for (let i = 0; i < n; i++) {
-        const a = i / n * 6.283 + r() * 0.3, up = 0.5 - r() * 0.9, L = (3.3 + r() * 1.2) * s;
-        const pts = [], verts = [];
-        for (let j = 0; j <= 4; j++) {
-          const t = j / 4, dx = Math.cos(a) * L * t, dz = Math.sin(a) * L * t, dy = up * L * t - 1.6 * s * t * t;
-          pts.push([top.x + dx, top.y + dy, top.z + dz, (1 - t * 0.85) * 0.55 * s]);
-        }
-        for (let j = 0; j < 4; j++) {
-          const [x0, y0, z0, w0] = pts[j], [x1, y1, z1, w1] = pts[j + 1], px = -Math.sin(a), pz = Math.cos(a);
-          verts.push(x0 - px * w0, y0, z0 - pz * w0, x0 + px * w0, y0, z0 + pz * w0, x1 + px * w1, y1, z1 + pz * w1,
-            x0 - px * w0, y0, z0 - pz * w0, x1 + px * w1, y1, z1 + pz * w1, x1 - px * w1, y1, z1 - pz * w1);
-        }
-        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); g.computeVertexNormals();
-        fk.add(g, [0x3e6a2a, 0x4a7a30, 0x557f34][i % 3]);
-      }
-    };
+    const r = rng(23), near = [], far = [];
+    // real date palms (js/trees.js): ringed trunks, arching fronds; detailed near the house
+    const palm = (x, z, s) => { (Math.hypot(x, z) < 110 ? near : far).push({ x, y: groundHeight(x, z) - 0.2, z, s: s * (0.85 + r() * 0.35) }); };
     const clear = (x, z) => {
       const az = (Math.atan2(x, -z) / D2R + 360) % 360, d = Math.hypot(x, z);
       if (d < 22) return false;
@@ -485,7 +461,8 @@ export default class Nile {
       const a = r() * 6.283, rr = 0.75 + r() * 0.4, x = VX + Math.cos(a) * 165 * rr, z = Math.sin(a) * 330 * rr;
       if (clear(x, z)) { palm(x, z, 0.85 + r() * 0.35); n++; }
     }
-    this.egypt.add(tk.mesh(), fk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    if (near.length) this.egypt.add(grove(palmTree, near, { detail: 'mid', height: 11, dates: true, seed: 23, variants: 5 }).group);
+    if (far.length) this.egypt.add(grove(palmTree, far, { detail: 'low', height: 11, seed: 29, variants: 4 }).group);
   }
 
   // The pyramids of Giza on the desert edge, as they stood around 2500 BC (closer than in real life,
