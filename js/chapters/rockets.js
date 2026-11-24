@@ -28,6 +28,7 @@ import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp }
 import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
+import { bareTree, conifer, grove } from '../trees.js';
 import { glowPoints, rumble, whoosh, awe, shimmer, beeps } from '../wow/fx.js';
 import { Space, lonLat } from '../wow/space.js';
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
@@ -97,6 +98,19 @@ function groundPatch({ x: cx, z: cz, w, d }, step, hf, colf) {
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals();
   return new THREE.Mesh(g, FIG_MAT);
 }
+// birch bark: the trees.js bark material (wind and all) with a white bark texture, dark lenticels and scars
+let BIRCH = null;
+function birchMat(src) {
+  if (BIRCH) return BIRCH;
+  const c = document.createElement('canvas'); c.width = 64; c.height = 256; const x = c.getContext('2d'), r = rng(77);
+  x.fillStyle = '#eeeae2'; x.fillRect(0, 0, 64, 256);
+  for (let i = 0; i < 70; i++) { x.fillStyle = r() < 0.4 ? '#1e1a18' : r() < 0.6 ? '#4a4440' : '#b8b0a4'; x.fillRect(r() * 64, r() * 256, 3 + r() * 16, 1 + r() * 2.5); }
+  for (let i = 0; i < 6; i++) { x.fillStyle = '#2a2420'; const y = r() * 256; x.beginPath(); x.ellipse(r() * 64, y, 4 + r() * 6, 2 + r() * 3, 0, 0, 6.3); x.fill(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  BIRCH = src.clone(); BIRCH.map = t; BIRCH.bumpMap = null; BIRCH.onBeforeCompile = src.onBeforeCompile; BIRCH.customProgramCacheKey = src.customProgramCacheKey;
+  return BIRCH;
+}
+
 // a cylinder between two points (pipes, struts, branches)
 function pipe(k, a, b, r, col, seg = 5) {
   const d = _d.subVectors(b, a), L = d.length(); if (L < 1e-4) return;
@@ -445,13 +459,12 @@ export default class Rockets {
       for (const h of [0.35, 0.95]) for (let s = 0; s < 4; s++) { const f0 = s / 4, f1 = (s + 1) / 4, xa = lerp(x0, x1, f0), za = lerp(z0, z1, f0), xb = lerp(x0, x1, f1), zb = lerp(z0, z1, f1); pipe(k, V3(xa, kalugaHeight(xa, za) + h, za), V3(xb, kalugaHeight(xb, zb) + h, zb), 0.035, 0x5a4a3a, 4); }
     };
     fence(-16, -20, 16, -20, 3); fence(-16, -20, -16, 12); fence(16, -20, 16, -6);
-    const birch = (x, z, s) => {
-      const y = kalugaHeight(x, z);
-      k.cyl(0.11 * s, 0.17 * s, 9 * s, 6, 0xe8e6e0, [x, y + 4.5 * s, z]);
-      for (let i = 0; i < 7; i++) k.box(0.2 * s, 0.05, 0.04, 0x2a2622, [x + 0.12 * s, y + 0.6 + r() * 7 * s, z + (r() - 0.5) * 0.1], [0, r() * 3, 0]);
-      for (let i = 0; i < 9; i++) { const b = r() * 6.28, h0 = (3.5 + r() * 5) * s; pipe(k, V3(x, y + h0, z), V3(x + Math.cos(b) * 2.2 * s, y + h0 + 1.8 * s, z + Math.sin(b) * 2.2 * s), 0.03 * s, 0x4a3a34, 4); }
+    // birches: bare winter trees with pale bark and snow along the limbs (trees.js), feet sunk a little into the snow
+    const birch = (x, z, s, seed) => {
+      const t = bareTree({ seed, height: 10 * s, snow: true, detail: 'high' }); t.bark.material = birchMat(t.bark.material);
+      t.group.position.set(x, kalugaHeight(x, z) - 0.08, z); t.group.rotation.y = seed; A.add(t.group);
     };
-    birch(-8, -12, 1.1); birch(-11, -4, 0.95); birch(9, -15, 1.2); birch(-6, -26, 1);
+    birch(-8, -12, 1.1, 3); birch(-11, -4, 0.95, 7); birch(9, -15, 1.2, 11); birch(-6, -26, 1, 15);
     for (let j = 0; j < 4; j++) for (let i = 0; i < 12; i++) k.cyl(0.11, 0.11, 1.1, 6, i % 3 ? 0x8a6a48 : 0x9a7a52, [-15.3, kalugaHeight(-15, -10) + 0.12 + j * 0.21, -14 + i * 0.23 + (j % 2) * 0.1], [0, 0, Math.PI / 2]);
     k.box(0.9, 0.05, 2.9, 0xeef2f8, [-15.3, kalugaHeight(-15, -10) + 0.98, -11.5]);
     const wy = kalugaHeight(-6, -7); k.cyl(0.6, 0.6, 0.8, 8, 0x6a5a48, [-6, wy + 0.4, -7]); k.box(0.08, 1.6, 0.08, 0x4a3a2a, [-6.6, wy + 0.8, -7]); k.box(0.08, 1.6, 0.08, 0x4a3a2a, [-5.4, wy + 0.8, -7]); k.add(gableRoof(1.6, 1.2, 0.5, 0.1), 0xeef2f8, [-6, wy + 1.6, -7]);
@@ -475,9 +488,14 @@ export default class Rockets {
     k.box(8, 30, 8, WH, [cx - 28, cy + 15, cz + 10]); k.cyl(3, 3, 6, 8, WH, [cx - 28, cy + 33, cz + 10]); k.ball(2.6, 1, GOLD, [cx - 28, cy + 38, cz + 10], 0, [1, 1.5, 1]); k.cyl(0.001, 0.6, 5, 6, GOLD, [cx - 28, cy + 43, cz + 10]);
     for (let i = 0; i < 5; i++) wins.push({ p: V3(cx - 8 + i * 4, cy + 6, cz + 11.03), yaw: 0 });
     // pines on the far bank, and along the slope
-    for (let i = 0; i < 420; i++) {
-      const x = (r() - 0.5) * 1600, z = -340 - r() * 500, y = kalugaHeight(x, z), s = 0.8 + r() * 0.8;
-      k.cyl(0.001, 2.6 * s, 9 * s, 6, 0x1c2a22, [x, y + 6 * s, z]); k.cyl(0.001, 2.0 * s, 4 * s, 6, 0xd8e0ea, [x, y + 9.6 * s, z]);
+    {
+      const pines = [], spruces = [];
+      for (let i = 0; i < 300; i++) {
+        const x = (r() - 0.5) * 1600, z = -340 - r() * 500, y = kalugaHeight(x, z), s = 0.8 + r() * 0.8;
+        (r() < 0.2 ? pines : spruces).push({ x, y: y - 0.3, z, s });
+      }
+      A.add(grove(conifer, pines, { type: 'pine', height: 15, snow: true, detail: 'low', variants: 4, seed: 5 }).group);
+      A.add(grove(conifer, spruces, { type: 'spruce', height: 12, snow: true, detail: 'low', variants: 3, seed: 6 }).group);
     }
     A.add(k.mesh());
     A.add(windows(wins, { lit: 0.6, seed: 4, warm: 0xffb85a }));
@@ -740,12 +758,23 @@ export default class Rockets {
     // telegraph poles along the road
     for (let x = -300; x <= 300; x += 40) { const z = 31 + Math.sin(x / 40) * 4, y = auburnHeight(x, z); k.cyl(0.12, 0.15, 8, 5, 0x4a3a2a, [x, y + 4, z]); k.box(1.4, 0.1, 0.1, 0x4a3a2a, [x, y + 7.6, z]); }
     // bare maples and elms, a stand of pines to the west
-    for (let i = 0; i < 140; i++) {
-      const a = r() * 6.28, d = 40 + r() * 340, x = Math.cos(a) * d, z = Math.sin(a) * d; if (Math.hypot(x - LAND.x, z - LAND.z) < 22 || Math.hypot(x - 60, z + 25) < 28) continue;
-      const y = auburnHeight(x, z), s = 0.8 + r() * 0.8;
-      if (x < -120 && r() < 0.7) { k.cyl(0.2 * s, 0.3 * s, 3 * s, 5, 0x3a2a1c, [x, y + 1.5 * s, z]); k.cyl(0.001, 3 * s, 10 * s, 7, 0x2a3a2a, [x, y + 8 * s, z]); continue; }
-      k.cyl(0.15 * s, 0.3 * s, 6 * s, 5, 0x4a3e34, [x, y + 3 * s, z]);
-      for (let j = 0; j < 6; j++) { const b = r() * 6.28; pipe(k, V3(x, y + (3.5 + r() * 2) * s, z), V3(x + Math.cos(b) * 3 * s, y + (7 + r() * 2) * s, z + Math.sin(b) * 3 * s), 0.07 * s, 0x4a3e34, 4); }
+    // (trees.js: the ones you stand near are full trees with fine twigs; the rest are low-detail groves)
+    {
+      const nearB = [], farB = [], spr = [], clear = (x, z) => Math.hypot(x - LAND.x, z - LAND.z) < 22 || Math.hypot(x - 60, z + 25) < 28 || Math.abs(z - 31 - Math.sin(x / 40) * 4) < 5;
+      for (let i = 0; i < 150; i++) {
+        const a = r() * 6.28, d = 40 + r() * 340, x = Math.cos(a) * d, z = Math.sin(a) * d; if (clear(x, z)) continue;
+        const y = auburnHeight(x, z) - 0.1, s = 0.8 + r() * 0.6;
+        if (x < -120 && r() < 0.7) spr.push({ x, y, z, s }); else if (d < 90) nearB.push({ x, y, z, s }); else if (r() < 0.62) farB.push({ x, y, z, s });
+      }
+      B.add(grove(bareTree, nearB, { height: 11, snow: true, detail: 'mid', variants: 4, seed: 21 }).group);
+      B.add(grove(bareTree, farB, { height: 11, snow: true, detail: 'low', variants: 4, seed: 22 }).group);
+      B.add(grove(conifer, spr, { type: 'spruce', height: 13, snow: true, detail: 'low', variants: 3, seed: 23 }).group);
+      // a few big old trees closer by: an elm by the road, maples along the field edge, a spruce pair to the west
+      for (const [x, z, h, seed, kind] of [[-9, 24, 12, 31, 'b'], [17, 19, 10, 32, 'b'], [26, -6, 11, 33, 'b'], [-26, 10, 13, 34, 's'], [-30, 15, 10, 35, 's'], [12, -30, 9, 36, 'b']]) {
+        const det = seed === 36 ? 'mid' : 'high';
+        const t = kind === 's' ? conifer({ seed, height: h, type: 'spruce', snow: true, detail: det }) : bareTree({ seed, height: h, snow: true, detail: det });
+        t.group.position.set(x, auburnHeight(x, z) - 0.1, z); t.group.rotation.y = seed; B.add(t.group);
+      }
     }
     // the shelter: a lean-to of boards with a table of instruments, a lantern
     const shx = 4.3, shz = 2.9;
@@ -930,12 +959,16 @@ export default class Rockets {
       if (Math.abs(x - 6) < 3 && z > PAD.z && z < 40) c.lerp(_col.setHex(0x6a6a66), 0.75);   // the concrete road
     }));
     // pines all round, thick beyond the clearing
-    for (let i = 0; i < 620; i++) {
-      const a = r() * 6.28, d = 45 + Math.sqrt(r()) * 420, x = Math.cos(a) * d, z = PAD.z + Math.sin(a) * d;
-      if (Math.abs(x - 6) < 6 && z > PAD.z) continue; if (Math.hypot(x, z) < 14) continue;
-      const y = balticHeight(x, z), s = 0.8 + r() * 0.7;
-      k.cyl(0.2 * s, 0.3 * s, 14 * s, 5, 0x4a3426, [x, y + 7 * s, z]);
-      for (let j = 0; j < 3; j++) k.cyl(0.001, (2.6 - j * 0.6) * s, 4.5 * s, 7, j % 2 ? 0x1c2a20 : 0x22301e, [x, y + (11 + j * 2.6) * s, z]);
+    {
+      const nearP = [], farP = [];
+      for (let i = 0; i < 520; i++) {
+        const a = r() * 6.28, d = 45 + Math.sqrt(r()) * 420, x = Math.cos(a) * d, z = PAD.z + Math.sin(a) * d;
+        if (Math.abs(x - 6) < 6 && z > PAD.z) continue; if (Math.hypot(x, z) < 14) continue;
+        const y = balticHeight(x, z) - 0.15, s = 0.8 + r() * 0.6;
+        (d < 75 && nearP.length < 45 ? nearP : farP).push({ x, y, z, s });
+      }
+      C.add(grove(conifer, nearP, { type: 'pine', height: 17, detail: 'mid', variants: 4, seed: 41 }).group);
+      C.add(grove(conifer, farP, { type: 'pine', height: 17, detail: 'low', variants: 4, seed: 42 }).group);
     }
     // the earth wall round the test stand: an arc of banked sand to the north, grassed and scrubby on top
     {
