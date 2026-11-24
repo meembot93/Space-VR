@@ -53,7 +53,7 @@ const SIT = TREE.clone().addScaledVector(TOWARD, 0.42);                    // Ne
 const SIDE = new THREE.Vector3(-TOWARD.z, 0, TOWARD.x);                    // to his left (our right)
 const APPLE0 = TREE.clone().addScaledVector(TOWARD, 1.05).addScaledVector(SIDE, -0.5).setY(1.95);
 const HOUSE = at(38, 24), BARN = at(352, 30), CHURCH = at(100, 760);
-const BOOKSPOT = at(86, 3.0);                      // where Newton stands with the Principia
+const BOOKSPOT = at(106, 2.4);                     // where Newton stands with the Principia (clear of the apple boughs)
 const KEPSPOT = at(104, 3.5);                      // an open patch of grass beside him (no trees)
 const ORR = at(100, 10, 9.5);                      // the ellipse over the orchard
 const MOON_AZ = (h) => 113 + (h - 19) * 9, MOON_EL = (h) => 7.5 + (h - 19) * 5;
@@ -315,7 +315,7 @@ export default class Newton {
     k.cyl(2.2, 2.4, 5, 14, 0xcfc2a0, [dv.x, dy + 2.5, dv.z]); k.cyl(0.001, 2.8, 2.6, 14, 0x6a645a, [dv.x, dy + 6.3, dv.z]); k.cyl(0.4, 0.4, 0.8, 8, 0x8a7a60, [dv.x, dy + 7.8, dv.z]);
     for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28; k.box(0.25, 0.25, 0.1, 0x1a1410, [dv.x + Math.sin(a) * 2.32, dy + 4 + (i % 2) * 0.5, dv.z + Math.cos(a) * 2.32], [0, a, 0]); }
     // haystacks (clear of the orchard wall) and a cart in the yard
-    for (const [az, d] of [[5, 22.5], [358, 21.5], [16, 23]]) { const p = at(az, d), y = groundHeight(p.x, p.z); k.cyl(1.6, 2.1, 3, 10, 0xb89a56, [p.x, y + 1.5, p.z]); k.cyl(0.001, 1.8, 1.8, 10, 0xa88a4a, [p.x, y + 3.9, p.z]); }
+    for (const [az, d] of [[5, 22.5], [358, 21.5], [14, 27]]) { const p = at(az, d), y = groundHeight(p.x, p.z); k.cyl(1.6, 2.1, 3, 10, 0xb89a56, [p.x, y + 1.5, p.z]); k.cyl(0.001, 1.8, 1.8, 10, 0xa88a4a, [p.x, y + 3.9, p.z]); }
     const ca = at(25, 18), cy = groundHeight(ca.x, ca.z), cyaw = 0.6;
     k.box(1.4, 0.15, 2.6, 0x6a4a2e, [ca.x, cy + 0.85, ca.z], [0, cyaw, 0]);
     for (const sx of [-1, 1]) { k.box(0.06, 0.5, 2.6, 0x5a3e26, [ca.x + Math.cos(cyaw) * sx * 0.68, cy + 1.1, ca.z - Math.sin(cyaw) * sx * 0.68], [0, cyaw, 0]); k.cyl(0.55, 0.55, 0.08, 12, 0x4a3420, [ca.x + Math.cos(cyaw) * sx * 0.8, cy + 0.55, ca.z - Math.sin(cyaw) * sx * 0.8], [0, cyaw, Math.PI / 2]); }
@@ -418,16 +418,16 @@ export default class Newton {
     const GR = [0x4a6a2c, 0x5a7a34, 0x3e5a26, 0x6a8040, 0x7a8a46];
     for (let i = 0; i < 520; i++) {
       const a = r() * 6.28, d = 1.2 + Math.pow(r(), 0.7) * 17, x = Math.sin(a) * d, z = -Math.cos(a) * d;
-      if (Math.hypot(x - SIT.x, z - SIT.z) < 1.3 || Math.hypot(x - APPLE0.x, z - APPLE0.z) < 0.9 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 1.4 || Math.hypot(x - TREE.x, z - TREE.z) < 0.5) continue;
+      if (Math.hypot(x - SIT.x, z - SIT.z) < 1.7 || Math.hypot(x - APPLE0.x, z - APPLE0.z) < 0.9 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 1.4 || Math.hypot(x - TREE.x, z - TREE.z) < 0.5) continue;
       const y = groundHeight(x, z), col = GR[Math.floor(r() * GR.length)];
       for (let b = 0; b < 3; b++) { const h = 0.12 + r() * 0.16, ba = r() * 6.28; k.cyl(0.002, 0.018, h, 3, col, [x + Math.cos(ba) * 0.05, y + h / 2 - 0.01, z + Math.sin(ba) * 0.05], [(r() - 0.5) * 0.5, r() * 3, (r() - 0.5) * 0.5]); }
       if (r() < 0.25) k.ball(0.014, 0, r() < 0.6 ? 0xe8d040 : 0xf2f0e8, [x + 0.08, y + 0.1 + r() * 0.06, z + 0.03]);
     }
     for (let i = 0; i < 3; i++) { const p = at(200 + i * 40, 9 + i * 3), y = groundHeight(p.x, p.z); k.ball(0.22, 1, 0x4a3a28, [p.x, y - 0.06, p.z], [r(), r(), 0], [1, 0.45, 1]); }
     // Newton's little pile of books on the grass beside him, and an open notebook
-    k.box(0.22, 0.05, 0.3, 0x5a2a1a, [SIT.x + SIDE.x * 0.55, groundHeight(SIT.x, SIT.z) + 0.025, SIT.z + SIDE.z * 0.55], [0, 0.4, 0]);
-    k.box(0.2, 0.05, 0.28, 0x2a3a2a, [SIT.x + SIDE.x * 0.55, groundHeight(SIT.x, SIT.z) + 0.075, SIT.z + SIDE.z * 0.55], [0, 0.7, 0]);
-    k.box(0.36, 0.01, 0.26, 0xece0c0, [SIT.x + SIDE.x * 0.75 + TOWARD.x * 0.5, groundHeight(SIT.x, SIT.z) + 0.01, SIT.z + SIDE.z * 0.75 + TOWARD.z * 0.5], [0, 0.9, 0]);
+    k.box(0.22, 0.05, 0.3, 0x5a2a1a, [SIT.x + SIDE.x * 0.68, groundHeight(SIT.x, SIT.z) + 0.025, SIT.z + SIDE.z * 0.68], [0, 0.4, 0]);
+    k.box(0.2, 0.05, 0.28, 0x2a3a2a, [SIT.x + SIDE.x * 0.68, groundHeight(SIT.x, SIT.z) + 0.075, SIT.z + SIDE.z * 0.68], [0, 0.7, 0]);
+    k.box(0.36, 0.01, 0.26, 0xece0c0, [SIT.x + SIDE.x * 0.92 + TOWARD.x * 0.5, groundHeight(SIT.x, SIT.z) + 0.01, SIT.z + SIDE.z * 0.92 + TOWARD.z * 0.5], [0, 0.9, 0]);
     this.root.add(k.mesh());
     this.applesMesh = ak.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })); this.root.add(this.applesMesh);
   }
@@ -491,15 +491,16 @@ export default class Newton {
     this.hannahLamp = makeTorch({ len: 0.3, color: 0xffc070, size: 0.6 }); holdProp(this.hannah, this.hannahLamp, 'Right', [0, 0.02, 0.02]);
     this.hannah.routine = [{ x: this.doorPos.x, z: this.doorPos.z, pose: 'idle', secs: 14, look: this.nw.g.position.clone().setY(1) }, { x: this.doorPos.x + 3, z: this.doorPos.z + 2, pose: 'work', secs: 8 }, { x: this.doorPos.x - 2, z: this.doorPos.z + 3, pose: 'idle', secs: 6 }];
     // a shepherd bringing the flock in, and a farmhand forking hay onto the cart
-    const sp = at(150, 45);
+    const sp = at(138, 36);   // (this side of the lane's hedge)
     this.shep = add('townsman', sp.setY(groundHeight(sp.x, sp.z)), { tunic: 0x5a5a3a, hair: 0x4a3a2a, beard: true, height: 1.7 });
     const staff = new Kit(); staff.cyl(0.02, 0.02, 1.6, 5, 0x5a4028, [0, 0.8, 0]); holdProp(this.shep, staff.mesh(), 'Right', [0, 0.05, 0.02]);
-    this.shep.routine = [at(140, 40), at(110, 46), at(80, 40), at(60, 52), at(100, 58), at(135, 52)].map((p, i) => ({ x: p.x, z: p.z, pose: i % 3 === 2 ? 'beckon' : 'idle', secs: 4 + (i % 3) * 3, speed: 0.6 }));
-    const hp = new THREE.Vector3(8.3, 0, -20.6);
+    this.shep.routine = [at(132, 40), at(110, 46), at(80, 40), at(60, 52), at(100, 58), at(118, 52)].map((p, i) => ({ x: p.x, z: p.z, pose: i % 3 === 2 ? 'beckon' : 'idle', secs: 4 + (i % 3) * 3, speed: 0.6 }));
+    const hp = new THREE.Vector3(9.23, 0, -25.3);
     this.hand = add('rheticus', hp.setY(groundHeight(hp.x, hp.z)), { tunic: 0x6a5a40, hair: 0x2a1a10, height: 1.74 });
     const fork = new Kit(); fork.cyl(0.018, 0.018, 1.5, 5, 0x6a4a2e, [0, 0.75, 0]); for (const ox of [-0.05, 0, 0.05]) fork.cyl(0.006, 0.006, 0.25, 4, 0x5a5a5a, [ox, 1.6, 0]); holdProp(this.hand, fork.mesh(), 'Right', [0, 0.05, 0.02]);
-    // (he forks hay from the far side of the haystack, outside the orchard wall, and loads the cart)
-    this.hand.routine = [{ x: 8.3, z: -20.6, pose: 'work', secs: 12, face: -2.22 }, { x: 8.67, z: -17.03, pose: 'work', secs: 8, face: -0.97 }, { x: 8.0, z: -18.9, pose: 'idle', secs: 5 }];
+    // (he forks hay from the haystack by the manor's gable end and loads the cart, walking round the
+    // front corner of the house both ways, never through it)
+    this.hand.routine = [{ x: 9.23, z: -25.3, pose: 'work', secs: 12, face: -1.89 }, { x: 6.3, z: -20.4, pose: 'idle', secs: 3 }, { x: 8.84, z: -17.14, pose: 'work', secs: 8, face: -0.97 }, { x: 6.0, z: -21.2, pose: 'idle', secs: 3 }];
     for (const P of [this.hand]) for (const st of P.routine) { delete st.y; }
     this.people = [this.nw, this.hannah, this.shep, this.hand];
   }
@@ -509,7 +510,7 @@ export default class Newton {
     this.sheep = L.add(makeHerd('sheep', { n: 16, area: { x: at(140, 48).x, z: at(140, 48).z, r: 9 }, height: groundHeight, mode: 'follow', seed: 7 }));
     this.sheepDog = L.add(makeHerd('dog', { n: 1, area: { x: 0, z: 40, r: 4 }, height: groundHeight, mode: 'follow', seed: 3, speed: 2.4 }));
     // the farm dog, asleep by Newton (it goes to sniff the apple)
-    const dp = SIT.clone().addScaledVector(SIDE, 1.2).addScaledVector(TOWARD, 0.4);
+    const dp = SIT.clone().addScaledVector(SIDE, -1.25).addScaledVector(TOWARD, 0.4);   // on his right, the side the apple falls (so it never crosses his legs)
     this.dog = L.add(makeHerd('dog', { n: 1, area: { x: dp.x, z: dp.z, r: 0.25 }, height: groundHeight, mode: 'follow', seed: 9, speed: 1.8, scale: 0.8 }));
     this.dog.lead.copy(dp); this.dogHome = dp.clone();
     this.cows = L.add(makeHerd('cow', { n: 5, area: { x: at(330, 55).x, z: at(330, 55).z, r: 14 }, height: groundHeight, seed: 4 }));
@@ -882,6 +883,13 @@ export default class Newton {
     runRoutine(this.shep, dt, { height: groundHeight }); animatePerson(this.shep, t, dt);
     this.sheep.lead.copy(this.shep.g.position).addScaledVector(_a.set(Math.sin(this.shep.g.rotation.y), 0, Math.cos(this.shep.g.rotation.y)), -4);
     this.sheepDog.lead.copy(this.shep.g.position).add(_a.set(Math.sin(t * 0.3) * 6, 0, Math.cos(t * 0.23) * 5));
+    // the flock (and his dog) step aside for the shepherd when he turns back through them
+    { const sx = this.shep.g.position.x, sz = this.shep.g.position.z;
+      for (const o of [...this.sheep.animals, ...this.sheepDog.animals]) {
+        const dx = o.x - sx, dz = o.z - sz, d = Math.hypot(dx, dz) || 1e-3;
+        if (d < 1.2) { o.x = sx + dx / d * 1.2; o.z = sz + dz / d * 1.2; }
+        if (Math.hypot(o.tx - sx, o.tz - sz) < 1.6) { o.tx = sx + dx / d * 2.4; o.tz = sz + dz / d * 2.4; }
+      } }
     runRoutine(this.hand, dt, { height: groundHeight }); animatePerson(this.hand, t, dt);
   }
 
@@ -898,7 +906,7 @@ export default class Newton {
       if (y <= gy) {
         this.landed = true; this.landT = 0; if (G.isHost !== false && s.apple === 1) s.apple = 2;
         if (G.audio.ctx) { const o = G.audio.out(A.position, 0.7, 3); G.audio.tone(o, { f: 140, f2: 70, peak: 0.6, a: 0.003, d: 0.25 }); G.audio.noise(o, { f: 700, f2: 200, peak: 0.4, a: 0.003, d: 0.15 }); }
-        this.dog.lead.copy(A.position).addScaledVector(TOWARD, 0.45); this.dogBack = 7; this.bark(A.position, 0.6);
+        this.dog.lead.copy(A.position).addScaledVector(TOWARD, 0.3).addScaledVector(SIDE, -0.35); this.dogBack = 7; this.bark(A.position, 0.6);
       }
     }
     if (this.landed && !this.applePicked) { this.landT += dt; const b = Math.max(0, Math.sin(this.landT * 9)) * 0.06 * Math.exp(-this.landT * 4); A.position.y = gy + b; A.position.addScaledVector(TOWARD, dt * 0.08 * Math.exp(-this.landT * 2)); }
