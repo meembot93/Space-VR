@@ -65,6 +65,7 @@ function terrain(x, z) {
   return (N1(x / 300, z / 300) - 0.5) * 10 * clamp01((r - 150) / 400) + (N2(x / 30, z / 30) - 0.5) * 0.6 * clamp01((r - 60) / 80);
 }
 export function siteH(x, z) { return onApron(x, z) && !inSlot(x, z) ? APRON : terrain(x, z); }
+const stepH = (x, z) => x > DOOR.x && x < DOOR.x + 1.3 && Math.abs(z - DOOR.z) < 1.1 ? APRON + 0.16 * clamp01((DOOR.x + 1.3 - x) / 0.4) : siteH(x, z);   // the bunker door's step (he steps down off its front edge)
 const ROADS = [
   [[28, 12], [140, 30], [320, 44], [900, 90]],
   [[-24, 30], [-140, 300], [-250, 552]],
@@ -498,7 +499,7 @@ export default class Sputnik {
     for (let i = 0; i < p.count; i++) {
       let x = p.getX(i), z = p.getZ(i); const r0 = Math.hypot(x, z), kk = r0 > 0 ? Math.pow(r0 / (SIZE / 2), 1.6) * (SIZE / 2) / r0 : 0;
       x = x * kk + CX; z = z * kk + CZ;
-      const y = onApron(x, z) ? 0 : terrain(x, z); p.setXYZ(i, x, y, z);
+      const y = Math.max(Math.abs(x), Math.abs(z)) < 75 ? Math.min(0, terrain(x, z)) - 0.05 : terrain(x, z); p.setXYZ(i, x, y, z);   // big triangles: keep every one near the pad under the concrete
       c.copy(steppe).lerp(scrub, clamp01(N3(x / 9, z / 9) * 1.6 - 0.5)).lerp(frost, 0.25 * N2(x / 40, z / 40));
       for (const R of ROADS) if (distPoly(x, z, R) < 4) c.lerp(road, 0.75);
       if (distPoly(x, z, RAIL) < 3) c.lerp(gravel, 0.7);
@@ -549,6 +550,7 @@ export default class Sputnik {
     k.add(new THREE.TorusGeometry(0.2, 0.025, 4, 12), 0x8a8a84, [DX + 0.04, A + 1.2, DZ - 0.25], [0, Math.PI / 2, 0]);
     for (let i = 0; i < 4; i++) k.box(0.02, 0.38, 0.02, 0x8a8a84, [DX + 0.04, A + 1.2, DZ - 0.25], [i * Math.PI / 4, 0, 0]);
     k.box(0.9, 0.16, 2.2, 0x8a8882, [DX + 0.45, A + 0.08, DZ]);
+    k.box(0.44, 0.1, 2.2, 0x8a8882, [DX + 1.1, A + 0.034, DZ], [0, 0, -0.38]);   // a little ramp down off the step
     for (const s of [-1, 1]) k.box(2.6, 2.4, 0.4, CON, [DX + 1.0, A + 1.2, DZ + s * 3.3], [0, s * 0.25, 0]);   // wing walls
     k.box(0.25, 0.2, 0.3, 0x2a2a2a, [DX + 0.15, A + 3.1, DZ]); k.cyl(0.09, 0.09, 0.18, 8, 0xfff0c8, [DX + 0.25, A + 2.95, DZ], [0, 0, Math.PI / 2]);
     for (const y of [2.88, 3.02]) k.box(0.04, 0.02, 0.24, 0x2a2a2a, [DX + 0.36, A + y, DZ]);
@@ -822,7 +824,7 @@ export default class Sputnik {
   buildPeople() {
     const add = (parent, model, pos, look = {}) => { const P = makePerson({ model, seed: 11 + parent.children.length * 3, ...look }); P.g.position.copy(pos); parent.add(P.g); return P; };
     // Korolev: waits in the bunker, then walks out to look up at his rocket
-    this.korolev = add(this.site, 'korolev', DOOR.clone().setX(DOOR.x - 1.5), { height: 1.72, tunic: 0x2a2a30 });
+    this.korolev = add(this.site, 'korolev', DOOR.clone().setX(DOOR.x + 0.45).setY(stepH(DOOR.x + 0.45, DOOR.z)), { height: 1.72, tunic: 0x2a2a30 });   // on the door step
     this.korolev.g.visible = false; this.korolev.g.rotation.y = Math.PI / 2;
     // Tsiolkovsky's book, which Korolev read as a young man: it glows open beside him as he's named
     this.book = makeBook(); this.book.position.set(KS.x - 1.1, 1.45, KS.z + 0.7); this.book.visible = false; this.site.add(this.book);
@@ -1529,7 +1531,7 @@ export default class Sputnik {
       if (!view) {
         if (s.korolev && !K.g.visible) { K.g.visible = true; clank(G, this.W(DOOR.x, 1.2, DOOR.z), 0.4); }
         if (s.korolev) {
-          if (walkToward(K, KS.x, KS.z, dt, { speed: 0.9 * this.F, height: siteH })) { K.pose = s.korolev === 2 ? 'idle' : 'idle'; K.look = top.clone(); K.g.rotation.y = damp(K.g.rotation.y, Math.atan2(-KS.x, -KS.z), 2, dt); }
+          if (walkToward(K, KS.x, KS.z, dt, { speed: 0.9 * this.F, height: stepH })) { K.pose = s.korolev === 2 ? 'idle' : 'idle'; K.look = top.clone(); K.g.rotation.y = damp(K.g.rotation.y, Math.atan2(-KS.x, -KS.z), 2, dt); }
         }
       } else {
         if (!this.kView) { this.kView = true; K.g.visible = true; K.g.position.copy(this.korolevView); K.g.rotation.y = Math.atan2(this.vf.x, this.vf.z); holdProp(K, makeBinoculars(), 'Right', [0, 0.05, 0.05]); }
