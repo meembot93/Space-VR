@@ -117,11 +117,14 @@ function animalGeo(kind) {
 // bow to graze (graze: radians for each, then how far the whole body tips forward, front legs
 // splayed) and turn to look. tail: root first. wag: 'side' swings a hanging tail (cows, horses),
 // 'wag' a dog's raised tail. gait: 'walk' (four beats) or 'trot' (diagonal pairs, dogs).
+// lie: how it lies down (makeHerd(..., { lie: true })): front and hind [leg, lower joint] angles, head
+// [neck, head, turn], how far the body drops to the floor. Far copies: models/herd/<kind>_far.glb.
 const MODELS = {
   sheep: { file: 'herd/sheep.glb', size: 0.87 /* 0.75 m */, legs: [['Spine_3', '0_Left_Limb_0'], ['bone_20', '0_Right_Limb_0'], ['bone_1', '1_Left_Limb_1'], ['bone_5', '1_Right_Limb_1']], knee: [-1, 1], head: ['Head_0', 'Head_1'], graze: [0.95, 0.45, 0.06], tail: ['bone_25', 'bone_26'], wag: 'side', gait: 'walk' },
   cow: { file: 'herd/cow.glb', size: 1.52 /* 1.35 m */, legs: [['0_Left_Limb_0', '0_Left_Limb_1'], ['0_Right_Limb_0', '0_Right_Limb_1'], ['1_Left_Limb_0', '1_Left_Limb_2'], ['1_Right_Limb_0', '1_Right_Limb_2']], knee: [-1, 1], head: ['Head_0', 'Head_1'], graze: [0.85, 0.35, 0.05], tail: ['bone_21', 'bone_22', 'bone_23'], wag: 'side', gait: 'walk' },
   horse: { file: 'herd/horse.glb', size: 1.92 /* 1.55 m */, legs: [['0_Left_Limb_0', '0_Left_Limb_1'], ['0_Right_Limb_0', '0_Right_Limb_1'], ['1_Left_Limb_0', '1_Left_Limb_1'], ['1_Right_Limb_0', '1_Right_Limb_1']], knee: [-1, 1], head: ['Head_0', 'Head_1'], graze: [1.55, 0.1, 0.05], tail: ['Tail_0', 'Tail_1', 'bone_22'], wag: 'side', gait: 'walk' },
-  dog: { file: 'herd/dog.glb', size: 0.75 /* 0.55 m */, legs: [['0_Left_Limb_0', '0_Left_Limb_2'], ['0_Right_Limb_0', '0_Right_Limb_2'], ['1_Left_Limb_0', '1_Left_Limb_2'], ['1_Right_Limb_0', '1_Right_Limb_2']], knee: [-1, 1], head: ['Head_0', 'Head_1'], graze: [0.6, 0.35], tail: ['Tail_0', 'bone_35'], wag: 'wag', gait: 'trot' },
+  dog: { file: 'herd/dog.glb', size: 0.75 /* 0.55 m */, legs: [['0_Left_Limb_0', '0_Left_Limb_2'], ['0_Right_Limb_0', '0_Right_Limb_2'], ['1_Left_Limb_0', '1_Left_Limb_2'], ['1_Right_Limb_0', '1_Right_Limb_2']], knee: [-1, 1], head: ['Head_0', 'Head_1'], graze: [0.6, 0.35], tail: ['Tail_0', 'bone_35'], wag: 'wag', gait: 'trot',
+    lie: { drop: 0.2, front: [1.35, -0.3], hind: [0.9, 1.3], head: [0.9, 0.3, 0.2], tail: 0.9, tailDown: -1.2, spread: 0.25 } },
   moose: { file: 'herd/moose.glb', size: 2.32 /* 1.9 m */, legs: [['0_Left_Limb_1', '0_Left_Limb_3'], ['0_Right_Limb_0', '0_Right_Limb_2'], ['1_Left_Limb_0', '1_Left_Limb_2'], ['bone_30', '1_Right_Limb_1']], knee: [-1, 1], head: ['Head_0', 'bone_15'], graze: [0.75, 0.35, 0.045], tail: ['bone_34'], wag: 'side', gait: 'walk' },
 };
 const boneKey = (o) => o.name.replace(/^tripo[:_]*/, '');
@@ -131,7 +134,7 @@ const rigCache = {};
 // its rest pose and the axes (side to side, up, forward) in its parent's space.
 function animalRig(kind) {
   const M = MODELS[kind];
-  return (rigCache[kind] ||= loadGLB(M.file).then((gltf) => {
+  return (rigCache[kind] ||= Promise.all([loadGLB(M.file), loadGLB(M.file.replace('.glb', '_far.glb'))]).then(([gltf, farGltf]) => {
     if (!gltf) return null;
     const inner = gltf.scene; inner.rotation.y = Math.PI / 2;
     const proto = new THREE.Group(); proto.add(inner);
@@ -145,8 +148,22 @@ function animalRig(kind) {
     const bones = {};
     let mesh = null;
     proto.traverse((o) => { if (o.name && !o.isMesh) bones[boneKey(o)] = o; if (o.isSkinnedMesh) mesh = o; });
-    untangleLegs(mesh, M.legs.map(([hip]) => bones[hip]));
+    const hips = M.legs.map(([hip]) => bones[hip]);
+    untangleLegs(mesh, hips);
     mesh.computeBoundingSphere(); mesh.boundingSphere.radius *= 1.15;
+    mesh.userData.lod = 'near';
+    // the far copy (about 2.5k triangles, no textures of its own): bound to the same bones, shown beyond FAR metres
+    let fm = null; farGltf?.scene.traverse((o) => { if (o.isSkinnedMesh) fm = o; });
+    const fb = fm?.skeleton.bones.map((b) => bones[boneKey(b)]);
+    if (fm && fb.every(Boolean)) {
+      const far = new THREE.SkinnedMesh(fm.geometry, mesh.material);
+      far.position.copy(mesh.position); far.quaternion.copy(mesh.quaternion); far.scale.copy(mesh.scale);
+      mesh.parent.add(far); proto.updateMatrixWorld(true);
+      far.bind(new THREE.Skeleton(fb, fm.skeleton.boneInverses), mesh.bindMatrix);
+      untangleLegs(far, hips);
+      far.computeBoundingSphere(); far.boundingSphere.radius *= 1.15;
+      far.userData.lod = 'far'; far.visible = false;
+    }
     const used = [...M.legs.flat(), ...M.head, ...M.tail];
     const info = {}, pq = new THREE.Quaternion(), wp = new THREE.Vector3();
     for (const name of used) {
@@ -193,8 +210,9 @@ function untangleLegs(mesh, hips) {
 // A ready-to-pose copy: shares geometry and material with every other copy, has its own skeleton.
 function animalCopy(rig) {
   const g = cloneSkinned(rig.proto), b = {};
-  g.traverse((o) => { if (o.name && !o.isMesh) b[boneKey(o)] = o; });   // (some joints are plain nodes, not in the skin)
-  return { g, b };
+  let near = null, far = null;
+  g.traverse((o) => { if (o.name && !o.isMesh) b[boneKey(o)] = o; if (o.userData.lod === 'near') near = o; if (o.userData.lod === 'far') far = o; });   // (some joints are plain nodes, not in the skin)
+  return { g, b, near, far };
 }
 const _dq = new THREE.Quaternion(), _dq2 = new THREE.Quaternion();
 function turnBone(copy, rig, name, axis, ang, axis2, ang2) {
@@ -203,12 +221,13 @@ function turnBone(copy, rig, name, axis, ang, axis2, ang2) {
   if (axis2) _dq.multiply(_dq2.setFromAxisAngle(I[axis2], ang2));
   bone.quaternion.copy(_dq).multiply(I.rest);
 }
+const FAR = 25;   // metres: beyond this herd animals use their far copy
 const smooth = (u) => u * u * (3 - 2 * u);
 // Which part of its stride each leg is at (0..1) [LF, RF, LH, RH]: a walk puts the feet down
 // left hind, left front, right hind, right front; a trot moves diagonal pairs together.
 const GAITS = { walk: { off: [0.25, 0.75, 0, 0.5], duty: 0.65, maxA: 0.3 }, trot: { off: [0, 0.5, 0.5, 0], duty: 0.5, maxA: 0.42 } };
 
-export function makeHerd(kind, { n = 8, area = { x: 0, z: 0, r: 20 }, height = null, mode = 'graze', dir = [1, 0], seed = 5, scale = 1, speed = null, y = null } = {}) {
+export function makeHerd(kind, { n = 8, area = { x: 0, z: 0, r: 20 }, height = null, mode = 'graze', dir = [1, 0], seed = 5, scale = 1, speed = null, y = null, lie = false, far = FAR } = {}) {
   const K = KINDS[kind], geo = animalGeo(kind), r = rng(seed);
   const legs = K.hips.length, legLen = K.leg[0];
   const body = new THREE.InstancedMesh(geo.body, MAT, n), legM = new THREE.InstancedMesh(geo.leg, MAT, n * legs);
@@ -245,6 +264,7 @@ export function makeHerd(kind, { n = 8, area = { x: 0, z: 0, r: 20 }, height = n
       c.gy = Math.min((hf + hb) / 2, (hL + hR) / 2 + 0.02); c.pitch = -Math.atan2(hf - hb, hl * 2); c.roll = Math.atan2(hL - hR, hw * 2) * 0.7;
       c.gx = o.x; c.gz = o.z; c.gyaw = o.yaw;
     }
+    if (lie && M.lie) { poseLying(o, c, i, t); return; }
     // stride: a natural step rate for its leg length, longer steps the faster it goes, quicker steps once they're as long as they get
     const hip = R.hipH * c.ms, v = Math.max(0, o.v);
     const f0 = 0.35 * Math.sqrt(9.8 / hip) * (M.gait === 'trot' ? 1.25 : 1);
@@ -278,19 +298,45 @@ export function makeHerd(kind, { n = 8, area = { x: 0, z: 0, r: 20 }, height = n
     c.g.position.set(o.x, c.gy - dip + bob - R.zh * c.ms * Math.sin(bow), o.z);
     _e.set(c.pitch + bow, o.yaw, c.roll, 'YXZ'); c.g.quaternion.setFromEuler(_e);
   };
+  // lying down (lie: true, e.g. a dog asleep by the stove): legs folded, head on its paws, breathing slowly
+  const poseLying = (o, c, i, t) => {
+    const R = rig, L = M.lie, br = 0.5 + 0.5 * Math.sin(t * 1.4 + i);
+    for (let j = 0; j < 4; j++) {
+      const [hipB, kneeB] = M.legs[j], [a, k] = j < 2 ? L.front : L.hind, sd = j % 2 ? -1 : 1;
+      turnBone(c, R, hipB, 'x', -a, 'z', sd * (j < 2 ? 0 : L.spread || 0)); turnBone(c, R, kneeB, 'x', -k);
+    }
+    turnBone(c, R, M.head[0], 'y', L.head[2] || 0, 'x', L.head[0] + br * 0.03);
+    turnBone(c, R, M.head[1], 'x', L.head[1]);
+    M.tail.forEach((tb, j) => turnBone(c, R, tb, 'y', L.tail * (j ? 0.7 : 1), 'x', L.tailDown || 0));
+    c.g.scale.set(c.ms, c.ms * (1 + 0.015 * br), c.ms);
+    c.g.position.set(o.x, c.gy - L.drop * c.ms, o.z);
+    _e.set(c.pitch, o.yaw, c.roll, 'YXZ'); c.g.quaternion.setFromEuler(_e);
+  };
+  const _cam = new THREE.Vector3(), _wp = new THREE.Vector3();
   herd.update = (dt, t) => {
     if (!group.visible) return;
+    // near copies close to you, the light far copies beyond `far` metres (with a little give so they don't flicker)
+    const cam = globalThis.G?.camera;
+    if (copies && cam) {
+      cam.getWorldPosition(_cam);
+      for (const c of copies) {
+        if (!c.far) continue;
+        const d2 = c.g.getWorldPosition(_wp).distanceToSquared(_cam), isFar = c.far.visible ? d2 > (far - 2) ** 2 : d2 > (far + 2) ** 2;
+        c.far.visible = isFar; c.near.visible = !isFar;
+      }
+    }
     // life-size models take room: nudge apart any two standing in each other
     if (copies && n > 1) for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
       const a = A[i], b = A[j], dx = b.x - a.x, dz = b.z - a.z, dd = Math.hypot(dx, dz) || 1e-3;
-      const need = rig.len * 0.5 * (copies[i].ms + copies[j].ms) * 0.5;
+      const need = rig.len * 0.8 * (copies[i].ms + copies[j].ms) * 0.5;   // (about a body length apart)
       if (dd < need) { const k = Math.min(1, dt * 2) * (need - dd) / dd * 0.5; a.x -= dx * k; a.z -= dz * k; b.x += dx * k; b.z += dz * k; }
     }
     for (let i = 0; i < n; i++) {
       const o = A[i];
       // where to go next
       let want = 0;
-      if (herd.mode === 'migrate') {
+      if (lie) { o.tx = o.x; o.tz = o.z; o.eat = 0; }
+      else if (herd.mode === 'migrate') {
         // walk across the area along dir, each at its own offset; loop back once past the far side
         const along = (o.x - area.x) * d.x + (o.z - area.z) * d.y;
         if (along > area.r) { o.x -= d.x * area.r * 2; o.z -= d.y * area.r * 2; }
@@ -317,7 +363,7 @@ export function makeHerd(kind, { n = 8, area = { x: 0, z: 0, r: 20 }, height = n
         if (dl < 0.05) o.v = 0;
       }
       // grazing: when standing still, now and then the head goes down to eat
-      o.eat += ((o.v < 0.1 && Math.sin(t * 0.4 + i * 1.7) > 0.1 ? 1 : 0) - o.eat) * Math.min(1, dt * 1.5);
+      if (!lie) o.eat += ((o.v < 0.1 && Math.sin(t * 0.4 + i * 1.7) > 0.1 ? 1 : 0) - o.eat) * Math.min(1, dt * 1.5);
       if (copies) { poseModel(o, copies[i], i, dt, t); continue; }
       const gy = H(o.x, o.z), hipY = legLen * o.s;
       const bob = Math.abs(Math.sin(o.stride)) * 0.04 * Math.min(1, o.v) * o.s;

@@ -125,6 +125,9 @@ it exits with 1 and lists each problem with its narration line, person, body par
   grazing and swishing their tails by turning their bones in code. Herds use lighter copies in
   `models/herd/` (about 5k triangles, the moose 8k), made from the originals in `models/` with
   `npx @gltf-transform/cli weld cow.glb w.glb` then `npx @gltf-transform/cli simplify w.glb herd/cow.glb --ratio 0.45 --error 0.01`.
+  Animals farther than 25 m (`makeHerd(..., { far: 14 })` changes it) switch to `herd/<kind>_far.glb`,
+  about 2.5k triangles and no textures of their own (simplified again to half, textures removed).
+  `makeHerd('dog', { lie: true })` gives a dog asleep: legs folded, head on its paws, breathing.
 
 ## Version number (please keep it up to date)
 
