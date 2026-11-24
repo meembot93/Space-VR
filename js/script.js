@@ -20,7 +20,7 @@ export const LINES = {
   ch1_04: "No streetlights. No glow from a city. Just thousands and thousands of stars, and the Milky Way stretched across the sky like a river of light. For these people, the night sky wasn't a background. It was the biggest, brightest thing in their whole world.",
   ch1_05: "Somebody, long ago, picked up a piece of bone and a sharp stone. And they started to keep track of something.",
   ch1_06: "Tonight the Moon is just a sliver. Make a mark.",
-  ch1_07: "Each night it grows a little. Mark it again. And again. Half a Moon now... bigger... bigger...",
+  ch1_07: "Each night the Moon grows a little. Mark it again. And again. Half a Moon now... a little rounder every night...",
   ch1_08: "The full Moon. Bright enough to walk by, bright enough to hunt by. If you knew when it was coming, you could plan for it.",
   ch1_09: "Then it shrinks, night after night, until it's gone completely. A few dark nights... and then, there it is again. A thin sliver, right back where it started.",
   ch1_10: "Count your marks. About twenty-nine. Every time, the same. The Moon keeps time.",

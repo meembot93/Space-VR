@@ -13,6 +13,7 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
 import { rng, noise2, roughStone } from '../shapes.js';
 import { grove, conifer, bareTree } from '../trees.js';
+import { loadModel } from '../models.js';
 
 const D2R = Math.PI / 180;
 const MARKS = 29;                // nights in one round of the Moon's phases (29.5)
@@ -290,7 +291,8 @@ export default class Campfire {
     const g = new THREE.Group();
     const k = new Kit();
     k.add(boneGeo(), 0xe6dcc2);
-    g.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 })));
+    const stand = k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 }));
+    g.add(stand);   // the simple shape, until Meem's model (tally_bone) has loaded
     // the flint, resting beside it
     const fk = new Kit(); fk.add(roughStone(0.05, 0.09, 0.025, 77, [2, 2, 1]), 0x5a5048); const flint = fk.mesh(); fk.add(roughStone(0.05, 0.09, 0.025, 77, [2, 2, 1]), 0x5a5048); flint.position.set(0.24, -0.06, 0.02); flint.rotation.z = 0.6; g.add(flint);
     // marks: small dark notches, made visible one at a time (they can glow when counted)
@@ -311,6 +313,51 @@ export default class Campfire {
     const tk = new Kit(); tk.add(boneGeo(), 0xe6dcc2); const tb = tk.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a3c28 }));
     tb.rotation.z = Math.PI / 2; tb.scale.setScalar(1.5); this.tellerBone = new THREE.Group(); this.tellerBone.add(tb);
     this.tellerFlint = new THREE.Group(); const ff = fk.mesh(); ff.rotation.z = 0.4; this.tellerFlint.add(ff);
+    this.useBoneModel(stand, tb);
+  }
+
+  // Swap in Meem's bone model: laid flat facing you (long along x, its curve bowing up), 34 cm long,
+  // with each notch moved onto the bone's front surface.
+  async useBoneModel(stand, tellerStand) {
+    const m = await loadModel('tally_bone');
+    if (!m) return;
+    let src = null; m.scene.traverse((o) => { if (o.isMesh && !src) src = o; });
+    if (!src) return;
+    m.scene.updateMatrixWorld(true);
+    const geo = src.geometry.clone(); geo.applyMatrix4(src.matrixWorld);
+    geo.rotateX(Math.PI / 2);                 // thin side (its y) now faces you (+z)
+    geo.computeBoundingBox(); const b = geo.boundingBox, c = b.getCenter(new THREE.Vector3());
+    geo.translate(-c.x, -c.y, -c.z);
+    const k = 0.34 / Math.max(1e-3, b.max.x - b.min.x); geo.scale(k, k, k);
+    // bow up in the middle, like the old shape (flip it if the model curves the other way)
+    geo.computeBoundingBox();
+    const mid = this.surfaceAt(geo, 0), end = this.surfaceAt(geo, 0.13);
+    if (mid && end && mid.y < end.y) geo.rotateZ(Math.PI);
+    const mat = new THREE.MeshLambertMaterial({ map: src.material.map, emissiveMap: src.material.map, emissive: 0x6a5a48 });   // glows a little so it reads by firelight
+    const mesh = new THREE.Mesh(geo, mat);
+    stand.parent.add(mesh); stand.removeFromParent();
+    // notches onto the surface
+    for (const n of this.notches) {
+      const hit = this.surfaceAt(geo, n.position.x);
+      if (hit) n.position.set(n.position.x, hit.y, hit.z + 0.001);
+    }
+    const tm = new THREE.Mesh(geo, mat); tm.rotation.copy(tellerStand.rotation); tm.scale.copy(tellerStand.scale);
+    tellerStand.parent.add(tm); tellerStand.removeFromParent();
+  }
+  // Where the bone's front surface is at a point along it: casts a ray from in front, along the bone's middle line
+  surfaceAt(geo, x) {
+    const mesh = this._ray || (this._ray = new THREE.Mesh()); mesh.geometry = geo; mesh.material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+    const rc = new THREE.Raycaster(); geo.computeBoundingBox(); const bb = geo.boundingBox;
+    let best = null;
+    for (let y = bb.min.y; y <= bb.max.y; y += 0.002) {   // find the column's span, then use its middle
+      rc.set(new THREE.Vector3(x, y, 1), new THREE.Vector3(0, 0, -1));
+      const h = rc.intersectObject(mesh)[0];
+      if (h) { if (!best) best = { lo: y, hi: y, z: h.point.z }; best.hi = y; }
+    }
+    if (!best) return null;
+    const y = (best.lo + best.hi) / 2; rc.set(new THREE.Vector3(x, y, 1), new THREE.Vector3(0, 0, -1));
+    const h = rc.intersectObject(mesh)[0];
+    return h ? { y, z: h.point.z } : null;
   }
 
   registerInteractables() {

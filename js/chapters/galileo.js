@@ -471,7 +471,7 @@ export default class Galileo {
     this.paduaWins = panes(wins, { lit: 0.42, seed: 11 }); Bg.add(this.paduaWins);
     // smoke from chimneys, bats round the roofs, a dog in the garden, horses in a stable yard
     for (const sm of [[30, 16, 30], [-40, 15, -30], [70, 15, -10], [-80, 17, 40], [10, 14, -90]]) { const s = this.life.add(makeSmoke(new THREE.Vector3(...sm), { n: 6, rise: 9, size: 1.4, opacity: 0.1, color: 0x8a90a0 })); s.scene = 'padua'; }
-    const bats = this.life.add(makeFlock({ n: 9, center: new THREE.Vector3(-4, TOPB + 7, -10), r: 16, height: 6, color: 0x0a0a0c, size: 0.35, seed: 3, speed: 9 })); bats.scene = 'padua';
+    const bats = this.life.add(makeFlock({ n: 9, center: new THREE.Vector3(-4, TOPB + 7, -10), r: 16, height: 6, color: 0x0a0a0c, size: 0.35, seed: 3, speed: 9, kind: 'bat' })); bats.scene = 'padua';
     this.dog = this.life.add(makeHerd('dog', { n: 1, area: { x: 3, z: -22, r: 5 }, height: paduaHeight, seed: 6 })); this.dog.scene = 'padua';
     const hs = this.life.add(makeHerd('horse', { n: 2, area: { x: 40, z: -30, r: 6 }, height: paduaHeight, seed: 8 })); hs.scene = 'padua';
   }

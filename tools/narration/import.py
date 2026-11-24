@@ -3,7 +3,7 @@
 
 Usage:  python3 tools/narration/import.py <folder with recordings>
 
-Each recording is named by its line number, e.g. ch2_05.m4a or br5_01.m4a (any of .m4a .mp3 .wav .ogg .aac .caf).
+Each recording is named by its line number, e.g. ch2_05.m4a, br5_01.m4a or open_01.m4a (any of .m4a .mp3 .wav .ogg .aac .caf).
 Each one is trimmed of silence at both ends, evened out in loudness, saved as
 sounds/narration/<id>.mp3, and listed in sounds/narration/index.json so the game plays it
 instead of showing the line as a subtitle-only placeholder. Needs ffmpeg.
@@ -20,7 +20,7 @@ def main(src):
     index = json.loads(index_path.read_text()) if index_path.exists() else {}
     added = []
     for f in sorted(pathlib.Path(src).iterdir()):
-        m = re.match(r'^((?:ch|br)\d+_\d+)', f.stem.lower())
+        m = re.match(r'^((?:ch\d+|br\d+|open)_\d+)', f.stem.lower())
         if not m or f.suffix.lower() not in EXTS:
             continue
         line = m.group(1)
