@@ -41,7 +41,7 @@ const RX = 2.6, RZ = 2.2, RH = 2.9;                 // Tsiolkovsky's veranda stu
 const LAT_K = 54.5, SL_K = 275, LAT_A = 42.2, SL_A = 355, LAT_P = 54.1, SL_P = 89;
 const EYE_K = V3(0.6, 1.6, 1.0);                     // where you stand in Kaluga (eyes)
 const CHAIR = V3(-0.95, 0, -0.78), SEAT_Y = 0.47;     // Tsiolkovsky's chair at the desk (seat top), facing north
-const SEAT_FRONT = V3(-0.95, 0, -1.1), DESK_SIDE = V3(-0.36, 0, -1.1), TALK_SPOT = V3(-0.42, 0, -0.3);
+const SEAT_FRONT = V3(-0.95, 0, -1.12), DESK_SIDE = V3(-0.02, 0, -1.08), TALK_SPOT = V3(-0.42, 0, -0.3);
 const FRAME = V3(0, 0, -2.2);                        // Goddard's launch frame
 const LAND = V3(-38, 0, -42);
 // the flight: straight up 4.2 m in the frame, then an arc 12.5 m high (above the frame's foot) to the cabbages
@@ -1168,7 +1168,7 @@ export default class Rockets {
     this.braunLab = label('Wernher von Braun', 0.12, { color: '#f2ecdc', glowCol: 'rgba(10,10,16,0.9)' }); this.braunLab.position.set(0, 2.12, 0); this.braunLab.material.opacity = 0; this.braun.g.add(this.braunLab);
     // (two different men: an engineer in a white work coat and a hat, and one in a long field-grey coat and cap)
     // what the Auburn people walk round: the frame, the camera and Esther, the shelter, the sawhorse, each other
-    this.obsA = [{ x: FRAME.x, z: FRAME.z, r: 0.85 }, { x: 4.5, z: -1.5, r: 0.6 }, { x: 4.3, z: 2.9, r: 1.05 }, { x: -0.9, z: 0.2, r: 0.45 }, { P: this.god, r: 0.25 }, { P: this.henry, r: 0.25 }, { P: this.roope, r: 0.25 }];
+    this.obsA = [{ x: FRAME.x, z: FRAME.z, r: 0.85 }, { x: 4.5, z: -1.5, r: 0.6 }, { x: 4.3, z: 2.9, r: 1.05 }, { x: -0.9, z: 0.2, r: 0.7 }, { x: -1.9, z: 0.2, r: 0.35 }, { x: -2.5, z: 0.2, r: 0.3 }, { P: this.god, r: 0.25 }, { P: this.henry, r: 0.25 }, { P: this.roope, r: 0.25 }];
     this.eng = [0, 1].map((i) => { const x = PAD.x + 3 + i * 1.2, z = PAD.z + 5, p0 = V3(x, balticHeight(x, z), z); return fig(this.C, p0, i
       ? { height: 1.78, coat: 0x5a5e50, coatLen: 0.8, hat: 'fieldcap', hatCol: 0x4a4e42, belt: 0x2a2620, hair: 0x6a5a40, glasses: true, trousers: 0x4a4e42, boots: 0x161412, seed: 21 }
       : { height: 1.7, coat: 0xd8d4c8, coatLen: 0.7, hat: 'fedora', hatCol: 0x3a3a3a, hair: 0x2a2018, trousers: 0x3a3a40, boots: 0x161412, seed: 23 }); });
@@ -1449,11 +1449,17 @@ export default class Rockets {
     const route = [SEAT_FRONT, DESK_SIDE, TALK_SPOT];
     T.sitK ??= 1; T.leg ??= 0;   // leg: 0 seated .. 3 at the talk spot (index into the route)
     let busy = false;
+    // turn on the spot to face the next point before stepping off (so the first stride doesn't go into the desk or chair)
+    const go = (p) => {
+      const ex = p.x - T.g.position.x, ez = p.z - T.g.position.z, yaw = Math.atan2(ex, ez), d = Math.atan2(Math.sin(yaw - T.g.rotation.y), Math.cos(yaw - T.g.rotation.y));
+      if (Math.hypot(ex, ez) > 0.06 && Math.abs(d) > 0.3) { T.g.rotation.y += d * Math.min(1, dt * 5); T.pose = 'idle'; return false; }
+      return walkToward(T, p.x, p.z, dt, { speed: 1.0, stop: 0.04 });
+    };
     if (wantSit) {
-      if (T.leg > 0) { const p = route[T.leg - 1]; if (walkToward(T, p.x, p.z, dt, { speed: 1.0, stop: 0.04 })) T.leg--; busy = true; }
+      if (T.leg > 0) { if (go(route[T.leg - 1])) T.leg--; busy = true; }
       else { face(Math.PI); T.sitK = Math.min(1, T.sitK + dt * 1.8); busy = T.sitK < 1; }
     } else if (T.sitK > 0) { T.sitK = Math.max(0, T.sitK - dt * 1.8); busy = true; face(Math.PI); }
-    else if (T.leg < 3) { const p = route[T.leg]; if (walkToward(T, p.x, p.z, dt, { speed: 1.0, stop: 0.04 })) T.leg++; busy = true; }
+    else if (T.leg < 3) { if (go(route[T.leg])) T.leg++; busy = true; }
     if (T.leg === 0) { const k = ease(T.sitK); T.g.position.set(lerp(SEAT_FRONT.x, CHAIR.x, k), 0, lerp(SEAT_FRONT.z, CHAIR.z + 0.02, k)); }
     this.bookCenter.set(T.g.position.x, 1.75, T.g.position.z);
     if (busy && T.pose === 'walk') { T.look = null; }
@@ -1596,7 +1602,7 @@ export default class Rockets {
     else if (ph === 'ready') { if (walkAround(Gd, 3.2, 1.6, dt, { height: auburnHeight, speed: 1.2 }, this.obsA)) { Gd.pose = 'talk'; Gd.look = H.g.position.clone().setY(1.6); G_cam(G, _a); Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(_a.x - 3.2, _a.z - 1.6), 3, dt); if (G.kids) Gd.look = rkp.clone(); } }
     else if (ph === 'launch' && !this.landed) { walkAround(Gd, 3.2, 1.6, dt, { height: auburnHeight }, this.obsA); Gd.pose = flying ? 'point' : 'gasp'; Gd.pointAt.copy(rkp); Gd.look = rkp.clone(); }
     else if (ph === 'launch' || ph === 'landed' || ph === 'descend') { if (walkAround(Gd, -14, -16, dt, { height: auburnHeight, speed: 1.4 }, this.obsA)) { Gd.pose = s.descend ? 'point' : 'cheer'; Gd.pointAt.set(0, 60, -150); Gd.look = s.descend ? Gd.pointAt.clone() : rkp.clone(); } }
-    else { if (walkAround(Gd, -1.6, 0.3, dt, { height: auburnHeight, speed: 1.2 }, this.obsA)) { Gd.pose = s.correction ? 'idle' : 'talk'; G_cam(G, _a); Gd.look = _a.clone(); Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(_a.x + 1.6, _a.z - 0.3), 3, dt); } }
+    else { if (walkAround(Gd, -1.55, 1.15, dt, { height: auburnHeight, speed: 1.2 }, this.obsA)) { Gd.pose = s.correction ? 'idle' : 'talk'; G_cam(G, _a); Gd.look = _a.clone(); Gd.g.rotation.y = damp(Gd.g.rotation.y, Math.atan2(_a.x + 1.55, _a.z - 1.15), 3, dt); } }
     animatePerson(Gd, t, dt);
     // Henry: walks up with the blowtorch on its pole, lights it, hurries back
     this.henryTorch.userData.flicker(t, launched ? 0 : 0.8);
