@@ -471,7 +471,7 @@ export default class Kepler {
     this.scopeLab = label('A new invention: the telescope', 0.09); this.scopeLab.position.set(-0.55, TOP + SILL + 0.6, -RZ + 0.3); this.scopeLab.material.opacity = 0; this.root.add(this.scopeLab);
     this.scopeSparks = glowPoints(30, { sizeScale: 200 }); this.scopeSparks.visible = false; this.root.add(this.scopeSparks);
     // a dog asleep by the stove
-    this.dog = this.life.add(makeHerd('dog', { n: 1, area: { x: RX - 1.35, z: RZ - 0.6, r: 0.2 }, height: () => TOP + 0.05, seed: 2 }));
+    this.dog = this.life.add(makeHerd('dog', { n: 1, area: { x: RX - 1.35, z: RZ - 0.6, r: 0.2 }, height: () => TOP + 0.05, seed: 2, lie: true }));
   }
 
   // ---------- The drawing board (ch10_06): paper, two pins, a loop of string, a pencil ----------

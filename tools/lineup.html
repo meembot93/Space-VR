@@ -42,7 +42,7 @@ if (m) {
 const herds = [];
 if (q.has('animals')) {
   const { makeHerd } = await import('../js/life.js');
-  ['reindeer', 'horse', 'goat', 'sheep', 'cow', 'donkey', 'dog', 'ibis'].forEach((k, i) => { const h = makeHerd(k, { n: 1, area: { x: -5 + i * 1.5, z: 4, r: 0.6 }, seed: i + 2 }); scene.add(h.group); herds.push(h); });
+  ['reindeer', 'horse', 'goat', 'sheep', 'cow', 'donkey', 'dog', 'ibis', 'moose'].forEach((k, i) => { const h = makeHerd(k, { n: 1, area: { x: -10 + i * 2.5, z: 4, r: 0.6 }, seed: i + 2 }); scene.add(h.group); herds.push(h); });
 }
 const clock = new THREE.Clock(); let t = 0;
 r.setAnimationLoop(() => { const dt = Math.min(0.05, clock.getDelta()); t += dt; for (const P of people) { if (P.pose === 'walk') P.stride = t * 5; animatePerson(P, t, dt); }
