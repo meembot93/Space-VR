@@ -13,6 +13,7 @@
 //   hint                  -> short words shown the first time a hand comes near it
 import * as THREE from 'three';
 import { clamp } from './util.js';
+import { loadModel } from './models.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _q = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -38,6 +39,31 @@ export function buildGlove(color = 0xe8d2b0) {
   return g;
 }
 
+const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion();
+// Meem's glove (models/glove.glb, a right hand): turned so the fingers point along the controller
+// (-z), thumb up and palm facing in, about 19 cm long. The left hand is the same glove mirrored.
+// Until it loads (or if it's missing) the simple glove above shows instead.
+const GLOVE_FINGERS = new THREE.Vector3(-0.7, -0.65, 0.35).normalize();   // wrist-to-fingertips in the model
+const GLOVE_BACK = new THREE.Vector3(0.3, 0.7, 0.6);                      // roughly the back of the hand
+async function gloveModel() {
+  const m = await loadModel('glove'); if (!m) return null;
+  const F = GLOVE_FINGERS, N = GLOVE_BACK.clone().addScaledVector(F, -GLOVE_BACK.dot(F)).normalize(), W = F.clone().negate();
+  const X = new THREE.Vector3().crossVectors(N, W), turn = new THREE.Matrix4().makeBasis(X, N, W).transpose();
+  const box = new THREE.Box3().setFromObject(m.scene), c = box.getCenter(new THREE.Vector3());
+  m.scene.position.sub(c);
+  // g (squeezed when you grip) > mirror (x -1 on the left hand) > sized > tilt > the model
+  const g = new THREE.Group(), mirror = new THREE.Group(), sized = new THREE.Group(), tilt = new THREE.Group();
+  tilt.add(m.scene); tilt.quaternion.setFromRotationMatrix(turn); sized.add(tilt); mirror.add(sized); g.add(mirror);
+  const len = new THREE.Box3().setFromObject(sized).getSize(new THREE.Vector3()).z;
+  sized.scale.setScalar(0.19 / Math.max(1e-3, len));
+  sized.rotation.z = -Math.PI / 2;   // rolled like a hand holding a controller: thumb up, palm facing in
+  // its own material per hand, so one hand can light up on its own
+  let mat = null;
+  m.scene.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); mat ||= o.material; o.castShadow = false; } });
+  g.userData.mat = mat;
+  return g;
+}
+
 export class Player {
   constructor(G, id = 'player:0') {
     this.G = G; this.id = id; this.name = '';
@@ -52,6 +78,9 @@ export class Player {
     this.seated = false; this.lift = 0; this.calibT = -1; this.holdT = 0;
     this.deskHand = { side: 'desk', pos: new THREE.Vector3(), held: null, hover: null, desk: true };
   }
+
+  // The left hand wears the right glove mirrored
+  sideGlove(h) { if (h.model) h.model.children[0].scale.x = h.side === 'left' ? -1 : 1; }
 
   // Stand at x, z facing compass yaw (radians, 0 = looking north / -Z)
   placeAt(x, z, yaw = 0) {
@@ -72,7 +101,12 @@ export class Player {
       const glove = buildGlove(); grip.add(glove); glove.position.z = 0.02;
       const h = { i, ctrl, grip, glove, src: null, gp: null, side: '', trig: false, sq: false, evTrig: false, evSq: false,
         held: null, hover: null, pos: new THREE.Vector3(), last: new THREE.Vector3() };
-      ctrl.addEventListener('connected', (e) => { h.src = e.data; h.gp = e.data.gamepad || null; h.side = e.data.handedness; glove.userData.thumb.position.x = h.side === 'left' ? 0.045 : -0.045; });
+      ctrl.addEventListener('connected', (e) => { h.src = e.data; h.gp = e.data.gamepad || null; h.side = e.data.handedness; glove.userData.thumb.position.x = h.side === 'left' ? 0.045 : -0.045; this.sideGlove(h); });
+      gloveModel().then((m) => {
+        if (!m) return;
+        grip.add(m); glove.visible = false;
+        h.model = m; h.glove = m; this.sideGlove(h);
+      }).catch(() => {});
       ctrl.addEventListener('disconnected', () => { this.release(h); h.src = null; h.gp = null; h.evTrig = h.evSq = false; });
       this.hands.push(h);
     }
@@ -133,9 +167,18 @@ export class Player {
         const it = this.nearest(h);
         if (it !== h.hover) { h.hover = it; if (it) { this.haptic(h, 0.15, 15); if (it.hint && !it.hinted) { it.hinted = true; this.G.ui.showHint(it.hint, 5); } } }
       }
-      if (sq && !h.sq) this.grab(h);
-      if (!sq && h.sq) this.release(h);
-      if (trig && !h.trig) this.touch(h);
+      const menu = this.G.paused && this.G.ui.menu;
+      if (menu) {
+        // the pause menu: thumbstick up/down moves, trigger picks
+        const my = h.gp ? (ax.length >= 4 ? ax[3] : ax[1] || 0) : 0;
+        if (Math.abs(my) > 0.6 && !h.menuLatch) { h.menuLatch = true; this.G.ui.menuMove(my > 0 ? 1 : -1); this.haptic(h, 0.2, 20); }
+        else if (Math.abs(my) < 0.3) h.menuLatch = false;
+        if (trig && !h.trig) { h.trig = true; this.G.ui.menuChoose(); }
+      } else {
+        if (sq && !h.sq) this.grab(h);
+        if (!sq && h.sq) this.release(h);
+        if (trig && !h.trig) this.touch(h);
+      }
       h.trig = trig; h.sq = sq;
       if (h.held) h.held.onHold?.(h, dt);
       // A or X: pause / carry on
@@ -148,6 +191,9 @@ export class Player {
       h.by = by;
       // Thumbstick pressed in (held for a second resets your height, see updateHeight)
       if (btn(3)) sticks = true;
+      // Meem's glove points where the controller points (its pointing ray), which looks right on every
+      // controller; the grip pose only gives where the hand is
+      if (h.model) { h.grip.getWorldQuaternion(_gq); h.ctrl.getWorldQuaternion(_rq); h.model.quaternion.copy(_gq.invert().multiply(_rq)); }
       h.glove.scale.set(1, sq ? 0.75 : 1, sq ? 0.85 : 1);
       h.glove.userData.mat.emissive.setHex(h.hover || h.held ? 0x4a3a10 : 0x000000);
       if (!h.gp || this.frozen) continue;
@@ -236,6 +282,12 @@ export class Player {
       this.keys[e.code] = true;
       if (e.code === 'KeyM') this.G.net?.voice.setMuted(!this.G.net.voice.muted);
       if (e.code === 'KeyP') this.G.togglePause?.();
+      if (this.G.paused && this.G.ui.menu) {
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') this.G.ui.menuMove(-1);
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') this.G.ui.menuMove(1);
+        if (e.code === 'Enter' || e.code === 'Space') this.G.ui.menuChoose();
+        return;
+      }
       if (e.code === 'KeyN' && this.G.debug) this.G.narration.skip();
       if (e.code === 'KeyE') { const it = this.deskTarget(); if (it?.onTouch) it.onTouch(this.deskHand); else if (it?.onKey) it.onKey(this.deskHand); }
     });

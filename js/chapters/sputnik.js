@@ -1121,7 +1121,7 @@ export default class Sputnik {
   // ---------- The story ----------
   async run(D) {
     const G = this.G, s = this.s, fast = G.params.has('fast');
-    G.music.preload?.('sputnik_launch.mp3');
+    G.music.ready?.then(() => G.music.files.ch14 && G.music.preload?.(G.music.files.ch14));
     G.events.emit('placePlayers', { x: 0, z: 0, yaw: this.start.yaw });
     await G.ui.fadeIn(3);
     // 1. Night at the pad

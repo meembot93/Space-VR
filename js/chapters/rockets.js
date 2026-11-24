@@ -49,6 +49,7 @@ const LAND = V3(-38, 0, -42);
 const FLY = (() => { const u0 = 0.22, h0 = 4.2, M = 12.5 - h0, D = h0 + 0.1; const a = 2 * M + 2 * Math.sqrt(M * (M + D)), b = a + D; return { u0, h0, a, b, apex: u0 + (1 - u0) * a / (2 * b) }; })();
 const IGNITER_Y = 2.24;   // the igniter hangs in the mouth of the nozzle (rocket's own height)
 const HENRY_LIGHT = V3(1.3, 0, -0.75);   // where Henry stands to light it, a pole's length from the nozzle
+const LIGHT_SPOT = V3(-0.4, 0, -0.3);    // Adults: where you stand to light it, beside the torch on its sawhorse
 const CAMERA_A = V3(4.3, 0, -1.5), ESTHER = V3(4.76, 0, -1.44);   // Esther's movie camera (lens to the west, at the rocket) and her place behind it                        // the cabbage patch, 56 m away
 const PAD = V3(0, 0, -55);                           // the V-2's firing table
 const CLOUD = 200;                                   // the cloud deck over Peenemünde
@@ -957,7 +958,13 @@ export default class Rockets {
     this.rkLight = new THREE.PointLight(0xffa050, 0, 12, 1.5); this.rkLight.position.y = 1.8; this.rk.add(this.rkLight);
     // a pulsing marker on the igniter when it is yours to light (Adults)
     this.ignMark = new THREE.Group(); this.ignMark.position.y = IGNITER_Y; this.rk.add(this.ignMark);
-    this.ignMark.add(glow(0xffd070, 0.35, 0.8)); const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.006, 6, 28), new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0.8, depthWrite: false, fog: false })); ring.rotation.x = Math.PI / 2; this.ignMark.add(ring); this.ignRing = ring; this.ignMark.visible = false;
+    // (a big glowing ring that always faces you, a second steady ring inside it and "Light here")
+    this.ignMark.add(glow(0xffd070, 0.6, 0.8));
+    const ringM = () => new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0.8, depthWrite: false, depthTest: false, fog: false });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.014, 8, 40), ringM()); ring.renderOrder = 6; this.ignMark.add(ring); this.ignRing = ring;
+    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.01, 8, 32), ringM()); ring2.renderOrder = 6; this.ignMark.add(ring2); this.ignRing2 = ring2;
+    this.ignLab = label('Light here', 0.16, { color: '#fff6e0', glowCol: 'rgba(20,28,48,0.95)' }); this.ignLab.position.set(0, -0.38, 0); this.ignMark.add(this.ignLab);
+    this.ignMark.visible = false;
     // labels for the parts
     const dk = { color: '#fff6e0', glowCol: 'rgba(20,28,48,0.95)' };   // light text on a dark halo: readable against snow and sky
     this.rkLabs = [label('liquid-fuel rocket', 0.22, dk), label('gasoline', 0.16, dk), label('liquid oxygen', 0.16, dk), label('motor', 0.16, dk)];
@@ -1250,17 +1257,23 @@ export default class Rockets {
   registerInteractables() {
     const G = this.G, self = this;
     this.torchIt = {
-      hint: 'Grab the torch with GRIP and touch the flame to the rocket\'s igniter', deskHint: 'Click the torch to light the rocket',
+      hint: 'Grab the torch beside you with GRIP, then point its flame at the glowing ring under the rocket', deskHint: 'Click the torch to light the rocket',
       get disabled() { return self.s.torch !== 1 || self.s.lit || self.cur !== 'auburn'; },
       reach(pos) { self.torchP.localToWorld(_a.set(0, 1.0, 0)); return Math.max(0, pos.distanceTo(_a) - 0.95); },
       aim(o, d) { self.torchP.localToWorld(_a.set(0, 1.0, 0)); _b.copy(_a).sub(o); const t = _b.dot(d); return t > 0 && _b.addScaledVector(d, -t).length() < 0.4 ? t : Infinity; },
       onGrab(h) { if (G.mode === 'desktop') G.act({ type: 'light' }); else self.held = h; },
       onHold(h) {
         if (!h?.grip) return;
-        h.grip.getWorldQuaternion(_q); _b.set(0, 0, -1).applyQuaternion(_q).add(_c.set(0, 0.6, 0)).normalize();
+        // the pole points where the controller points (its pointing ray, the same on every headset;
+        // the grip pose is tilted differently on different controllers), tilted a little upward
+        (h.ctrl || h.grip).getWorldQuaternion(_q); _b.set(0, 0, -1).applyQuaternion(_q).add(_c.set(0, 0.3, 0)).normalize();
         self.torchP.position.copy(h.pos).addScaledVector(_b, -0.3); self.torchP.quaternion.setFromUnitVectors(UP, _b);
         self.torchP.userData.tip.getWorldPosition(_a); self.igniterWorld(_c);
-        if (_a.distanceTo(_c) < 0.25 + 0.08) G.act({ type: 'light' });   // the flame's tip (8 cm beyond the nozzle) within 25 cm
+        // forgiving, so it works in a real headset: the flame's tip within 60 cm of the igniter, or the
+        // torch pointing at it (within about 12 degrees) from up to 1.5 m away
+        const dist = _a.distanceTo(_c), aimed = _c.sub(_a).normalize().dot(_b) > 0.978;
+        if (dist < 0.6 || (aimed && dist < 1.5)) G.act({ type: 'light' });
+        else if (dist < 1.2 && !self.buzzT) { self.buzzT = 0.25; G.player.haptic?.(h, 0.25, 30); }   // getting close: a little buzz
       },
       onRelease() { self.held = null; },
       onTouch() { G.act({ type: 'light' }); },
@@ -1330,10 +1343,12 @@ export default class Rockets {
     await D.until(() => !G.kids || this.henryReady, w(6));
     await D.say('ch13_06');
     s.labels = 0;
-    // light it (Adults: you're Henry)
+    // light it (Adults: you're Henry). First a quick move to the sawhorse, right beside the torch and
+    // facing the rocket, so you don't have to find your way there yourself
+    if (!G.kids && G.mode === 'vr') await D.goTo(LIGHT_SPOT, Math.atan2(-(FRAME.x - LIGHT_SPOT.x), -(FRAME.z - LIGHT_SPOT.z)));
     s.torch = 1;
     D.hint(G.mode === 'desktop' ? this.torchIt.deskHint : this.torchIt.hint, 10);
-    await D.auto(() => s.lit, () => { s.henry = 1; if (this.henryReady) { s.henry = 2; s.lit = 1; } }, { after: fast ? 0.2 : 0.8, timeout: fast ? 3 : 30 });
+    await D.auto(() => s.lit, () => { s.henry = 1; if (this.henryReady) { s.henry = 2; s.lit = 1; } }, { after: fast ? 0.2 : 0.8, timeout: fast ? 3 : 60 });
     if (!s.lit) { s.henry = 1; await D.until(() => this.henryReady, w(8)); s.henry = 2; s.lit = 1; }
     s.torch = 0; G.ui.showHint('');
     s.phase = 'launch';
@@ -1562,7 +1577,15 @@ export default class Rockets {
     if (!this.held) { this.torchP.position.copy(this.torchHome.pos); this.torchP.rotation.copy(this.torchHome.rot); }
     this.torchFlame.material.opacity = yours || this.held ? 0.9 : 0; this.torchP.userData.flicker(t, yours || this.held ? 1 : 0);
     // the igniter marker (Adults, when it is yours to light)
-    this.ignMark.visible = yours; if (yours) { const pk = 0.5 + 0.5 * Math.sin(t * 6); this.ignRing.scale.setScalar(0.8 + 0.5 * pk); this.ignRing.material.opacity = 0.9 - 0.6 * pk; this.ignMark.children[0].material.opacity = 0.5 + 0.4 * pk; }
+    this.ignMark.visible = yours;
+    if (yours) {
+      const pk = 0.5 + 0.5 * Math.sin(t * 6);
+      this.ignRing.scale.setScalar(0.8 + 0.5 * pk); this.ignRing.material.opacity = 0.9 - 0.6 * pk; this.ignMark.children[0].material.opacity = 0.5 + 0.4 * pk;
+      this.ignRing2.material.opacity = this.held ? 0.95 : 0.6;
+      // the rings face you, so they read as a circle from anywhere
+      this.G.camera.getWorldPosition(_a); this.ignRing.lookAt(_a); this.ignRing2.lookAt(_a);
+    }
+    if (this.buzzT > 0) this.buzzT = Math.max(0, this.buzzT - dt);
     // the blowtorch roars while it burns near you (yours, or Henry's on its way to the rocket)
     const henryBurning = G.kids || s.henry >= 1;
     if (G.audio.ctx && !s.lit && ((yours && this.held) || (henryBurning && s.henry >= 1))) {

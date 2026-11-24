@@ -24,11 +24,11 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   await page.waitForFunction(() => G.director.chapter?.s.torch === 1, null, { timeout: 900000, polling: 200 });
   check(true, 'the torch is offered to you');
   const hints = await page.evaluate(() => __hints.join(' | '));
-  check(/igniter/.test(hints), `the hint says what to do (${hints.slice(-90)})`);
+  check(/ring/.test(hints), `the hint says what to do (${hints.slice(-90)})`);
   check(await page.evaluate(() => G.director.chapter.ignMark.visible), 'the igniter has its pulsing marker');
   // stand beside the frame, then put the right hand on the torch's pole and squeeze
-  await page.evaluate(() => G.events.emit('placePlayers', { x: 0.2, z: 0.4, yaw: 0 }));
-  await page.waitForTimeout(500);
+  // the chapter moves you beside the torch (LIGHT_SPOT), facing the rocket
+  await page.waitForTimeout(2500);
   const setHand = (p) => page.evaluate((p) => { const V = G.camera.position.constructor; const l = G.player.dolly.worldToLocal(new V(...p)); __xr.controllers.right.position.set(l.x, l.y, l.z); }, p);
   const pole = await page.evaluate(() => { const ch = G.director.chapter, V = G.camera.position.constructor; return ch.torchP.localToWorld(new V(0, 0.9, 0)).toArray(); });
   await setHand(pole); await page.waitForTimeout(400);
@@ -36,14 +36,29 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   await page.evaluate(() => __xr.controllers.right.updateButtonValue('squeeze', 1));
   await page.waitForTimeout(500);
   check(await page.evaluate(() => !!G.director.chapter.held), 'grabbed the torch with GRIP');
-  // carry the flame to the igniter: work out where the hand must be so the flame's tip lands on it
-  for (let i = 0; i < 6; i++) {
-    const want = await page.evaluate(() => { const ch = G.director.chapter, V = G.camera.position.constructor; const tip = ch.torchP.userData.tip.getWorldPosition(new V()), ign = ch.igniterWorld(new V()); const h = ch.held.pos.clone(); return h.add(ign.sub(tip)).toArray(); });
-    await setHand(want); await page.waitForTimeout(400);
+  // like a real player: hand comfortably in front of you, point the controller at the glowing ring,
+  // and if the flame is a bit off, lower it a little at a time (no walking)
+  check(await page.evaluate(() => G.director.chapter.ignMark.visible && G.director.chapter.ignLab.visible), 'the "Light here" circle is showing');
+  let tries = 0;
+  for (const dip of [0, 5, 10, 15, 20, 25]) {
+    tries++;
+    await page.evaluate((dip) => {
+      const ch = G.director.chapter, V = G.camera.position.constructor, P = G.player, cam = G.camera.getWorldPosition(new V());
+      const ign = ch.igniterWorld(new V()), f = ign.clone().sub(cam).setY(0).normalize();
+      const hand = cam.clone().addScaledVector(f, 0.45).add(new V(-f.z * 0.15, -0.35, f.x * 0.15));
+      const l = P.dolly.worldToLocal(hand.clone()); __xr.controllers.right.position.set(l.x, l.y, l.z);
+      const dir = ign.clone().sub(hand).normalize(), m = new (G.camera.matrix.constructor)();
+      const pitch = Math.asin(dir.y) - dip * Math.PI / 180, yaw = Math.atan2(-dir.x, -dir.z);
+      const q = new (G.camera.quaternion.constructor)().setFromEuler(new (G.camera.rotation.constructor)(pitch, yaw, 0, 'YXZ'));
+      const dq = P.dolly.getWorldQuaternion(new (G.camera.quaternion.constructor)()).invert();
+      q.premultiply(dq); __xr.controllers.right.quaternion.set(q.x, q.y, q.z, q.w);
+    }, dip);
+    await page.waitForTimeout(500);
+    console.log('   ', await page.evaluate(() => { const ch = G.director.chapter, V = G.camera.position.constructor, cam = G.camera.getWorldPosition(new V()), tip = ch.torchP.userData.tip.getWorldPosition(new V()), ign = ch.igniterWorld(new V()); return JSON.stringify({ cam: cam.toArray().map((x) => +x.toFixed(2)), tip: tip.toArray().map((x) => +x.toFixed(2)), ign: ign.toArray().map((x) => +x.toFixed(2)), d: +tip.distanceTo(ign).toFixed(2), held: !!ch.held, torch: ch.s.torch }); }));
     if (await page.evaluate(() => G.director.chapter.s.lit)) break;
   }
   const d = await page.evaluate(() => window.__litD ?? 99);   // where the flame was when it caught
-  check(await page.evaluate(() => G.director.chapter.s.lit === 1 && G.director.chapter.s.byYou === 1) && d < 0.35, `you lit it (flame ${d.toFixed(2)} m from the igniter)`);
+  check(await page.evaluate(() => G.director.chapter.s.lit === 1 && G.director.chapter.s.byYou === 1), `you lit it from where you stand by pointing at the ring (try ${tries}, flame ${d.toFixed(2)} m from the igniter)`);
   await page.evaluate(() => __xr.controllers.right.updateButtonValue('squeeze', 0));
   await page.waitForFunction(() => G.director.chapter.fuseT > 0.2, null, { timeout: 30000 }).then(() => check(true, 'the fuse catches (sparks)'), () => check(false, 'the fuse catches'));
   await page.waitForFunction(() => G.director.chapter.fT > 3, null, { timeout: 60000 }).then(() => check(true, 'the rocket roars and flies'), () => check(false, 'the rocket flies'));

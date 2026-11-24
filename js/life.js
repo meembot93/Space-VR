@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { Kit } from './kit.js';
 import { rng } from './shapes.js';
 import { canvasTex } from './util.js';
-import { loadGLB } from './models.js';
+import { loadGLB, loadModel } from './models.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const _lq = new THREE.Quaternion();
@@ -387,25 +387,64 @@ export function makeHerd(kind, { n = 8, area = { x: 0, z: 0, r: 20 }, height = n
 }
 
 // ---------- Birds: a flock wheeling in loose circles, wings flapping (in the shader) ----------
-function flapMaterial(color, speed = 11) {
-  const m = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide, flatShading: true });
+function flapMaterial(color, speed = 11, map = null) {
+  // map: a bird model's texture (smooth shaded); without one it's the flat V stand-in (bats)
+  const m = new THREE.MeshLambertMaterial({ color, map, side: THREE.DoubleSide, flatShading: !map });
   const u = { time: { value: 0 } }; m.userData.u = u;
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = u.time;
+    // only the wings move: everything further than the body's half-width from the middle bends up and down
     sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       float ph = instanceMatrix[3].x * 0.37 + instanceMatrix[3].z * 0.23;
-      float wing = abs(position.x);
-      transformed.y += sin(uTime * ${speed.toFixed(1)} + ph) * wing * 0.9;`);
+      float wing = max(0.0, abs(position.x) - ${map ? '0.07' : '0.0'});
+      transformed.y += sin(uTime * ${speed.toFixed(1)} + ph) * wing * ${map ? '0.75' : '0.9'};`);
   };
   return m;
 }
-export function makeFlock({ n = 12, center = new THREE.Vector3(0, 30, 0), r = 25, height = 6, color = 0x2a2624, size = 1, seed = 3, speed = 6 } = {}) {
+
+// Meem's bird models (models/index.json: bird_crow, bird_gull; bird_pigeon when it arrives), baked once into a
+// single geometry facing +z with a 0.9 m wingspan so they drop into the same flock code as the V stand-in.
+const birdCache = new Map();
+function birdModel(name) {
+  if (!birdCache.has(name)) birdCache.set(name, loadModel(name, { sd: true }).then((m) => {
+    if (!m) return null;
+    m.scene.updateMatrixWorld(true);
+    let mesh = null; m.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
+    if (!mesh) return null;
+    const g = mesh.geometry.clone(); g.applyMatrix4(mesh.matrixWorld);
+    g.computeBoundingBox(); const b = g.boundingBox, c = b.getCenter(new THREE.Vector3());
+    g.translate(-c.x, -c.y, -c.z);
+    const k = 0.9 / Math.max(1e-3, b.max.x - b.min.x); g.scale(k, k, k);
+    return { geometry: g, map: mesh.material.map || null };
+  }).catch(() => null));
+  return birdCache.get(name);
+}
+// Which bird a flock gets from its colour: dark = crow, light = gull, in between = pigeon (a grey-tinted gull until then)
+function birdFor(color) {
+  const c = new THREE.Color(color), lum = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
+  if (lum < 0.12) return { names: ['bird_crow'], tint: 0xffffff };
+  if (lum > 0.6) return { names: ['bird_gull'], tint: 0xffffff };
+  return { names: ['bird_pigeon', 'bird_gull'], tint: c.clone().lerp(new THREE.Color(0xffffff), 0.35).getHex() };
+}
+export function makeFlock({ n = 12, center = new THREE.Vector3(0, 30, 0), r = 25, height = 6, color = 0x2a2624, size = 1, seed = 3, speed = 6, kind = 'bird' } = {}) {
   const g = new THREE.BufferGeometry();
   // body + two wings (a flat V), facing +z, wingspan about 0.9 m
   const v = [0, 0, 0.18, -0.45, 0.02, -0.05, 0, 0, -0.12,   0, 0, 0.18, 0, 0, -0.12, 0.45, 0.02, -0.05,   0, 0, -0.12, -0.08, 0, -0.26, 0.08, 0, -0.26];
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals();
-  const mat = flapMaterial(color, speed * 1.8);
+  let mat = flapMaterial(color, speed * 1.8);
   const mesh = new THREE.InstancedMesh(g, mat, n); mesh.frustumCulled = false;
+  if (kind !== 'bat') {   // swap the V for the real bird model once it has loaded
+    const pick = birdFor(color);
+    (async () => {
+      for (const name of pick.names) {
+        const b = await birdModel(name);
+        if (!b) continue;
+        const m2 = flapMaterial(pick.tint, speed * 1.8, b.map);
+        mesh.geometry = b.geometry; mesh.material = m2; mat.dispose(); mat = m2; g.dispose();
+        return;
+      }
+    })();
+  }
   const rr = rng(seed), B = [];
   for (let i = 0; i < n; i++) B.push({ a: rr() * 6.28, rad: r * (0.5 + rr() * 0.5), h: (rr() - 0.5) * height, w: (speed / r) * (0.8 + rr() * 0.4) * (rr() < 0.15 ? -1 : 1), s: size * (0.8 + rr() * 0.4) });
   const flock = { group: mesh, center: center.clone(), visible: true };

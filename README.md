@@ -9,7 +9,7 @@ as your guide. Astra narrates in Meem's voice. Plan: the "Era 1 Plan: Ancient Sk
 straight after Era 1: Copernicus on his tower at Frombork, Tycho's new star and Uraniborg, Kepler's
 ellipses in Prague, Galileo's telescope in Venice and Padua, Newton's apple and cannon, the rocket
 dreamers (Tsiolkovsky, Goddard, the V-2) and the launch of Sputnik. Shared Era 2 set helpers are in
-`js/era2/common.js`; Meem's music loops are in `sounds/music/` (`index.json` maps chapter to file).
+`js/era2/common.js`; Meem's music is in `sounds/music/` (`index.json` maps title, ch1..ch14, flight and flight_era to files).
 
 ## Play
 
@@ -35,6 +35,17 @@ Address-bar options for testing: `?fast` (placeholder lines and timelines run qu
 `?debug` (shows which narration clips are still missing; N skips a line on desktop),
 `?chapter=2`, `?labels` (tags every stand-in model "PLACEHOLDER"), `?autostart` (desktop),
 `?gfx=standard` or `?gfx=high` (graphics level), `?sharp=1.6` (pixels per eye in VR).
+
+## Your place, the pause menu and fast forward
+
+The title page remembers where you got to on this headset: finished chapters get a tick, and it
+picks up at the chapter you were in (or the next one). "Start from the beginning" goes back to
+Chapter 1. Starting at Chapter 1 plays a short opening among the stars first (js/opening.js).
+
+Press **A or X** to pause. The host gets a menu: Carry on, Restart this chapter, Skip to the next
+chapter, Back to the chapter before, Fast forward (for reviewing: the story runs 4x faster and each
+line is cut short) and Back to the title page. Thumbstick up/down to choose, trigger to pick
+(desktop: P, arrow keys, Enter). Test: `node tools/test/menu-test.js`.
 
 ## Controls
 

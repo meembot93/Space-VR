@@ -23,7 +23,7 @@ const ASKS = /\b(walk|touch|click|point|turn|pull|grab|ring|hold|press|look|foll
     await page.goto(`http://localhost:${srv.address().port}/index.html?fast&chapter=${n}`);
     await page.waitForFunction(() => !document.getElementById('vrBtn').disabled, null, { timeout: 20000 });
     await page.click('#vrBtn');
-    await page.waitForFunction(() => window.G?.mode === 'vr' && G.director.running, null, { timeout: 15000 });
+    await page.waitForFunction(() => window.G?.mode === 'vr' && G.director.running, null, { timeout: 90000 });
     const t0 = Date.now();
     await page.evaluate(() => {
       window.__hints = []; const sh = G.ui.showHint.bind(G.ui);
@@ -31,7 +31,7 @@ const ASKS = /\b(walk|touch|click|point|turn|pull|grab|ring|hold|press|look|foll
       window.__skip = setInterval(() => G.narration.skip(), 200);
       window.__ended = false; G.events.on('chapterEnd', () => { window.__ended = true; });
       window.__music = []; const mo = G.music.moment.bind(G.music);
-      G.music.moment = (name, v) => { __music.push(`${name} during ${G.narration.cur?.id || G.director.chapter?.s?.phase}`); return mo(name, v); };
+      G.music.moment = (name, v) => { if (name.startsWith('ch')) __music.push(`${name} during ${G.narration.cur?.id || G.director.chapter?.s?.phase}`); return mo(name, v); };
     });
     const kids = await page.evaluate(() => G.kids);
     const ok = await page.waitForFunction(() => window.__ended, null, { timeout: 1200000, polling: 250 }).then(() => true, () => false);

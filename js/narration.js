@@ -65,7 +65,7 @@ export class Narration {
       }
     });
     if (this.cur === token) { this.cur = null; this.G.ui.subtitle(''); this.level = 0; this.G.events.emit('narrating', { id, on: false }); }
-    await new Promise((ok) => setTimeout(ok, 350 / this.speed)); // a little pause between lines
+    await new Promise((ok) => setTimeout(ok, (this.G.ff ? 100 : 350) / this.speed)); // a little pause between lines
   }
 
   startSrc(c, src) {
@@ -111,6 +111,8 @@ export class Narration {
   update(dt) {
     const c = this.cur;
     if (!c || this.paused) { this.level *= Math.exp(-dt * 8); return; }
+    // fast forward (pause menu): each line is cut short once its subtitle has been up a moment
+    if (this.G.ff && c.done) { c.ffT = (c.ffT || 0) + dt; if (c.ffT > 1.6) { this.skip(); return; } }
     if (c.fake && c.done) {
       c.left -= dt;
       // A gentle made-up "talking" rhythm so the guide still pulses with placeholder lines

@@ -406,7 +406,7 @@ export default class Newton {
       if (Math.hypot(x - KEPSPOT.x, z - KEPSPOT.z) < 2.5 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 2.5) continue;
       tree(x, z, 0.8 + r() * 0.35);
     }
-    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6 }); this.root.add(g.group); }
+    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6, height: 4.6, trunkExtra: 0.7 }); this.root.add(g.group); }   // height + trunkExtra: tall enough to read as trees, not bushes (Meem)
     // a wooden ladder against one tree and a basket of picked apples beside it
     const lt = this.trees[3] || TREE;
     k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z - 0.25], [0, 0, 0.3]); k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z + 0.25], [0, 0, 0.3]);
@@ -508,7 +508,7 @@ export default class Newton {
     this.cows = L.add(makeHerd('cow', { n: 5, area: { x: at(330, 55).x, z: at(330, 55).z, r: 14 }, height: groundHeight, seed: 4 }));
     this.horses = L.add(makeHerd('horse', { n: 2, area: { x: at(290, 40).x, z: at(290, 40).z, r: 10 }, height: groundHeight, seed: 6 }));
     this.rooks = L.add(makeFlock({ n: 16, center: new THREE.Vector3(-60, 45, -140), r: 60, height: 12, color: 0x161414, size: 0.9, seed: 4, speed: 7 }));
-    this.bats = L.add(makeFlock({ n: 5, center: new THREE.Vector3(HOUSE.x, 6, HOUSE.z + 6), r: 9, height: 3, color: 0x1a1612, size: 0.35, seed: 8, speed: 9 }));
+    this.bats = L.add(makeFlock({ n: 5, center: new THREE.Vector3(HOUSE.x, 6, HOUSE.z + 6), r: 9, height: 3, color: 0x1a1612, size: 0.35, seed: 8, speed: 9, kind: 'bat' }));
     this.smokes = (this.chimneys || []).slice(0, 1).map((p) => L.add(makeSmoke(p, { n: 7, rise: 10, size: 1.2, opacity: 0.14, color: 0x9a98a0 })));
   }
 

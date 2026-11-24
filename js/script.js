@@ -10,13 +10,17 @@
 export const GUIDE_NAME = 'Astra';
 
 export const LINES = {
+  // The opening, among the stars before Chapter 1 (js/opening.js)
+  open_01: "Every night, for as long as there have been people, someone has looked up... and wondered.",
+  open_02: "What are those lights? How far away are they? Could we ever go there?",
+  open_03: "This is the story of how we found out.",
   ch1_01: "Hello. I'm Astra. I've been watching people watch the sky for a very long time, and I'd love to show you how it all began.",
   ch1_02: "Thirty thousand years ago, there were no cities. No farms. No roads. No books. The world was in the grip of an Ice Age, and people lived in small groups, following herds of reindeer and wild horses across frozen plains.",
   ch1_03: "But there was one thing they had that we've almost lost. Look up.",
   ch1_04: "No streetlights. No glow from a city. Just thousands and thousands of stars, and the Milky Way stretched across the sky like a river of light. For these people, the night sky wasn't a background. It was the biggest, brightest thing in their whole world.",
   ch1_05: "Somebody, long ago, picked up a piece of bone and a sharp stone. And they started to keep track of something.",
   ch1_06: "Tonight the Moon is just a sliver. Make a mark.",
-  ch1_07: "Each night it grows a little. Mark it again. And again. Half a Moon now... bigger... bigger...",
+  ch1_07: "Each night the Moon grows a little. Mark it again. And again. Half a Moon now... a little rounder every night...",
   ch1_08: "The full Moon. Bright enough to walk by, bright enough to hunt by. If you knew when it was coming, you could plan for it.",
   ch1_09: "Then it shrinks, night after night, until it's gone completely. A few dark nights... and then, there it is again. A thin sliver, right back where it started.",
   ch1_10: "Count your marks. About twenty-nine. Every time, the same. The Moon keeps time.",
@@ -51,7 +55,7 @@ export const LINES = {
   ch4_08: "To most people, an eclipse was scary. Something was swallowing the Moon! But up here, the sky-watchers weren't scared. They knew it was coming.",
   ch4_09: "That's Earth's shadow covering the Moon. And the red glow? That's sunlight bending through Earth's air, like all the sunsets in the world shining on the Moon at once.",
   ch4_10: "For thousands of years, people watched the sky. The Babylonians did something new. They predicted it. And some of their ideas are still with us: sixty minutes in an hour, three hundred and sixty degrees in a circle, and the twelve signs of the zodiac. All from here.",
-  ch5_01: "Greece. About twenty-three hundred and fifty years ago. In the city of Athens, people are trying something brand new: voting on their own laws. And a group of thinkers are asking questions about everything. What is the world made of? Why do things fall? And what shape is the Earth?",
+  ch5_01: "Greece. About twenty-three hundred and fifty years ago. In the city of Athens, ordinary citizens vote on their own laws, something almost nowhere else in the world does. And a group of thinkers are asking questions about everything. What is the world made of? Why do things fall? And what shape is the Earth?",
   ch5_02: "Sailors had noticed something strange. When a ship sails away, it doesn't just get smaller. It sinks, bottom first, below the horizon, as if it's going over a hill. A thinker named Aristotle noticed something else.",
   ch5_03: "Remember the eclipse in Babylon? That's Earth's shadow on the Moon. Watch the edge.",
   ch5_04: "It's curved. Every eclipse, every time, the shadow is curved.",
@@ -65,7 +69,7 @@ export const LINES = {
   ch5_12: "Today, with satellites, we know the real answer: about forty thousand kilometers. Over two thousand years ago, with a stick, a shadow and a bit of math, Eratosthenes measured the whole world. And he was almost exactly right.",
   br5_01: "Around the same time, far to the east in China, court astronomers were watching too. They wrote down a comet streaking across the sky. Today we call it Halley's Comet, and it keeps coming back, about every seventy-six years.",
   br5_02: "A Greek astronomer named Hipparchus made one of the first star catalogs, sorting about eight hundred and fifty stars from brightest to faintest. Astronomers still use his brightness scale today. Can you sort them too?",
-  ch6_01: "Let's jump forward to the year nineteen-oh-one. A storm has pushed a boat of Greek sponge divers to shelter near a tiny island called Antikythera. One diver goes down... and comes back up shouting that he's seen people lying on the seafloor.",
+  ch6_01: "Let's jump forward to the year nineteen hundred. A storm has pushed a boat of Greek sponge divers to shelter near a tiny island called Antikythera. One diver goes down... and comes back up shouting that he's seen people lying on the seafloor.",
   ch6_02: "They weren't people. They were statues. Bronze and marble, lying in the sand. The divers had found a shipwreck more than two thousand years old.",
   ch6_03: "This ship sank more than two thousand years ago. Rome was becoming the most powerful empire in the world, and rich Romans loved Greek treasures. This ship was probably carrying them across the sea: statues, glass, pottery, coins.",
   ch6_04: "And this. It doesn't look like much. A lump of green, crusty bronze. The divers almost ignored it.",

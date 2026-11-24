@@ -1216,7 +1216,7 @@ export const DIORAMA_LABELS = {
   3: 'The Nile, Egypt, about 2500 BC',
   4: 'Babylon, about 700 BC',
   5: 'Athens, Greece, about 350 BC',
-  6: 'Antikythera, Greece, 1901',
+  6: 'Antikythera, Greece, 1900',
   7: 'Alexandria, Egypt, about 150 AD',
   8: 'Frombork, Poland, 1543',
   9: 'Uraniborg, Hven, Denmark',

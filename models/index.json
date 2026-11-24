@@ -241,5 +241,18 @@
   "file": "sputnik.glb",
   "height": 0.58,
   "turn": 0
+ },
+ "glove": {
+  "file": "glove.glb"
+ },
+ "bird_crow": {
+  "file": "bird_crow.glb"
+ },
+ "bird_gull": {
+  "file": "bird_gull.glb",
+  "turn": 66
+ },
+ "tally_bone": {
+  "file": "tally_bone.glb"
  }
 }
