@@ -1,7 +1,7 @@
 // Music. Each chapter's music plays ONCE, at that chapter's big moment (the reveal, or just as
 // Astra makes the main point), then fades away. The rest of the chapter has only the quiet
 // soundscape (fire, wind, sea: js/soundscape.js). MOMENTS below says where each chapter's music lands.
-// If sounds/music/index.json lists a file for the chapter, e.g. { "ch9": "tycho.mp3" }, that file
+// If sounds/music/index.json lists a file for the chapter, e.g. { "ch9": "music_ch9.mp3" }, that file
 // plays once, start to end. With no file, a soft generated score plays for about 50 seconds instead:
 // slow warm chords and a few twinkling notes, made in WebAudio (no samples, nothing to license).
 // The music dips a little while Astra is talking so her words stay clear.
@@ -28,7 +28,7 @@ const MOMENTS = {
   ch11: { when: (ch) => ch.s?.phase === 'moon' && ch.s?.scope === 1, hold: true }, // the moment you look through the telescope at the Moon (Meem's model moment)
   ch12: { line: 'ch12_03', at: 'Something must be pulling', hold: true },   // Newton puts it together: something pulls the apple down
   ch13: { line: 'ch13_01', at: 'how do you get there' },  // right at the start, dreaming of space (Meem's pick); none for Goddard or the V-2
-  ch14: { when: (ch) => ch.s?.phase === 'liftoff', file: 'sputnik_launch.mp3', vol: 0.95, hold: true, then: 'sputnik.mp3' }, // the instant the countdown ends and the rocket lifts off (Meem's pick), on to the end
+  ch14: { when: (ch) => ch.s?.phase === 'liftoff', vol: 0.95, hold: true }, // the instant the countdown ends and the rocket lifts off (Meem's pick), on to the end
 };
 const SCORE_SECS = 50; // how long the generated score plays at a moment (when there's no music file)
 
@@ -95,7 +95,8 @@ export class Music {
       if (buf) {
         out.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 1);
         // hold: loop it to the end of the chapter, or (with `then`) carry on into that track, looped
-        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = !!hold && !then; src.connect(out); src.start();
+        // (a long track, made to run to the end, just plays out; only a short one loops)
+        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = !!hold && !then && buf.duration < 90; src.connect(out); src.start();
         cur.nodes.push(src); cur.end = this.G.t + buf.duration;
         if (hold && then) this.preload(then);
         src.onended = async () => {

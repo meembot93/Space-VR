@@ -1,8 +1,19 @@
 {
- "ch9": "tycho.mp3",
- "ch10": "kepler.mp3",
- "ch11": "galileo.mp3",
- "ch12": "newton.mp3",
- "ch13": "rockets.mp3",
- "ch14": "sputnik.mp3"
+ "title": "music_title.mp3",
+ "ch1": "music_ch1.mp3",
+ "ch2": "music_ch2.mp3",
+ "ch3": "music_ch3.mp3",
+ "ch4": "music_ch4.mp3",
+ "ch5": "music_ch5.mp3",
+ "ch6": "music_ch6.mp3",
+ "ch7": "music_ch7.mp3",
+ "ch8": "music_ch8.mp3",
+ "ch9": "music_ch9.mp3",
+ "ch10": "music_ch10.mp3",
+ "ch11": "music_ch11.mp3",
+ "ch12": "music_ch12.mp3",
+ "ch13": "music_ch13.mp3",
+ "ch14": "music_ch14.mp3",
+ "flight": "music_flight.mp3",
+ "flight_era": "music_flight_era.mp3"
 }

@@ -9,7 +9,7 @@ as your guide. Astra narrates in Meem's voice. Plan: the "Era 1 Plan: Ancient Sk
 straight after Era 1: Copernicus on his tower at Frombork, Tycho's new star and Uraniborg, Kepler's
 ellipses in Prague, Galileo's telescope in Venice and Padua, Newton's apple and cannon, the rocket
 dreamers (Tsiolkovsky, Goddard, the V-2) and the launch of Sputnik. Shared Era 2 set helpers are in
-`js/era2/common.js`; Meem's music loops are in `sounds/music/` (`index.json` maps chapter to file).
+`js/era2/common.js`; Meem's music is in `sounds/music/` (`index.json` maps title, ch1..ch14, flight and flight_era to files).
 
 ## Play
 

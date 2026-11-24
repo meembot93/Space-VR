@@ -161,7 +161,7 @@ export class Flight {
       // a soft rushing sound for the glide, and a warm swell
       const o = A.out(null, 0.25);
       A.noise(o, { type: 'bandpass', f: 300, f2: 1400, q: 0.8, peak: 0.35, a: secs * 0.4, d: secs * 0.55 });
-      A.swell(secs + (this.hold || 0) + 2);
+      if (!G.music.files.flight) A.swell(secs + (this.hold || 0) + 2);   // (Meem's flight music takes its place)
     }
     return new Promise((ok) => { this.done = ok; });
   }
