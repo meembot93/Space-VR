@@ -119,8 +119,15 @@ it exits with 1 and lists each problem with its narration line, person, body par
   `P.look` turns a head toward a point, `P.glance` makes someone look at you now and then,
   `walkToward` / `runRoutine` walk people around, `holdProp` puts a prop in a hand.
   `tools/lineup.html?model=builder&look&animals` previews them all.
-- `js/life.js`: herds (reindeer, horses, goats, sheep, cows, donkeys, dogs, ibis), bird flocks,
-  dolphins, fish, smoke, cloth, torches. Each is one or two draw calls.
+- `js/life.js`: herds (reindeer, horses, goats, sheep, cows, donkeys, dogs, ibis, moose), bird flocks,
+  dolphins, fish, smoke, cloth, torches. Each is one or two draw calls, except sheep, cows, horses,
+  dogs and the moose: those are Meem's rigged Tripo models (one draw call per animal), walked,
+  grazing and swishing their tails by turning their bones in code. Herds use lighter copies in
+  `models/herd/` (about 5k triangles, the moose 8k), made from the originals in `models/` with
+  `npx @gltf-transform/cli weld cow.glb w.glb` then `npx @gltf-transform/cli simplify w.glb herd/cow.glb --ratio 0.45 --error 0.01`.
+  Animals farther than 25 m (`makeHerd(..., { far: 14 })` changes it) switch to `herd/<kind>_far.glb`,
+  about 2.5k triangles and no textures of their own (simplified again to half, textures removed).
+  `makeHerd('dog', { lie: true })` gives a dog asleep: legs folded, head on its paws, breathing.
 
 ## Version number (please keep it up to date)
 

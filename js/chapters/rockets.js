@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp } from '../people.js';
+import { loadModel } from '../models.js';
 import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
@@ -48,7 +49,7 @@ const LAND = V3(-38, 0, -42);
 const FLY = (() => { const u0 = 0.22, h0 = 4.2, M = 12.5 - h0, D = h0 + 0.1; const a = 2 * M + 2 * Math.sqrt(M * (M + D)), b = a + D; return { u0, h0, a, b, apex: u0 + (1 - u0) * a / (2 * b) }; })();
 const IGNITER_Y = 2.24;   // the igniter hangs in the mouth of the nozzle (rocket's own height)
 const HENRY_LIGHT = V3(1.3, 0, -0.75);   // where Henry stands to light it, a pole's length from the nozzle
-const CAMERA_A = V3(4.3, 0, -1.5), ESTHER = V3(4.76, 0, -1.5);   // Esther's movie camera (lens to the west, at the rocket) and her place behind it                        // the cabbage patch, 56 m away
+const CAMERA_A = V3(4.3, 0, -1.5), ESTHER = V3(4.76, 0, -1.44);   // Esther's movie camera (lens to the west, at the rocket) and her place behind it                        // the cabbage patch, 56 m away
 const PAD = V3(0, 0, -55);                           // the V-2's firing table
 const CLOUD = 200;                                   // the cloud deck over Peenemünde
 const PEEN = [54.15, 13.8], WSANDS = [32.4, -106.5], MOSCOW = [55.75, 37.6];
@@ -172,6 +173,80 @@ function sitPose(P, k, seatY, floorY = 0) {
   });
 }
 
+// Reach a rigged person's hand to a world point (two-bone IK: upper arm, forearm). The elbow bends
+// down and out to the side (and a little back), like a person holding something in front of them.
+// side 'Left' or 'Right' (the rig's own, Left = the figure's +x). k blends from the current pose.
+const _ik = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+function reachHand(P, side, target, k = 1, out = 0.6) {
+  const B = P.rig?.bones, up = B?.[side + 'Arm'], fore = B?.[side + 'ForeArm'], hand = B?.[side + 'Hand'];
+  if (!up || !fore || !hand) return;
+  const [S, E, H, u, pole] = _ik;
+  up.updateWorldMatrix(true, true);
+  up.getWorldPosition(S); fore.getWorldPosition(E); hand.getWorldPosition(H);
+  const a = S.distanceTo(E), b = E.distanceTo(H);
+  u.subVectors(target, S); const d = Math.min(Math.max(u.length(), Math.abs(a - b) + 1e-3), (a + b) * 0.999); u.normalize();
+  const cosA = clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1), sinA = Math.sqrt(1 - cosA * cosA);
+  pole.set(side === 'Left' ? out : -out, -1, -0.35).transformDirection(P.inner.matrixWorld);
+  pole.addScaledVector(u, -pole.dot(u)).normalize();
+  E.copy(S).addScaledVector(u, a * cosA).addScaledVector(pole, a * sinA);
+  aimBoneTo(up, fore, _ik[2].subVectors(E, S).normalize(), k);
+  fore.updateWorldMatrix(true, false); fore.getWorldPosition(E);
+  aimBoneTo(fore, hand, _ik[2].subVectors(target, E).normalize(), k);
+}
+
+// Close a rigged person's fingers round something held (a pole, a crank handle). amt 0 open .. 1 a fist.
+// Works in world space, so it doesn't matter which way the rig's finger bones point: each finger curls
+// about the line across the knuckles, toward the palm (the side the thumb's root sits on).
+const _gq = new THREE.Quaternion(), _gq2 = new THREE.Quaternion(), _gv = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+const FINGERS = ['Index', 'Middle', 'Ring', 'Pinky'];
+function gripHand(P, side, amt = 1) {
+  const B = P.rig?.bones, R = P.rig?.rest, hand = B?.[side + 'Hand'], pre = side + 'Hand';
+  const i1 = B?.[pre + 'Index1'], m1 = B?.[pre + 'Middle1'], m2 = B?.[pre + 'Middle2'], p1 = B?.[pre + 'Pinky1'], t1 = B?.[pre + 'Thumb1'];
+  if (!hand || !i1 || !m1 || !m2 || !p1 || !t1) return;
+  for (const f of [...FINGERS, 'Thumb']) for (let j = 1; j <= 3; j++) { const b = B[pre + f + j]; if (b) b.quaternion.copy(R.get(b)); }
+  hand.updateWorldMatrix(true, true);
+  const [K, across, fdir, palm, tmp] = _gv;
+  m1.getWorldPosition(K); i1.getWorldPosition(across).sub(p1.getWorldPosition(tmp)).normalize();
+  m2.getWorldPosition(fdir).sub(K).normalize();
+  t1.getWorldPosition(palm).sub(hand.getWorldPosition(tmp));
+  palm.addScaledVector(fdir, -palm.dot(fdir)).addScaledVector(across, -palm.dot(across));
+  const sgn = tmp.crossVectors(across, fdir).dot(palm) >= 0 ? 1 : -1;
+  const turn = (b, ang) => { b.getWorldQuaternion(_gq); _gq.premultiply(_gq2.setFromAxisAngle(across, ang)); b.parent.getWorldQuaternion(_gq2).invert(); b.quaternion.copy(_gq2.multiply(_gq)); b.updateWorldMatrix(false, true); };
+  for (const f of FINGERS) [1.0, 1.2, 0.8].forEach((a, j) => { const b = B[pre + f + (j + 1)]; if (b) turn(b, sgn * a * amt); });
+  // the thumb folds in a little over the fingers
+  [0.3, 0.5].forEach((a, j) => { const b = B[pre + 'Thumb' + (j + 2)]; if (b) turn(b, sgn * a * amt); });
+}
+
+// Hold a pole (through world point `at`, running along unit `axis`) in a power grip: the wrist sits just
+// off the pole on the shoulder's side, the knuckles run along the pole, the palm faces it, and the
+// fingers wrap round it.
+const _pm = new THREE.Matrix4(), _pm2 = new THREE.Matrix4(), _pv = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+function gripPole(P, side, at, axis) {
+  const B = P.rig?.bones, hand = B?.[side + 'Hand'], up = B?.[side + 'Arm'], pre = side + 'Hand';
+  const i1 = B?.[pre + 'Index1'], p1 = B?.[pre + 'Pinky1'], t1 = B?.[pre + 'Thumb1'];
+  if (!hand || !up || !i1 || !p1 || !t1) { reachHand(P, side, at); return; }
+  const [n, W, across, palm, c] = _pv;
+  up.getWorldPosition(n).sub(at); n.addScaledVector(axis, -n.dot(axis)).normalize();   // from the pole toward the shoulder
+  reachHand(P, side, W.copy(at).addScaledVector(n, 0.07));
+  for (const f of [...FINGERS, 'Thumb']) for (let j = 1; j <= 3; j++) { const b = B[pre + f + j]; if (b) b.quaternion.copy(P.rig.rest.get(b)); }
+  hand.updateWorldMatrix(true, true);
+  i1.getWorldPosition(across).sub(p1.getWorldPosition(c)).normalize();
+  t1.getWorldPosition(palm).sub(hand.getWorldPosition(c)); palm.addScaledVector(across, -palm.dot(across));
+  i1.getWorldPosition(c).sub(hand.getWorldPosition(W)); palm.addScaledVector(c.normalize(), -palm.dot(c)); palm.addScaledVector(across, -palm.dot(across)).normalize();   // (palm-ward, square to the fingers)
+  // turn the hand so across -> along the pole (whichever way round is nearer) and palm -> toward the pole
+  const ax2 = W.copy(axis).multiplyScalar(across.dot(axis) >= 0 ? 1 : -1), pn = c.copy(n).negate();
+  pn.addScaledVector(ax2, -pn.dot(ax2)).normalize();
+  _pm.makeBasis(across, palm, _pv[0].crossVectors(across, palm).normalize());
+  const t3 = _gv[4].crossVectors(ax2, pn).normalize();
+  _pm2.makeBasis(ax2, pn, t3);
+  _pm2.multiply(_pm.transpose());
+  _gq2.setFromRotationMatrix(_pm2);
+  hand.getWorldQuaternion(_gq); _gq.premultiply(_gq2);
+  hand.parent.getWorldQuaternion(_gq2).invert(); hand.quaternion.copy(_gq2.multiply(_gq));
+  hand.updateWorldMatrix(false, true);
+  gripHand(P, side, 1);
+}
+
 // ---------- Dressed figures (for people with no Tripo model yet) ----------
 // Better than the plain clay stand-in: a smooth turned body (coat or skirt), boots, gloves, collar,
 // scarf, a period hat and a face, so each one reads as a different person in their own clothes.
@@ -232,7 +307,6 @@ function makeFigure(o = {}) {
   inner.scale.setScalar(H);
   return { g, inner, arms, legs, pose: 'idle', phase: (o.seed || 1) * 1.7, pointAt: new THREE.Vector3(), placeholder: true, H };
 }
-function animateFigureLegs(P, dt) { P.legs.forEach((l) => { l.rotation.x = damp(l.rotation.x, 0, 10, dt); }); }
 function animateFigure(P, t, dt) {
   animatePerson(P, t, dt);
   const sw = P.pose === 'walk' ? Math.sin(P.stride || 0) * 0.45 : 0;
@@ -796,7 +870,7 @@ export default class Rockets {
       const mid = foot.clone().lerp(top, 0.45); k.box(0.07, 0.03, 0.03, BR, mid.toArray(), [0, -a, 0]); k.cyl(0.006, 0.001, 0.08, 4, 0x4a4a4a, foot.toArray());
     }
     k.cyl(0.1, 0.09, 0.05, 12, 0x3a2a1a, [cxm, 1.22, czm]); k.cyl(0.06, 0.07, 0.05, 10, 0x2a2a2a, [cxm, 1.265, czm]); k.box(0.16, 0.025, 0.14, 0x2a2a2a, [cxm, 1.3, czm]);
-    pipe(k, V3(cxm + 0.06, 1.28, czm + 0.04), V3(cxm + 0.42, 1.2, czm + 0.12), 0.01, 0x2a2a2a, 5); k.cyl(0.014, 0.014, 0.08, 6, TW, [cxm + 0.44, 1.19, czm + 0.12], [0, 0, 1.35]);
+    pipe(k, V3(cxm + 0.06, 1.28, czm + 0.04), V3(cxm + 0.12, 1.22, czm + 0.12), 0.01, 0x2a2a2a, 5); k.cyl(0.014, 0.014, 0.08, 6, TW, [cxm + 0.14, 1.215, czm + 0.12], [0, 0, 1.35]);   // (short, so it clears Esther's coat)
     k.box(0.3, 0.2, 0.15, CB, [cxm, 1.41, czm]); k.box(0.31, 0.012, 0.16, 0x3a3a3e, [cxm, 1.515, czm]); k.box(0.012, 0.21, 0.16, 0x3a3a3e, [cxm + 0.15, 1.41, czm]);
     for (const ox of [-0.075, 0.075]) { k.cyl(0.095, 0.095, 0.07, 22, CB, [cxm + ox, 1.6, czm], [Math.PI / 2, 0, 0]); k.cyl(0.02, 0.02, 0.075, 8, 0x5a5a5e, [cxm + ox, 1.6, czm], [Math.PI / 2, 0, 0]); k.add(new THREE.TorusGeometry(0.095, 0.006, 4, 22), 0x4a4a4e, [cxm + ox, 1.6, czm - 0.036]); }
     k.cyl(0.035, 0.035, 0.08, 14, 0x2a2a2e, [cxm - 0.19, 1.41, czm + 0.02], [0, 0, Math.PI / 2]); k.cyl(0.04, 0.04, 0.012, 14, BR, [cxm - 0.235, 1.41, czm + 0.02], [0, 0, Math.PI / 2]);
@@ -810,6 +884,7 @@ export default class Rockets {
     this.crank = ck.mesh(FIG_MAT); this.crank.position.set(cxm + 0.02, 1.38, czm - 0.11); B.add(this.crank);
     this.crankHandle = new THREE.Object3D(); this.crankHandle.position.set(0, 0.075, -0.06); this.crank.add(this.crankHandle);
     this.camGrip = V3(cxm + 0.1, 1.36, czm + 0.1);   // her other hand on the side of the body, steadying it
+    this.eyepiece = V3(cxm - 2, 1.2, ESTHER.z);   // (where she looks: through the eyepiece, out past the lens at the rocket)
     this.chimneyA = makeSmoke(V3(fx, fy + 10, fz + 2.5), { n: 6, rise: 8, size: 1.2, opacity: 0.18, color: 0xd8dce4 }); B.add(this.chimneyA.group);
     // cows by the barn, the farm dog, crows
     this.cowsA = this.life.add(makeHerd('cow', { n: 5, area: { x: 78, z: -28, r: 9 }, height: auburnHeight, seed: 3 })); B.add(this.cowsA.group);
@@ -983,26 +1058,15 @@ export default class Rockets {
       C.add(new THREE.Mesh(bg, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })));
       for (let i = 0; i < 26; i++) { const a = Math.PI * (0.14 + r() * 0.72), R = 34 + (r() - 0.5) * 2, x = Math.cos(a) * R, z = PAD.z - Math.sin(a) * R; k.ball(0.8 + r() * 0.8, 0, r() < 0.5 ? 0x2a3a22 : 0x3a4428, [x, 6.6 + r() * 0.4, z], [r(), r(), r()], [1.3, 0.6, 1.2]); }
     }
-    // the firing table (Brenntisch): a steel ring on four braced legs, the rocket standing on it by its fins,
-    // the exhaust going down through the ring onto a four-sided blast deflector; all on a slab of concrete
+    // the slab of concrete the firing table stands on (the table itself comes with Meem's V-2 model, buildV2)
     {
-      const ST = 0x3a3e3a, X = PAD.x, Z = PAD.z, TOP = 1.6;
+      const X = PAD.x, Z = PAD.z;
       for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) k.box(1.38, 0.14, 1.38, [0x7a7a74, 0x74746e, 0x80807a][(i * 7 + j * 3 + 21) % 3], [X + i * 1.4, 0.07, Z + j * 1.4]);
-      k.add(new THREE.LatheGeometry([[0.95, TOP - 0.2], [1.45, TOP - 0.2], [1.45, TOP], [0.95, TOP], [0.95, TOP - 0.2]].map(([a, b]) => new THREE.Vector2(a, b)), 24), ST, [X, 0, Z]);
-      for (let i = 0; i < 24; i++) { const a = i / 24 * 6.283; k.cyl(0.025, 0.025, 0.03, 6, 0x2a2a2a, [X + Math.cos(a) * 1.35, TOP + 0.01, Z + Math.sin(a) * 1.35]); }
-      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4, cx = X + Math.cos(a) * 1.2, cz = Z + Math.sin(a) * 1.2; k.box(0.5, 0.06, 0.34, 0x4a4e4a, [cx, TOP + 0.03, cz], [0, -a, 0]); }   // fin pads
-      for (const [ox, oz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-        const top = V3(X + ox * 0.75, TOP - 0.2, Z + oz * 0.75), foot = V3(X + ox * 1.15, 0.14, Z + oz * 1.15);
-        pipe(k, foot, top, 0.11, 0x2e322e, 6); k.box(0.5, 0.06, 0.5, 0x2a2e2a, [foot.x, 0.17, foot.z]);
-        for (let b = 0; b < 4; b++) k.cyl(0.03, 0.03, 0.06, 6, 0x1a1a1a, [foot.x + (b % 2 - 0.5) * 0.36, 0.22, foot.z + (b > 1 ? 0.18 : -0.18)]);
-      }
-      for (const [a, b] of [[[-1, -1], [1, -1]], [[1, -1], [1, 1]], [[1, 1], [-1, 1]], [[-1, 1], [-1, -1]]]) pipe(k, V3(X + a[0] * 1.05, 0.55, Z + a[1] * 1.05), V3(X + b[0] * 1.05, 0.55, Z + b[1] * 1.05), 0.04, 0x2e322e, 5);
-      k.cyl(0.05, 1.0, 1.1, 4, 0x5a5e58, [X, 0.79, Z], [0, Math.PI / 4, 0]); k.box(1.9, 0.1, 1.9, 0x4a4e48, [X, 0.19, Z], [0, Math.PI / 4, 0]);
-      // cables and a fuel hose snaking from the trucks to the table, a little ladder, gas cylinders
-      bend(k, [[X + 1.3, 0.17, Z + 0.4], [X + 3, 0.18, Z + 2], [X + 6, 0.06, Z + 4], [X + 9, 0.06, Z + 7], [X + 12, 0.2, Z + 11]], 0.05, 0x1a1a1a, 6);
-      bend(k, [[X - 1.2, 0.5, Z + 0.6], [X - 2, 0.2, Z + 2], [X - 5, 0.08, Z + 4], [X - 9, 0.08, Z + 6.5], [X - 11, 0.5, Z + 8]], 0.07, 0x2a2a28, 6);
-      for (let i = 0; i < 6; i++) k.box(0.5, 0.04, 0.08, 0x5a5a52, [X + 1.75, 0.35 + i * 0.24, Z + 1.05 - i * 0.03], [0, 0.6, 0]);
-      for (const o of [-0.22, 0.22]) pipe(k, V3(X + 1.75 + o * 0.82, 0.14, Z + 1.15 - o * 0.56), V3(X + 1.75 + o * 0.82, 1.62, Z + 0.88 - o * 0.56), 0.025, 0x5a5a52, 4);
+      // cables and a fuel hose snaking from the trucks to the table, a little step ladder, gas cylinders
+      bend(k, [[X + 1.15, 0.2, Z + 0.4], [X + 3, 0.18, Z + 2], [X + 6, 0.06, Z + 4], [X + 9, 0.06, Z + 7], [X + 12, 0.2, Z + 11]], 0.05, 0x1a1a1a, 6);
+      bend(k, [[X - 1.1, 0.45, Z + 0.6], [X - 2, 0.2, Z + 2], [X - 5, 0.08, Z + 4], [X - 9, 0.08, Z + 6.5], [X - 11, 0.5, Z + 8]], 0.07, 0x2a2a28, 6);
+      for (let i = 0; i < 4; i++) k.box(0.5, 0.04, 0.08, 0x5a5a52, [X + 1.95, 0.35 + i * 0.24, Z + 1.25 - i * 0.03], [0, 0.6, 0]);
+      for (const o of [-0.22, 0.22]) pipe(k, V3(X + 1.95 + o * 0.82, 0.14, Z + 1.35 - o * 0.56), V3(X + 1.95 + o * 0.82, 1.15, Z + 1.18 - o * 0.56), 0.025, 0x5a5a52, 4);
       for (let i = 0; i < 4; i++) { const x = X - 4.6 + i * 0.32, z = Z - 2.4; k.cyl(0.13, 0.13, 1.5, 10, i % 2 ? 0x4a5a6a : 0x5a5a5a, [x, 0.89, z]); k.ball(0.13, 1, 0x4a5a6a, [x, 1.64, z], 0, [1, 0.6, 1]); k.cyl(0.03, 0.03, 0.1, 6, 0x8a7a4a, [x, 1.74, z]); }
     }
     // trucks: an Opel Blitz fuel bowser and a cable truck (cab with its long bonnet, mudguards, a tank or a
@@ -1056,7 +1120,8 @@ export default class Rockets {
     const ek = new Kit(), EC = 0x4a5048;
     for (const sx of [-0.6, 0.6]) for (const sz of [-0.6, 0.6]) ek.box(0.14, 15, 0.14, EC, [sx, 7.5, sz]);
     for (let i = 0; i < 14; i++) { ek.box(1.3, 0.08, 0.08, EC, [0, i * 1.1 + 0.5, -0.6], [0, 0, i % 2 ? 0.7 : -0.7]); ek.box(1.3, 0.08, 0.08, EC, [0, i * 1.1 + 0.5, 0.6], [0, 0, i % 2 ? -0.7 : 0.7]); ek.box(0.08, 0.08, 1.2, EC, [-0.6, i * 1.1, 0]); }
-    for (const y of [4, 9, 13.5]) ek.box(1.8, 0.1, 1.2, 0x5a5a50, [-1.2, y, 0]);
+    // service platforms reaching in toward the rocket (stopping short of its body, and of the fins low down)
+    for (const [y, x0] of [[4, -1.15], [9, -1.62], [13.5, -1.62]]) ek.box(-0.55 - x0, 0.1, 1.2, 0x5a5a50, [(x0 - 0.55) / 2, y, 0]);
     this.erector = new THREE.Group(); const em = ek.mesh(); em.position.x = 0; this.erector.add(em); this.erector.position.set(PAD.x + 2.6, 0, PAD.z); C.add(this.erector);
     // the cloud deck, lit from inside by the rocket's flame
     this.clouds = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000, 1, 1), new THREE.ShaderMaterial({
@@ -1089,23 +1154,31 @@ export default class Rockets {
     this.deer = this.life.add(makeHerd('reindeer', { n: 3, area: { x: -34, z: -22, r: 5 }, height: balticHeight, seed: 7, scale: 0.8, mode: 'follow' })); this.deer.lead.set(-34, 0, -22); C.add(this.deer.group);
   }
 
-  // the V-2: 14 m tall, painted in black and white quarters like the test rockets
+  // the V-2: Meem's model (black and white quarters like the test rockets, standing on its little
+  // firing table). It is one mesh, so it is cut in two where the rocket's tail meets the table: the
+  // table stays on the slab and the rocket (this.v2, its origin at the bottom of its tail) flies.
+  // Real V-2: 14 m tall, 1.65 m wide, 3.56 m across the fins; the model is a little stubby, so it is
+  // drawn a touch taller and slimmer (V2_S) to match.
   buildV2() {
-    const prof = [[0, 0.6], [0.4, 0.66], [1.5, 0.78], [3, 0.83], [6.5, 0.83], [8.5, 0.8], [10, 0.68], [11.5, 0.5], [12.8, 0.28], [13.6, 0.1], [14, 0.0]];
-    let g = new THREE.LatheGeometry(prof.map(([y, rr]) => new THREE.Vector2(rr, y)), 24).toNonIndexed();
-    const p = g.attributes.position, cols = new Float32Array(p.count * 3);
-    for (let i = 0; i < p.count; i += 3) {
-      const x = (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3, y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3, z = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3;
-      const qd = Math.floor((Math.atan2(z, x) + Math.PI) / (Math.PI / 2)), band = y < 2.6 ? 0 : y < 10.2 ? 1 : 2, black = (qd + band) % 2;
-      const v = black ? 0.08 : 0.82; for (let j = 0; j < 3; j++) cols.set([v, v, v * 0.97], (i + j) * 3);
-    }
-    g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals();
-    g.deleteAttribute('uv'); const k = new Kit(); k.parts.push(g);
-    const fin = new THREE.Shape(); fin.moveTo(0.6, 3.4); fin.lineTo(1.78, 0.6); fin.lineTo(1.78, -0.1); fin.lineTo(0.55, 0.25); fin.closePath();
-    for (let i = 0; i < 4; i++) { const fg = new THREE.ExtrudeGeometry(fin, { depth: 0.06, bevelEnabled: false }); fg.translate(0, 0, -0.03); k.add(fg, i % 2 ? 0x141414 : 0xd8d8d4, [0, 0, 0], [0, i * Math.PI / 2 + Math.PI / 4, 0]); }
-    k.cyl(0.45, 0.55, 0.3, 12, 0x2a2a2a, [0, -0.1, 0]);
-    this.v2 = new THREE.Group(); this.v2.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })));
-    this.v2Base = V3(PAD.x, 1.76, PAD.z);   // standing on the table's fin pads this.v2.position.copy(this.v2Base); this.C.add(this.v2);
+    const SLAB = 0.14, V2_S = [0.92, 1.05, 0.92], CUT = 1.0 * V2_S[1];   // the table's top, in model metres
+    this.v2 = new THREE.Group(); this.v2Base = V3(PAD.x, SLAB + CUT, PAD.z);
+    this.v2.position.copy(this.v2Base); this.C.add(this.v2);
+    this.v2Table = new THREE.Group(); this.v2Table.position.set(PAD.x, SLAB, PAD.z); this.C.add(this.v2Table);
+    loadModel('prop_v2').then((m) => {
+      if (!m || this.disposed) return;
+      m.scene.updateMatrixWorld(true);
+      m.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.scale(...V2_S);
+        const pos = g.attributes.position, idx = g.index ? g.index.array : [...Array(pos.count).keys()], lo = [], hi = [];
+        for (let i = 0; i < idx.length; i += 3) {
+          const cy = (pos.getY(idx[i]) + pos.getY(idx[i + 1]) + pos.getY(idx[i + 2])) / 3;
+          (cy < CUT ? lo : hi).push(idx[i], idx[i + 1], idx[i + 2]);
+        }
+        const part = (list, dy) => { const pg = new THREE.BufferGeometry(); for (const [n, a] of Object.entries(g.attributes)) pg.setAttribute(n, a.clone()); pg.setIndex(list); pg.translate(0, dy, 0); pg.computeBoundingSphere(); return new THREE.Mesh(pg, o.material); };
+        this.v2Table.add(part(lo, 0)); this.v2.add(part(hi, -CUT));
+      });
+    });
     const fm = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     const cone = (rr, L, m) => { const cg = new THREE.CylinderGeometry(rr, 0.0, L, 14, 1, true); cg.translate(0, -L / 2, 0); return new THREE.Mesh(cg, m); };
     this.flameC = new THREE.Group(); this.flameC.position.y = -0.25; this.flameC.add(cone(0.75, 11, fm(0xff8a30, 0.55)), cone(0.45, 7, fm(0xffe8b0, 0.85)), glow(0xffa040, 14, 0.9)); this.flameC.visible = false; this.v2.add(this.flameC);
@@ -1149,21 +1222,21 @@ export default class Rockets {
     // Auburn
     const ah = (x, z) => V3(x, auburnHeight(x, z), z);
     this.god = add(this.B, 'goddard', ah(1.1, -2.9), { tunic: 0x2a2a30, height: 1.78 });
-    // Henry Sachs, Clark University's instrument maker: a flat cap, a work jacket over overalls, a scarf
-    this.henry = fig(this.B, ah(3.6, 2.0), { height: 1.72, coat: 0x5a4a36, coatLen: 0.2, hat: 'cap', hatCol: 0x4a4440, scarf: 0x8a2a22, trousers: 0x34405a, moustache: true, hair: 0x2a2018, gloves: 0x6a5038, boots: 0x2a1e14, seed: 12 });
-    // his blowtorch pole, carried in both hands sloping up in front of him (posed every frame in updatePeopleA)
-    this.henryTorch = poleTorch(1.8); this.henry.g.add(this.henryTorch);
+    // Henry Sachs, Clark University's instrument maker (Meem's model: red plaid jacket, cap). He lit the
+    // rocket with a blowtorch lashed to a long pole; he carries it in both hands sloping up in front of him
+    this.henry = add(this.B, 'henry_sachs', ah(3.9, 1.45), { tunic: 0x8a2a22, height: 1.74 });
+    this.henryTorch = poleTorch(2.3); this.henry.g.add(this.henryTorch);
     // Percy Roope with his stopwatch: no model yet, so a dressed figure (fedora, overcoat, glasses), not a second townsman
     this.roope = fig(this.B, ah(5.0, 1.6), { height: 1.69, coat: 0x4a4038, coatLen: 0.55, hat: 'fedora', hatCol: 0x3a3430, scarf: 0x8a7a5a, glasses: true, moustache: true, hair: 0x3a2a1e, trousers: 0x3a3a3e, seed: 5 });
     const sw = new Kit(); sw.cyl(0.028, 0.028, 0.012, 14, 0xc8c8c0, [0, 0, 0], [Math.PI / 2, 0, 0]); sw.cyl(0.024, 0.024, 0.013, 14, 0xf0ece0, [0, 0, 0.001], [Math.PI / 2, 0, 0]); sw.cyl(0.006, 0.006, 0.012, 6, 0xc8c8c0, [0, 0.033, 0]);
     this.stopwatch = sw.mesh(FIG_MAT); this.stopwatch.position.set(0, -0.66, 0.06); this.roope.arms[0].add(this.stopwatch);
-    // Esther Goddard behind her movie camera: 1920s cloche hat, a long belted coat with a fur collar, gloves
-    this.esther = fig(this.B, ah(ESTHER.x, ESTHER.z), { height: 1.62, coat: 0x2e4a3e, coatLen: 0.82, collar: 0x5a4636, belt: 0x22362c, hat: 'cloche', hatCol: 0x6a2a3e, hatBand: 0xc8a05a, hair: 0x4a3020, longHair: false, gloves: 0x5a3a2a, trousers: 0x6a5a50, boots: 0x2a1e18, skin: 0xe0b8a0, seed: 31 });
+    // Esther Goddard behind her movie camera (Meem's model: green coat): she filmed his launches
+    this.esther = add(this.B, 'esther_goddard', ah(ESTHER.x, ESTHER.z), { tunic: 0x2e4a3e, height: 1.63 });
     this.esther.g.rotation.y = -Math.PI / 2;
     // Peenemünde: two engineers walk back to the bunker before the launch
-    // Wernher von Braun, 32, who led the team: tall, fair hair swept back, a dark double-breasted suit under a long
-    // black leather coat, no hat; he stands at the end of your parapet and watches it go (no Tripo model yet)
-    this.braun = fig(this.C, V3(-1.7, balticHeight(-1.7, -0.55), -0.55), { height: 1.86, coat: 0x1c1a1a, coatLen: 0.85, collar: null, belt: 0x141212, hair: 0xc8a868, skin: 0xe2bca4, trousers: 0x2a2a30, boots: 0x101010, gloves: 0x1a1414, scarf: 0xd8d4c8, seed: 44 });
+    // Wernher von Braun, 32, who led the team (Meem's model: young, fair hair, a long black overcoat); he
+    // stands at the end of your parapet and watches it go
+    this.braun = add(this.C, 'von_braun', V3(-1.7, balticHeight(-1.7, -0.55), -0.55), { tunic: 0x1c1a1a, height: 1.86 });
     this.braun.g.rotation.y = Math.PI * 0.94;
     this.braunLab = label('Wernher von Braun', 0.12, { color: '#f2ecdc', glowCol: 'rgba(10,10,16,0.9)' }); this.braunLab.position.set(0, 2.12, 0); this.braunLab.material.opacity = 0; this.braun.g.add(this.braunLab);
     // (two different men: an engineer in a white work coat and a hat, and one in a long field-grey coat and cap)
@@ -1608,27 +1681,32 @@ export default class Rockets {
     this.henryTorch.userData.flicker(t, launched ? 0 : 0.8);
     this.henryTorch.visible = !(!G.kids && s.torch === 1) && !(s.byYou);
     if (s.henry >= 1 && !launched) { if (walkAround(H, HENRY_LIGHT.x, HENRY_LIGHT.z, dt, { height: auburnHeight }, this.obsA)) { this.henryReady = true; H.g.rotation.y = damp(H.g.rotation.y, Math.atan2(FRAME.x - HENRY_LIGHT.x, FRAME.z - HENRY_LIGHT.z), 4, dt); H.pose = s.henry >= 2 ? 'point' : 'hold'; H.pointAt.copy(this.igniterWorld(_a)); H.look = H.pointAt.clone(); } }
-    else if (launched && !this.landed) { if (walkAround(H, 4.0, 2.4, dt, { height: auburnHeight, speed: 2.6 }, this.obsA)) { H.pose = flying ? 'point' : 'gasp'; H.pointAt.copy(rkp); H.look = rkp.clone(); } }
+    else if (launched && !this.landed) { if (walkAround(H, 4.0, 1.4, dt, { height: auburnHeight, speed: 2.6 }, this.obsA)) { H.pose = flying ? 'point' : 'gasp'; H.pointAt.copy(rkp); H.look = rkp.clone(); } }
     else if (this.landed && (ph === 'launch' || ph === 'landed' || ph === 'descend')) { if (walkAround(H, -16, -17.5, dt, { height: auburnHeight, speed: 1.6 }, this.obsA)) { H.pose = 'cheer'; H.look = rkp.clone(); } }
     else if (!launched) { H.pose = 'idle'; H.look = null; H.glance = true; }
     else { H.pose = 'idle'; H.look = null; H.glance = true; }
-    animateFigure(H, t, dt);
+    animatePerson(H, t, dt);
     // the pole: sloping up ahead of him as he walks; reaching its flame into the nozzle when he lights it
     {
-      const TP = this.henryTorch, L = 1.8 + 0.21, reach = s.henry >= 1 && !launched && this.henryReady;
+      const TP = this.henryTorch, L = 2.3 + 0.21, reach = s.henry >= 1 && !launched && this.henryReady;
       H.g.updateMatrixWorld(true);
-      const base = _a.set(-0.12, 1.0, 0.3), dir = _b.set(0, Math.sin(0.75), Math.cos(0.75));
-      if (reach) { const ign = H.g.worldToLocal(this.igniterWorld(_c)); const sh = _d.set(-0.1, 1.3, 0.05); dir.copy(ign).sub(sh).normalize(); base.copy(ign).addScaledVector(dir, -L); }
+      const base = _a.set(-0.1, 0.95, 0.18), dir = _b.set(0, Math.sin(0.75), Math.cos(0.75));   // its butt by his right hip
+      if (reach) { const ign = H.g.worldToLocal(this.igniterWorld(_c)); const hip = _d.set(-0.1, 1.0, 0.2); dir.copy(ign).sub(hip).normalize(); base.copy(ign).addScaledVector(dir, -L); }
       this.hDir = (this.hDir || V3(0, 0.68, 0.73)).lerp(dir, Math.min(1, dt * 3)).normalize(); this.hBase = (this.hBase || base.clone()).lerp(base, Math.min(1, dt * 3));
       TP.position.copy(this.hBase); TP.quaternion.setFromUnitVectors(UP, this.hDir);
-      aimArm(H, 0, H.g.localToWorld(_c.copy(this.hBase).addScaledVector(this.hDir, 0.05)), dt); aimArm(H, 1, H.g.localToWorld(_c.copy(this.hBase).addScaledVector(this.hDir, 0.35)), dt);
+      // both hands on the pole: the right one low by his hip, the left one further up
+      const lowGrip = H.g.localToWorld(_c.copy(this.hBase).addScaledVector(this.hDir, 0.06)).clone(), highGrip = H.g.localToWorld(_c.copy(this.hBase).addScaledVector(this.hDir, 0.38));
+      if (H.rig) { const ax = _b.copy(this.hDir).transformDirection(H.g.matrixWorld).clone(); gripPole(H, 'Right', lowGrip, ax); gripPole(H, 'Left', highGrip, ax); }
+      else { aimArm(H, 0, lowGrip, dt); aimArm(H, 1, highGrip, dt); }
     }
     // Esther films; Roope times it with his stopwatch
     // Esther: eye to the viewfinder, one hand steadying the camera, the other turning its crank (two turns a second)
     const cranking = launched || s.labels; this.crank.rotation.z = cranking ? -t * 12.5 : this.crank.rotation.z;
-    this.crankHandle.getWorldPosition(_a); aimArm(E, 0, _a, dt);
-    aimArm(E, 1, this.camGrip, dt);
-    E.inner.rotation.x = 0.08; animateFigureLegs(E, dt);   // leaning in, her eye just at the eyepiece
+    E.pose = 'idle'; E.look = this.eyepiece; animatePerson(E, t, dt);
+    if (E.rig) {   // leaning in, her eye just at the eyepiece
+      const Bn = E.rig.bones; if (Bn.Spine && Bn.Neck) aimBoneTo(Bn.Spine, Bn.Neck, _b.set(0, 1, 0.3).normalize().transformDirection(E.inner.matrixWorld), 1);
+      this.crankHandle.getWorldPosition(_a); reachHand(E, 'Right', _a); reachHand(E, 'Left', this.camGrip); gripHand(E, 'Right'); gripHand(E, 'Left', 0.35);
+    } else { this.crankHandle.getWorldPosition(_a); aimArm(E, 0, _a, dt); aimArm(E, 1, this.camGrip, dt); }
     Rp.g.rotation.y = damp(Rp.g.rotation.y, Math.atan2(rkp.x - Rp.g.position.x, rkp.z - Rp.g.position.z), 3, dt);
     Rp.pose = this.landed && ph !== 'papers' ? 'cheer' : flying ? 'point' : 'hold'; Rp.pointAt.copy(rkp); Rp.look = rkp.clone(); animateFigure(Rp, t, dt);
   }
@@ -1651,7 +1729,8 @@ export default class Rockets {
     // von Braun watches; his name while his line plays; he looks up as it climbs
     const B2 = this.braun; this.braunLab.material.opacity = damp(this.braunLab.material.opacity, s.braun === 1 ? 1 : 0, 2.5, dt);
     B2.pose = this.liftT != null && this.v2Y < 120 ? 'point' : 'idle'; B2.pointAt.copy(this.v2.position).setY(this.v2.position.y + 8);
-    animateFigure(B2, t, dt); B2.inner.rotation.x = this.liftT != null ? -0.08 : 0;
+    B2.look = this.liftT != null ? B2.pointAt.clone() : s.braun === 1 ? null : _a.copy(this.v2.position).setY(this.v2.position.y + 7).clone(); B2.glance = s.braun === 1;
+    animatePerson(B2, t, dt);
     // remembrance lights
     const mv = this.memV = damp(this.memV || 0, s.lights ? 1 : 0, 0.6, dt);
     this.memorial.visible = mv > 0.01 && this.C.visible;
@@ -1753,6 +1832,7 @@ export default class Rockets {
   }
 
   dispose() {
+    this.disposed = true;
     this.space.dispose();
     this.G.scene.remove(this.root);
     this.root.traverse((o) => { o.geometry?.dispose(); });

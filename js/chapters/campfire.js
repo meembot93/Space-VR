@@ -208,7 +208,7 @@ export default class Campfire {
     this.life = new Life(this.root);
     const c = at(192, 24), h = at(148, 30);
     this.reindeer = this.life.add(makeHerd('reindeer', { n: 18, area: { x: c.x, z: c.z, r: 16 }, height: groundHeight, mode: 'migrate', dir: [1, 0.08], seed: 11 }));
-    this.horses = this.life.add(makeHerd('horse', { n: 8, area: { x: h.x, z: h.z, r: 7 }, height: groundHeight, seed: 12 }));
+    this.horses = this.life.add(makeHerd('horse', { n: 5, area: { x: h.x, z: h.z, r: 11 }, height: groundHeight, seed: 12 }));
     this.hunters = [];
     const spear = () => { const k = new Kit(); k.cyl(0.015, 0.018, 2.1, 5, 0x6a5038, [0, 0, 0]); k.add(roughStone(0.04, 0.14, 0.015, 9, [1, 2, 1]), 0x4a4440, [0, 1.1, 0]); return k.mesh(); };
     [[160, 46, 0], [166, 50, 1]].forEach(([az, d, i]) => {

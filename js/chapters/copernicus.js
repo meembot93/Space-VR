@@ -20,6 +20,7 @@ import * as THREE from 'three';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, walkToward, holdProp, dropProp } from '../people.js';
 import { makeHerd, makeFlock, makeSmoke, makeTorch, Life } from '../life.js';
+import { dress } from '../dress.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2, roughStone } from '../shapes.js';
 import { glowPoints } from '../wow/fx.js';
@@ -678,26 +679,30 @@ export default class Copernicus {
     this.friend.g.visible = false;
     this.messenger = add('townsman', new THREE.Vector3(this.HATCH.x, TOP - 2.5, this.HATCH.z), { tunic: 0x5a4a32, hair: 0x3a2a1a, height: 1.7 }, 'messenger');
     this.messenger.g.visible = false;
-    // Everyone else in the scene is a different person (no two copies of one model on screen at
-    // once: 'canon' is Rheticus's face and 'townsman' is the messenger's, so neither is used again).
+    // Everyone else in the scene is a different person (no two copies of one model close together:
+    // 'canon' is Rheticus's face and 'townsman' is the messenger's, so neither is used again; the
+    // 1600s townsfolk appear twice, in other clothes, a hundred metres apart).
     // A night watchman walking the close's wall with his lantern
     const wy = 6.55, wz = 0.25;   // on the wall-walk's boards, behind the breastwork
-    this.watch = add('sailor', new THREE.Vector3(20, wy, wz), { tunic: 0x4a4038, hair: 0x2a1a10, beard: true }, 'watch');
+    this.watch = add('townsman_1600', new THREE.Vector3(20, wy, wz), {}, 'watch');
     this.watch.routine = [{ x: 60, z: wz, pose: 'idle', secs: 6, look: new THREE.Vector3(60, 0, -200) }, { x: 104, z: wz, pose: 'idle', secs: 4 }, { x: 10, z: wz, pose: 'idle', secs: 8, look: new THREE.Vector3(0, TOP + 1.5, 0) }];
     this.watchLamp = makeTorch({ len: 0.4, color: 0xffc070, size: 0.7 }); holdProp(this.watch, this.watchLamp, 'Right', [0, 0.02, 0.02]);
-    // two robed canons crossing the close with lanterns, to and from the cathedral
+    // an old canon in his black gown and the canons' housekeeper crossing the close with lanterns
     this.walkers = [];
-    ['eratosthenes', 'instrument_maker'].forEach((model, i) => {
-      const P = add(model, new THREE.Vector3(20 + i * 20, 0, 40), { tunic: 0x1a1a1e, hair: 0x6a6a6a, height: 1.72 }, 'canon');
+    ['venetian_senator', 'townswoman_1600'].forEach((model, i) => {
+      const P = add(model, new THREE.Vector3(20 + i * 20, 0, 40), {}, 'canon');
+      if (!i) dress(P, { sat: 0.06, val: 0.38, build: 1.04 });   // the red robe dyed black
       P.routine = [{ x: 28 - i * 2, z: 23, pose: 'idle', secs: 5 + i * 3 }, { x: 22 + i * 26, z: 42, pose: 'talk', secs: 6 + i * 2, look: new THREE.Vector3(30 + i * 20, 1.6, 44) }];
       P.ri = i; const L = makeTorch({ len: 0.35, color: 0xffc070, size: 0.6 }); holdProp(P, L, 'Right', [0, 0.02, 0.02]); P.lamp = L;
       this.walkers.push(P);
     });
     // two townsfolk walking up and down a lane of the town, far below (the lane runs from
-    // (-35, -60) to (-41, -140) with houses either side: they keep to its middle)
+    // (-35, -60) to (-41, -140) with houses either side: they keep to its middle), dressed
+    // differently from the watchman and the housekeeper
     const lane = (z, o) => -35 - 6 * (-60 - z) / 80 + o;
-    ['villager', 'builder_far'].forEach((model, i) => {
-      const o = i ? 0.7 : -0.7, z0 = i ? -66 : -72, z1 = i ? -80 : -86, P = add(model, new THREE.Vector3(lane(z0, o), groundHeight(lane(z0, o), z0), z0), { tunic: [0x5a4a32, 0x6a2a2a][i], hair: 0x3a2a1a, height: 1.64 + i * 0.08 }, 'town');
+    ['townsman_1600', 'townswoman_1600'].forEach((model, i) => {
+      const o = i ? 0.7 : -0.7, z0 = i ? -66 : -72, z1 = i ? -80 : -86, P = add(model, new THREE.Vector3(lane(z0, o), groundHeight(lane(z0, o), z0), z0), {}, 'town');
+      dress(P, i ? { hue: 0.45, sat: 0.9, val: 0.9 } : { hue: 0.55, sat: 0.6, val: 0.9, build: 1.05 });
       P.routine = [{ x: lane(z1, o), z: z1, pose: i ? 'talk' : 'idle', secs: 6 + i }, { x: lane(z0, o), z: z0, pose: 'work', secs: 5 }];
       this.walkers.push(P);
     });
@@ -966,6 +971,15 @@ export default class Copernicus {
     // the town and the close
     runRoutine(this.watch, dt, { height: () => 6.55, speed: 0.8 }); animatePerson(this.watch, t, dt); this.watchLamp.userData.flicker(t);
     for (const P of this.walkers) { runRoutine(P, dt, { height: groundHeight, speed: 0.9 }); animatePerson(P, t, dt); P.lamp?.userData.flicker(t); }
+    // the dog in the close steps aside for the canon and the housekeeper (never through their legs)
+    for (const P of this.walkers) {
+      const px = P.g.position.x, pz = P.g.position.z;
+      for (const o of this.dog?.animals || []) {
+        const dx = o.x - px, dz = o.z - pz, d = Math.hypot(dx, dz) || 1e-3;
+        if (d < 1.1) { o.x = px + dx / d * 1.1; o.z = pz + dz / d * 1.1; }
+        if (Math.hypot(o.tx - px, o.tz - pz) < 1.6) { o.tx = px + dx / d * 2.6; o.tz = pz + dz / d * 2.6; }
+      }
+    }
   }
 
   updateModel(dt, t) {

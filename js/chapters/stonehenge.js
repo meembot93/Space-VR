@@ -486,10 +486,10 @@ export default class Stonehenge {
     // (directions from where you start toward the village)
     const S = this.start.pos, V = at(150, 165), dir = _a.subVectors(V, S).setY(0).normalize().clone(), side = new THREE.Vector3(dir.z, 0, -dir.x);
     const along = (d, sd = 0) => S.clone().addScaledVector(dir, d).addScaledVector(side, sd);
-    const c = along(13, 6);
-    this.cattle = this.life.add(makeHerd('cow', { n: 7, area: { x: c.x, z: c.z, r: 5 }, height: groundHeight, seed: 31 }));
+    const c = along(17, 7);   // (life-size cattle: a few, with room to graze)
+    this.cattle = this.life.add(makeHerd('cow', { n: 4, area: { x: c.x, z: c.z, r: 8 }, height: groundHeight, seed: 31, far: 14 }));
     const sh = along(20, -8);
-    this.sheep = this.life.add(makeHerd('sheep', { n: 14, area: { x: sh.x, z: sh.z, r: 5 }, height: groundHeight, mode: 'follow', seed: 32 }));
+    this.sheep = this.life.add(makeHerd('sheep', { n: 6, area: { x: sh.x, z: sh.z, r: 5 }, height: groundHeight, mode: 'follow', seed: 32, far: 14 }));   // (far: light copies beyond 14 m keep the scene in its triangle budget)
     this.dog = this.life.add(makeHerd('dog', { n: 1, area: { x: sh.x, z: sh.z, r: 3 }, height: groundHeight, mode: 'follow', seed: 33 }));
     this.flock = this.life.add(makeFlock({ n: 16, center: new THREE.Vector3(0, 28, 0), r: 30, height: 8, color: 0x1a1a1c, seed: 34 }));
     this.flock.group.visible = false;
