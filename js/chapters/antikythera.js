@@ -703,7 +703,7 @@ export default class Antikythera {
     this.ghost = new THREE.Group();
     const gm = new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
     const lm = new THREE.LineBasicMaterial({ color: 0xbff2ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-    const ship = PROPS.models.ship_ancient;
+    const ship = null;   // (Meem's ship_ancient as the ghost read as a tangle of lines, so the code ghost ship stays)
     if (ship) {   // Meem's Greek ship, her keel where the old hull's was, 26 m long
       const sg = ship.geometry.clone(), k2 = 26 / ship.size.z; sg.scale(k2, k2, k2); sg.translate(0, -1.6, 0);
       this.ghost.add(new THREE.Mesh(sg, gm), new THREE.LineSegments(new THREE.EdgesGeometry(sg, 35), lm));

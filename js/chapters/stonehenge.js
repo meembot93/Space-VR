@@ -24,6 +24,13 @@ import { loadProps } from '../props.js';
 // stones; the one the builders raise uses the full one. Missing models fall back to the code stones.
 const PROPS = await loadProps(['sarsen_stone', 'sarsen_stone_lo', 'sarsen_lintel', 'sarsen_lintel_lo', 'bluestone_lo', 'roundhouse', 'stone_sledge'],
   { stone_sledge: { z: 4 } });
+// Meem's stone textures are dark under the pre-dawn sky: lift them to the pale grey of the old stones,
+// with a little light of their own so the circle still reads before sunrise
+for (const [n, k, e] of [['sarsen_stone', 1.55, 0x262420], ['sarsen_stone_lo', 1.55, 0x262420], ['sarsen_lintel', 1.55, 0x262420],
+  ['sarsen_lintel_lo', 1.55, 0x262420], ['bluestone_lo', 1.3, 0x1a1c20]]) {
+  const m = PROPS.models[n]?.material; if (!m) continue;
+  m.color.setScalar(k); m.emissive.setHex(e); m.emissiveMap = m.map;
+}
 // A single (not instanced) mesh of one of the models, stretched to w x h x d (for the moving stone,
 // the waiting lintels and the sledge, which the story moves)
 function propMesh(name, w, h, d) {

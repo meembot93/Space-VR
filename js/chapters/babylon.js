@@ -521,7 +521,7 @@ export default class Babylon {
     const SHELF_Z = F + 0.2, WOOD = 0x6e4e30;
     // Meem's tablet shelves (two to each side, 2.1 m tall, full of tablets of their own): the four
     // glowing tablets wait on their boards (heights measured off the model, x 1.05)
-    const SP = PROPS.fresh(), model = PROPS.has('tablet_shelf');
+    const SP = PROPS.fresh(), model = false;   // (Meem's tablet_shelf: its own stretched tablets poked through the posts and hid the glowing ones, so the code shelves stay for now)
     const ROWS = model ? [0.44, 0.80, 1.17, 1.52, 1.90] : [0.32, 0.74, 1.16, 1.58, 2.0];
     this.shelfSpots = [];
     if (model) {
