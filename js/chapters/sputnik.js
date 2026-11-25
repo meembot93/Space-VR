@@ -1620,6 +1620,7 @@ export default class Sputnik {
       else if (pair) { P.pose = 'hold'; P.look = other.g.position.clone().add(this.site.position).setY(1.6); }
       else if (lr < 0) { P.pose = this.meetV > 0.5 && P.i % 5 === 0 ? 'wave' : 'idle'; P.look = this.meetV > 0.3 ? me.clone() : rocketTop.clone(); }
       else { P.pose = lr < 2.5 ? 'idle' : lr < 6 ? (P.i % 3 ? 'gasp' : 'point') : P.i % 3 === 0 ? 'point' : P.i % 3 === 1 ? 'cheer' : 'wave'; P.look = rocketTop.clone(); }
+      if (P.name === 'von_braun' && P.pose !== 'idle') P.pose = 'idle';   // von Braun keeps his arms down the whole time: no raised arm that could read as a salute
       P.pointAt.copy(rocketTop);
       animate(P, t, dt);
       // named: a nod and a soft warm light on them
