@@ -213,10 +213,10 @@ const RECIPES = {
   1: () => [
     { kind: 'fire', at: V(0, 0.5, 0), vol: 0.55, ref: 1.6, rolloff: 1.2 },
   ],
-  // Ch2: the builders' crowd by the stones, the village far off, a breeze in the trees
+  // Ch2: the village murmuring far off, a breeze in the trees. (No crowd bed by the stones: the
+  // made-up babble right next to you sounded like a strange buzzing, Meem 2026-11-25.)
   2: () => [
-    { kind: 'crowd', at: V(0, 1.5, 0), vol: 0.22, ref: 10, rolloff: 1 },
-    { kind: 'crowd', at: at(150, 165, 2), vol: 0.12, ref: 30, rolloff: 1 },
+    { kind: 'crowd', at: at(150, 165, 2), vol: 0.06, ref: 30, rolloff: 1 },
     { kind: 'leaves', at: at(230, 120, 6), vol: 0.1, ref: 40, wide: true },
   ],
   // Ch3: the Nile flowing past below the village, palms rustling, the village waking after the bell.
