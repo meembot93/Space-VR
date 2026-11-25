@@ -36,6 +36,7 @@ import { Echo } from '../wow/echo.js';
 import { Space, lonLat } from '../wow/space.js';
 import { D2R, ease, clamp01, at, sunAt, windows, label, Journal, INK, guideUpdate } from '../era2/common.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadProps } from '../props.js';
 
 // Meem's R-7 and Sputnik (Tripo models), cut into the pieces that move on their own by
 // tools/models/split_r7.mjs: r7_parts.glb has the core stage above the boosters, four boosters and
@@ -45,6 +46,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const GLB = (f) => new GLTFLoader().loadAsync(new URL('../../models/' + f, import.meta.url).href).catch((e) => { console.warn('Model failed', f, e); return null; });
 const [R7, SPUTNIK] = await Promise.all([GLB('r7_parts.glb'), GLB('sputnik_ball.glb')]);
 const r7Part = (name) => R7?.scene.getObjectByName(name);
+// Meem's tanker truck, the tracking station's receiver, a family's radio and an apartment block (models/props)
+const PROPS = await loadProps(['soviet_truck', 'radio_receiver', 'family_radio', 'apartment_block'],
+  { soviet_truck: { z: 7 }, radio_receiver: { h: 1.75 }, family_radio: { h: 0.34 }, apartment_block: { x: 20 } });   // (the truck's length is along its z)
 
 const LAT = 45.92, LON = 63.34, YEAR = 1957, SUNLON = 191, HOUR = 23.7;   // 22:28 Moscow time = local midnight
 const MOON = { az: 230, el: 14, phase: 0.36 };                               // a waxing gibbous Moon, low in the south-west
@@ -948,7 +952,10 @@ export default class Sputnik {
       for (const a of [-0.18, 0.18]) { const q = P(a, 0.19); k.box(0.035, 0.48, 0.035, 0x4a3220, [q[0], 0.7, q[1]], [0, yaw, 0]); }
       const q = P(0, 0.19); k.box(0.4, 0.14, 0.025, 0x6a4a2a, [q[0], 0.84, q[1]], [0, yaw, 0]);
     };
-    chair(-0.35, -1.25, 0.35); chair(1.45, -1.0, -1.2);
+    // Meem's receiver cabinet (its reels on top) in the front corner by the right wall, turned a little toward the window
+    const RP = PROPS.fresh(), rcv = RP.add('radio_receiver', 1.46, 0, -0.55, -Math.PI / 2 + 0.35);
+    if (rcv) R.add(RP.build());
+    chair(-0.35, -1.25, 0.35); chair(1.45, rcv ? -1.5 : -1.0, -1.2);
     // on the walls: a map of the world, a clock, a calendar for October 1957, a poster
     k.box(1.2, 0.7, 0.02, 0xd8d0b0, [-W / 2 + 0.02, 2.0, -1.5], [0, Math.PI / 2, 0]); for (const [z, y, w, h] of [[-1.75, 2.1, 0.3, 0.25], [-1.45, 2.15, 0.2, 0.3], [-1.2, 2.0, 0.35, 0.2], [-1.4, 1.85, 0.12, 0.2]]) k.box(w, h, 0.01, 0x8a9a6a, [-W / 2 + 0.032, y, z], [0, Math.PI / 2, 0]);
     k.cyl(0.16, 0.16, 0.04, 20, 0xf0ece0, [W / 2 - 0.03, 2.1, -1.2], [0, 0, Math.PI / 2]); k.add(new THREE.TorusGeometry(0.165, 0.015, 4, 20), 0x2a2a2a, [W / 2 - 0.035, 2.1, -1.2], [0, Math.PI / 2, 0]);
@@ -979,7 +986,7 @@ export default class Sputnik {
 
   // ---------- 3. Rooftops at dusk ----------
   buildTown() {
-    const k = new Kit(), r = rng(61), wins = [], T = this.town, ant = new Kit(), lampP = [];
+    const k = new Kit(), r = rng(61), wins = [], T = this.town, ant = new Kit(), lampP = [], TP = PROPS.fresh();   // TP: Meem's models
     const g = new THREE.PlaneGeometry(1600, 1600, 8, 8); g.rotateX(-Math.PI / 2);
     T.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x3a3a3c })));
     // our block: you stand on its flat roof
@@ -1009,6 +1016,8 @@ export default class Sputnik {
       const x = gx * 26 + (r() - 0.5) * 4, z = gz * 26 + (r() - 0.5) * 4;
       if (Math.abs(gx) <= 1 && Math.abs(gz) <= 1) continue;
       const far = Math.hypot(gx, gz);
+      // Meem's apartment block in a few of the nearer spots, out where you look (south-west), facing our roof
+      if ([[-2, 1], [-2, 2], [-1, 2], [0, 2]].some(([a, b]) => a === gx && b === gz) && TP.add('apartment_block', x, 0, z, Math.round(Math.atan2(-x, -z) / (Math.PI / 2)) * Math.PI / 2)) continue;
       block(x, z, 12 + r() * 8, 10 + r() * 8, 8 + r() * (far > 4 ? 18 : 10), pal[Math.floor(r() * pal.length)]);
     }
     // a water tower on a roof, a church spire and a factory chimney on the skyline
@@ -1026,12 +1035,13 @@ export default class Sputnik {
     for (const [x, z] of [[5.7, -1.5], [5.7, -0.6], [-5.7, 1.0]]) { k.cyl(0.18, 0.13, 0.3, 10, 0xa05a3a, [x, ROOF + 0.15, z]); k.ball(0.2, 1, 0x3a5a2a, [x, ROOF + 0.38, z], 0, [1, 0.7, 1]); }
     k.cyl(0.14, 0.11, 0.28, 10, 0x6a6e72, [-3.2, ROOF + 0.14, 2.6]);
     k.box(0.6, 0.5, 0.5, 0x6a4a2a, [1.6, ROOF + 0.25, -1.2]);
-    k.box(0.5, 0.34, 0.28, 0x5a3a22, [1.6, ROOF + 0.67, -1.2]); k.box(0.36, 0.16, 0.02, 0xd8c8a0, [1.6, ROOF + 0.7, -1.055]);
+    const famRadio = TP.add('family_radio', 1.6, ROOF + 0.5, -1.2, 0);   // Meem's family radio on the crate (its dial on the right of its face)
+    if (!famRadio) { k.box(0.5, 0.34, 0.28, 0x5a3a22, [1.6, ROOF + 0.67, -1.2]); k.box(0.36, 0.16, 0.02, 0xd8c8a0, [1.6, ROOF + 0.7, -1.055]); }
     // street lamps (one glowing draw call)
     for (let i = -6; i <= 6; i++) for (const zz of [-13, 13, -39, 39]) { const x = i * 26 + 13; k.cyl(0.08, 0.1, 6, 5, 0x2a2a2a, [x, 3, zz]); lampP.push([x, 6.1, zz]); }
-    T.add(k.mesh()); T.add(ant.mesh());
+    T.add(k.mesh()); T.add(ant.mesh(), TP.build({ glow: 0x231c16 }));
     T.add(windows(wins, { lit: 0.55, seed: 13, w: 1.0, h: 1.3, warm: 0xffc870 }));
-    this.radioDial = glowSprite(0xffc060, 0.35, 0.9); this.radioDial.position.set(1.6, ROOF + 0.7, -1.0); T.add(this.radioDial);
+    this.radioDial = glowSprite(0xffc060, 0.35, 0.9); this.radioDial.position.set(famRadio ? 1.72 : 1.6, famRadio ? ROOF + 0.65 : ROOF + 0.7, -1.0); T.add(this.radioDial);
     this.radioPos = new THREE.Vector3(1.6, ROOF + 0.7, -1.0);
     const L = glowPoints(lampP.length, { sizeScale: 300 }); lampP.forEach(([x, y, z], i) => { L.userData.pos.set([x, y, z], i * 3); L.userData.col.set([1, 0.85, 0.6], i * 3); L.userData.size[i] = 0.9; }); L.userData.commit(); T.add(L);
     this.washing = makeCloth(1.2, 0.8, { color: 0xd8d0c0, hang: true }); this.washing.group.position.set(4.6, ROOF + 1.7, 4.35); T.add(this.washing.group);
@@ -1850,6 +1860,10 @@ function jeep(k, p, yaw) {
 // A 1950s Soviet truck: a long bonnet, a square cab, and a body (a frosty oxygen tank, or a cable drum)
 function makeTruck(kind) {
   const k = new Kit(), g = new THREE.Group(), wheels = [];
+  if (kind === 'tanker' && PROPS.has('soviet_truck')) {   // Meem's green tanker (its cab at +z, like these)
+    const TP = PROPS.fresh(); TP.add('soviet_truck', 0, 0, 0, 0); g.add(TP.build({ glow: 0x231c16 }));
+    return { g, wheels, lamps: [[-0.82, 1.2, 3.45], [0.82, 1.2, 3.45]] };
+  }
   const body = kind === 'tanker' ? 0x4a5a4a : kind === 'jeep' ? 0x4a5a3a : 0x3a4a5a;
   if (kind === 'jeep') {
     k.box(1.7, 0.7, 3.6, body, [0, 0.8, 0]); k.box(1.6, 0.7, 1.6, 0x3e4e32, [0, 1.5, -0.3]); k.box(1.5, 0.4, 0.05, 0x1a2a3a, [0, 1.55, 0.51]);
