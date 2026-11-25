@@ -1620,7 +1620,6 @@ export default class Sputnik {
       else if (pair) { P.pose = 'hold'; P.look = other.g.position.clone().add(this.site.position).setY(1.6); }
       else if (lr < 0) { P.pose = this.meetV > 0.5 && P.i % 5 === 0 ? 'wave' : 'idle'; P.look = this.meetV > 0.3 ? me.clone() : rocketTop.clone(); }
       else { P.pose = lr < 2.5 ? 'idle' : lr < 6 ? (P.i % 3 ? 'gasp' : 'point') : P.i % 3 === 0 ? 'point' : P.i % 3 === 1 ? 'cheer' : 'wave'; P.look = rocketTop.clone(); }
-      if (P.name === 'von_braun' && P.pose !== 'idle') P.pose = 'idle';   // von Braun keeps his arms down the whole time: no raised arm that could read as a salute
       P.pointAt.copy(rocketTop);
       animate(P, t, dt);
       // named: a nod and a soft warm light on them
@@ -1834,7 +1833,6 @@ export default class Sputnik {
       if (s.echoes && !E.on) { E.delay ??= 0.25 + i * 0.22; E.delay -= dt * this.F; if (E.delay <= 0) { E.show(true); if (i % 3 === 0) G.audio.chime(E.P.g.position, 0.2); } }
       E.P.look = look; E.P.pointAt.copy(look);
       E.P.pose = s.moon ? (i % 4 === 0 ? 'point' : 'idle') : (i % 3 === 0 ? 'point' : i % 5 === 1 ? 'gasp' : 'idle');
-      if (E.vb) E.P.pose = 'idle';   // arms always down for von Braun
       E.update(dt, t);
       for (const m of E.mats) if ('emissiveIntensity' in m) m.emissiveIntensity = 0.9 + 0.25 * Math.sin(t * 2.2 + i);
       E.lab.material.opacity = E.k * 0.85; E.lab.visible = E.k > 0.02;
