@@ -58,6 +58,7 @@ function bake(name, own) {
     const k = sz.h ? sz.h / s0.y : sz.x ? sz.x / s0.x : sz.z / s0.z;
     g.scale(k, k, k); g.computeBoundingBox();
     const m = src.material.clone();
+    m.transparent = false; m.alphaTest = 0; m.opacity = 1; m.depthWrite = true;   // (some Tripo textures carry stray alpha: holes in the bronze door)
     m.metalness = name === 'lantern' ? 0.4 : 0; m.roughness = Math.max(0.75, m.roughness ?? 1); m.metalnessMap = null;
     return { geometry: g, material: m, size: g.boundingBox.getSize(new THREE.Vector3()) };
   }));

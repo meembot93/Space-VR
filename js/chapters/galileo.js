@@ -455,7 +455,7 @@ export default class Galileo {
       if (Math.abs(gx % 60) < 2 || Math.abs(gz % 75) < 2 || r() < 0.1) continue;
       const near = d < 280; if (!near && r() < 0.6) continue;
       const x = gx + (r() - 0.5) * 2, z = gz + (r() - 0.5) * 2;
-      house(near ? k : far, { x, y: 0, z, shut: d < 150, tiles: d < 70, w: 10 + r() * 4, d: 10 + r() * 3, h: 7 + r() * 8, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], props: d < 110 ? PP : null, model: 'house_italian_lo' }, wins, r, near);
+      house(near ? k : far, { x, y: 0, z, shut: d < 150, tiles: d < 70, w: 10 + r() * 4, d: 10 + r() * 3, h: 7 + r() * 8, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], props: d < 110 ? PP : null, model: d < 45 ? 'house_italian' : 'house_italian_lo' }, wins, r, near);
     }
     // the Basilica of St Anthony (Il Santo): a brick church crowned with domes, a cone and minarets
     const sx = 262, sz = 183, B = 0x9a5a40;
@@ -574,7 +574,7 @@ export default class Galileo {
       k.cyl(0.35, 0.35, 0.08, 14, 0x8a8478, [-6.6, 1.3, -31.9], [0, 0, Math.PI / 2]); k.box(0.06, 0.5, 0.06, 0x3a2818, [-6.6, 1.05, -31.9]);
       for (let i = 0; i < 5; i++) k.cyl(0.03, 0.04, 1.0, 6, 0x7a2a1a, [-7.9 + i * 0.12, 0.98, -32.0], [0, 0, Math.PI / 2]);
     }
-    WP.add('galileo_telescope', -9.4, paduaHeight(-9.4, -31.5), -31.5, 0.25, { s: 0.75 });
+    WP.add('galileo_telescope', -10.3, paduaHeight(-10.3, -32.5), -32.5, Math.PI / 2, { s: 0.75 });   // (back against the wall, tube along it, out of people's way)
     k.cyl(0.25, 0.3, 0.6, 8, 0x6a4a30, [-11.8, 0.3, -31.7]); k.box(0.9, 0.5, 0.5, 0x5a3a22, [-12.0, 0.25, -32.6]);
     Bg.add(k.mesh(), WP.build({ glow: 0x231c16 }));
     Bg.add(panes(wins, { lit: 0.6, seed: 2 }));
@@ -1269,12 +1269,8 @@ function house(k, o, wins, r, near = true) {
   const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
   const rh = Math.min(w, d) * 0.2;
   // o.props + o.model: Meem's Italian house model in this footprint (with its own shutters and
-  // chimney); only lit window panes are added on its street face, for the candlelight at night
-  if (o.props?.add(o.model, x, y, z, yaw, { w, d, h: h + rh + 1 })) {
-    const floors = Math.max(1, Math.floor((h - 1) / 3.2)), cols = Math.max(1, Math.floor(w / 3.2));
-    for (let f = 1; f < floors; f++) for (let i = 0; i < cols; i++) wins.push({ p: new THREE.Vector3(...P(-w / 2 + (i + 0.5) * w / cols, 2.1 + f * 3.2, d / 2 + 0.06)), yaw, opt: true });
-    return;
-  }
+  // chimney; no code window panes on it: they didn't line up with the model's own windows)
+  if (o.props?.add(o.model, x, y, z, yaw, { w, d, h: h + rh + 1 })) return;
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.add(gableRoof(w, d, rh, 0.35), roofCol, P(0, h, 0), [0, yaw, 0]);
   if (!near) return;
