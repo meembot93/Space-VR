@@ -1115,7 +1115,7 @@ export default class Sputnik {
       const a = (i / who.length) * Math.PI * 2 + 0.25, x = Math.sin(a) * 4.6, z = -Math.cos(a) * 4.6;
       const E = new Echo(this.G, H, { model, tint, pos: new THREE.Vector3(x, hillH(x, z), z), face: Math.atan2(-x, -z), seed: 81 + i * 3, look: { beard: i % 3 === 1 } });
       E.lab = label(name, 0.13); E.lab.position.set(x, hillH(x, z) + 2.15, z); E.lab.material.opacity = 0; H.add(E.lab);
-      E.i = i; return E;
+      E.i = i; E.vb = model === 'von_braun'; return E;
     });
     // a ring of light on the grass where they stand, and a little pool of light at each one's feet
     this.ringGlow = glowPoints(144 + who.length, { sizeScale: 300 }); H.add(this.ringGlow);
@@ -1834,6 +1834,7 @@ export default class Sputnik {
       if (s.echoes && !E.on) { E.delay ??= 0.25 + i * 0.22; E.delay -= dt * this.F; if (E.delay <= 0) { E.show(true); if (i % 3 === 0) G.audio.chime(E.P.g.position, 0.2); } }
       E.P.look = look; E.P.pointAt.copy(look);
       E.P.pose = s.moon ? (i % 4 === 0 ? 'point' : 'idle') : (i % 3 === 0 ? 'point' : i % 5 === 1 ? 'gasp' : 'idle');
+      if (E.vb) E.P.pose = 'idle';   // arms always down for von Braun
       E.update(dt, t);
       for (const m of E.mats) if ('emissiveIntensity' in m) m.emissiveIntensity = 0.9 + 0.25 * Math.sin(t * 2.2 + i);
       E.lab.material.opacity = E.k * 0.85; E.lab.visible = E.k > 0.02;
