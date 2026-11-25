@@ -37,7 +37,7 @@ import { loadProps } from '../props.js';
 // army truck (models/props), waited for before the chapter builds
 const PROPS = await loadProps(['house_log', 'house_log_lo', 'barrel', 'crate_basket_set', 'samovar', 'chalkboard', 'bicycle_1900',
   'farmhouse_clapboard', 'red_barn_silo', 'model_t', 'film_camera_tripod', 'ww2_truck'],
-{ samovar: { h: 1.15 }, bicycle_1900: { x: 1.6 }, model_t: { z: 3.4 }, film_camera_tripod: { h: 1.95 } });   // (the samovar stands on its own little round table; the Model T's length is along its z)
+{ samovar: { h: 1.15 }, bicycle_1900: { x: 1.6 }, model_t: { z: 3.4 }, film_camera_tripod: { h: 1.76 } });   // (the samovar stands on its own little round table; the Model T's length is along its z)
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(131), N2 = noise2(133), N3 = noise2(137);
@@ -893,8 +893,10 @@ export default class Rockets {
     // the rocket), the eyepiece at the back, and the hand crank on her side
     const cxm = CAMERA_A.x, czm = CAMERA_A.z, TW = 0x7a5a38, CB = 0x1c1c20, BR = 0xb8964a;
     // Meem's camera: its lens looks along its +x, the eyepiece at -x, the crank on its +z side (1.02 m up at
-    // its own 1.7 m, 0.19 m behind its middle): turned to look west, its eyepiece where the old one's was
-    const CS = 1.95 / 1.7, camM = FP.has('film_camera_tripod') && V3(cxm + 0.25 - 0.49 * CS, 0, czm);
+    // its own 1.7 m, 0.19 m behind its middle): turned to look west, its eyepiece where the old one's was.
+    // Sized like a real 1920s hand-cranked camera: 1.76 m to the top of its film magazine, so the body's
+    // top is 1.5 m up (at its own 1.7 m, the body runs 0.75..1.45 m), below Esther's eyes
+    const CS = 1.76 / 1.7, camM = FP.has('film_camera_tripod') && V3(cxm + 0.25 - 0.49 * CS, 0, czm);
     if (camM) FP.add('film_camera_tripod', camM.x, auburnHeight(camM.x, camM.z) - 0.03, camM.z, Math.PI);
     if (!camM) {
     for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) {
@@ -918,8 +920,8 @@ export default class Rockets {
     this.crank = ck.mesh(FIG_MAT); B.add(this.crank);
     if (camM) this.crank.position.set(camM.x + 0.19 * CS, 1.02 * CS, camM.z - 0.2 * CS); else this.crank.position.set(cxm + 0.02, 1.38, czm - 0.11);
     this.crankHandle = new THREE.Object3D(); this.crankHandle.position.set(0, 0.075, -0.06); this.crank.add(this.crankHandle);
-    this.camGrip = camM ? V3(camM.x + 0.15, 1.6, camM.z + 0.2) : V3(cxm + 0.1, 1.36, czm + 0.1);   // her other hand on the side of the body, steadying it
-    this.eyepiece = V3(cxm - 2, 1.2, ESTHER.z);   // (where she looks: through the eyepiece, out past the lens at the rocket)
+    this.camGrip = camM ? V3(camM.x + 0.15 * CS, 1.35 * CS, camM.z + 0.19 * CS) : V3(cxm + 0.1, 1.36, czm + 0.1);   // her other hand on the side of the body, steadying it
+    this.eyepiece = V3(cxm - 2, camM ? 1.2 * CS : 1.2, ESTHER.z);   // (where she looks: through the eyepiece, out past the lens at the rocket)
     this.chimneyA = makeSmoke(farmM ? V3(fx, fy + 9.4, fz - 5.4) : V3(fx, fy + 10, fz + 2.5), { n: 6, rise: 8, size: 1.2, opacity: 0.18, color: 0xd8dce4 }); B.add(this.chimneyA.group);
     // cows by the barn, the farm dog, crows
     this.cowsA = this.life.add(makeHerd('cow', { n: 5, area: { x: 82, z: -32, r: 8 }, height: auburnHeight, seed: 3 })); B.add(this.cowsA.group);
@@ -1285,7 +1287,7 @@ export default class Rockets {
     this.braunLab = label('Wernher von Braun', 0.12, { color: '#f2ecdc', glowCol: 'rgba(10,10,16,0.9)' }); this.braunLab.position.set(0, 2.12, 0); this.braunLab.material.opacity = 0; this.braun.g.add(this.braunLab);
     // (two different men: an engineer in a white work coat and a hat, and one in a long field-grey coat and cap)
     // what the Auburn people walk round: the frame, the camera and Esther, the shelter, the sawhorse, each other
-    this.obsA = [{ x: FRAME.x, z: FRAME.z, r: 0.85 }, { x: 4.5, z: -1.5, r: 0.6 }, { x: 4.3, z: 2.9, r: 1.05 }, { x: -0.9, z: 0.2, r: 0.7 }, { x: -1.9, z: 0.2, r: 0.35 }, { x: -2.5, z: 0.2, r: 0.3 }, { P: this.god, r: 0.25 }, { P: this.henry, r: 0.25 }, { P: this.roope, r: 0.25 }];
+    this.obsA = [{ x: FRAME.x, z: FRAME.z, r: 0.85 }, { x: 4.3, z: -1.5, r: 0.8 }, { x: 4.3, z: 2.9, r: 1.05 }, { x: -0.9, z: 0.2, r: 0.7 }, { x: -1.9, z: 0.2, r: 0.35 }, { x: -2.5, z: 0.2, r: 0.3 }, { P: this.god, r: 0.25 }, { P: this.henry, r: 0.25 }, { P: this.roope, r: 0.25 }];
     this.eng = [0, 1].map((i) => { const x = PAD.x + 3 + i * 1.2, z = PAD.z + 5, p0 = V3(x, balticHeight(x, z), z); return fig(this.C, p0, i
       ? { height: 1.78, coat: 0x5a5e50, coatLen: 0.8, hat: 'fieldcap', hatCol: 0x4a4e42, belt: 0x2a2620, hair: 0x6a5a40, glasses: true, trousers: 0x4a4e42, boots: 0x161412, seed: 21 }
       : { height: 1.7, coat: 0xd8d4c8, coatLen: 0.7, hat: 'fedora', hatCol: 0x3a3a3a, hair: 0x2a2018, trousers: 0x3a3a40, boots: 0x161412, seed: 23 }); });

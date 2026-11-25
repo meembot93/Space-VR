@@ -1009,6 +1009,18 @@ export default class Sputnik {
       for (let i = 0; i < 2; i++) { const cx = x + (r() - 0.5) * w * 0.7, cz = z + (r() - 0.5) * d * 0.7; if (me && Math.hypot(cx - x, cz - z) < 4) continue; k.box(0.7, 1.6, 0.7, 0x7a4a3a, [cx, h + 0.8, cz]); k.box(0.82, 0.1, 0.82, 0x5a3a2a, [cx, h + 1.55, cz]); for (const o of [-0.15, 0.15]) k.cyl(0.08, 0.09, 0.35, 6, 0x9a5a3a, [cx + o, h + 1.75, cz]); }
       if (r() < 0.6) { const ax = x + (r() - 0.5) * w * 0.5, az = z + (r() - 0.5) * d * 0.5; ant.cyl(0.03, 0.03, 3, 4, 0x9a9a9a, [ax, h + 1.5, az]); for (let j = 0; j < 4; j++) ant.box(1.4 - j * 0.2, 0.03, 0.03, 0x9a9a9a, [ax, h + 2.2 + j * 0.3, az], [0, r() * 3, 0]); }
     };
+    // window panes on Meem's apartment block (its model has none that light up), so at night it has lit
+    // windows like the code-built blocks round it. Measured on the model at its 20 m: the walls run x -9.9..9.9,
+    // z -5.8 (back) .. 0.5 (front, a tree before its door); four rows of windows; balconies (no panes behind
+    // them) at x -10..-8, -3.5..-1.5, 1.5..3 and 7.5..9.5 on the front, the outer two on the back
+    const blockWins = (bx, bz, yaw) => {
+      const c = Math.cos(yaw), sn = Math.sin(yaw), put = (lx, ly, lz, ry) => wins.push({ p: new THREE.Vector3(bx + lx * c + lz * sn, ly, bz - lx * sn + lz * c), yaw: yaw + ry });
+      for (const y of [2.0, 3.75, 5.25, 7.0]) {
+        for (const lx of [-6.6, -5.0, 0, 4.6, 6.1]) put(lx, y, 0.56, 0);
+        for (const lx of [-6.3, -4.3, -2.3, -0.3, 1.7, 3.7, 5.7]) put(lx, y, -5.93, Math.PI);
+        for (const lz of [-4.2, -1.6]) { put(9.95, y, lz, Math.PI / 2); put(-9.95, y, lz, -Math.PI / 2); }
+      }
+    };
     const pal = [0x8a6a58, 0x9a8a78, 0x7a7068, 0xa89880, 0x6a5a50, 0x8a7a6a];
     block(0, 0, 14, 12, ROOF, 0x8a6a58, 0x4a4a4c, true);
     block(-21, -8, 14, 16, 10, 0x9a8a78); block(19, -14, 12, 14, 15, 0x7a7068); block(0, -28, 26, 12, 9, 0xa89880);
@@ -1017,7 +1029,8 @@ export default class Sputnik {
       if (Math.abs(gx) <= 1 && Math.abs(gz) <= 1) continue;
       const far = Math.hypot(gx, gz);
       // Meem's apartment block in a few of the nearer spots, out where you look (south-west), facing our roof
-      if ([[-2, 1], [-2, 2], [-1, 2], [0, 2]].some(([a, b]) => a === gx && b === gz) && TP.add('apartment_block', x, 0, z, Math.round(Math.atan2(-x, -z) / (Math.PI / 2)) * Math.PI / 2)) continue;
+      const ay = Math.round(Math.atan2(-x, -z) / (Math.PI / 2)) * Math.PI / 2;
+      if ([[-2, 1], [-2, 2], [-1, 2], [0, 2]].some(([a, b]) => a === gx && b === gz) && TP.add('apartment_block', x, 0, z, ay)) { blockWins(x, z, ay); continue; }
       block(x, z, 12 + r() * 8, 10 + r() * 8, 8 + r() * (far > 4 ? 18 : 10), pal[Math.floor(r() * pal.length)]);
     }
     // a water tower on a roof, a church spire and a factory chimney on the skyline

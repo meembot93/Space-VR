@@ -149,8 +149,8 @@ export default class Tycho {
     // a fence along the lane, bare trees, haystacks
     const fz = (x) => 4 + Math.sin(x / 30) * 3 - 2.4;
     if (AP.has('wood_fence')) for (let x = -12; x < 48; x += 2.9) {   // Meem's rail fence, a 3 m section at a time
-      const x1 = x + 2.9, mx = (x + x1) / 2, mz = (fz(x) + fz(x1)) / 2;
-      AP.add('wood_fence', mx, fieldsHeight(mx, mz) - 0.05, mz, -Math.atan2(fz(x1) - fz(x), 2.9), { h: 1.2 });
+      const x1 = x + 2.9, mx = (x + x1) / 2, mz = (fz(x) + fz(x1)) / 2, len = Math.hypot(2.9, fz(x1) - fz(x));
+      AP.add('wood_fence', mx, fieldsHeight(mx, mz) - 0.05, mz, -Math.atan2(fz(x1) - fz(x), 2.9), { w: len + 0.12, h: 1.2 });   // each a little longer than its step, so the sections overlap
     }
     else for (let x = -12; x < 50; x += 2.4) { const z = fz(x); k.box(0.1, 1.1, 0.1, 0x4a3a2a, [x, fieldsHeight(x, z) + 0.55, z]); k.box(2.4, 0.08, 0.05, 0x5a4a3a, [x + 1.2, fieldsHeight(x, z) + 0.85, z]); }
     // bare November trees: a few detailed ones near the lane, the rest a cheap grove
@@ -355,7 +355,7 @@ export default class Tycho {
     const TT = PROPS.fresh();   // Meem's lantern and logbooks on the table (code boxes if they're missing)
     TT.add('lantern', 1.95, 0.875, -0.75, 0.3);
     if (!TT.add('book_set', 1.32, 0.875, -0.6, -0.2, { s: 1.4 })) for (let i = 0; i < 4; i++) tk.box(0.24, 0.07, 0.32, [0x5a2a1a, 0x2a3a2a, 0x4a3a1a, 0x3a2a3a][i], [1.3 + (i % 2) * 0.05, 0.91 + i * 0.07, -0.6]);
-    tk.box(0.36, 0.02, 0.28, 0xece0c0, [1.85, 0.885, -0.55]);
+    tk.box(0.3, 0.004, 0.22, 0xece0c0, [1.82, 0.877, -0.4], [0, 0.15, 0]);   // a loose sheet: paper-thin, flat on the table, clear of the lantern
     Bg.add(tk.mesh(), TT.build());
     this.lampB = new THREE.PointLight(0xffa860, 3, 10, 1.6); this.lampB.position.set(1.6, 1.4, -0.6); Bg.add(this.lampB);
     this.lampFlame = glow(0xffb050, 0.15); this.lampFlame.position.set(1.95, 1.0, -0.7); Bg.add(this.lampFlame);
