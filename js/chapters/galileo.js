@@ -48,7 +48,7 @@ const MILKY = [92, 24];          // a patch of the Milky Way near it (by the Twi
 const MOON = { az: 140, el: 30 };
 const SHIP = at(105, 4800, 0);   // the ship coming in from the Adriatic, beyond the Lido
 // Meem's bell for the belfry's bells, Meem's gondola for the nine boats (and the gondolier's deck height in it)
-const BELL_MODEL = true, GONDOLA_MODEL = true, GDECK = 0.65;
+const BELL_MODEL = true, GONDOLA_MODEL = false, GDECK = 0.65;
 const VEN = new THREE.Vector3(...at(118, 8.5, TOPB + 3.6).toArray());   // the Venus model
 const N1 = noise2(111), N2 = noise2(113);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
@@ -260,7 +260,7 @@ export default class Galileo {
     A.add(panes(wins, { lit: 0.12, seed: 4, glint: true }));
     // ---- boats: anchored ships in the basin, the ship far out at sea, gondolas ----
     this.boats = [];
-    for (const [x, z, yaw, s, m] of [[160, 220, 0.4, 1, 1], [60, 300, -0.2, 0.9, 0], [-80, 240, 1.3, 1.1, 1], [420, 180, 0.9, 0.8, 0], [600, 300, -0.5, 1, 0], [-300, 250, 0.2, 0.7, 0]]) { const b = ship(s, !!m); b.position.set(x, 0, z); b.rotation.y = yaw; b.userData.ph = r() * 6; A.add(b); this.boats.push(b); }
+    for (const [x, z, yaw, s, m] of [[160, 220, 0.4, 1, 0], [60, 300, -0.2, 0.9, 0], [-80, 240, 1.3, 1.1, 0], [420, 180, 0.9, 0.8, 0], [600, 300, -0.5, 1, 0], [-300, 250, 0.2, 0.7, 0]]) { const b = ship(s, !!m); b.position.set(x, 0, z); b.rotation.y = yaw; b.userData.ph = r() * 6; A.add(b); this.boats.push(b); }
     this.farShip = ship(1.1); this.farShip.position.copy(SHIP); this.farShip.rotation.y = 0.9; this.farShip.userData.ph = 1; A.add(this.farShip); this.boats.push(this.farShip);
     this.gondolas = [];
     for (let i = 0; i < 9; i++) {

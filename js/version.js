@@ -4,4 +4,4 @@
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
 export const VERSION = 35;
-export const CHANGES = ['Real houses in every town', 'Ships, boats, jars, barrels', 'Lamps, lanterns, books, tables'];
+export const CHANGES = ['New 3D models in every chapter', 'Houses, temples, churches, ships', 'Carts, lamps, radios, trucks'];

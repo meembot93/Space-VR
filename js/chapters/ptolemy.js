@@ -26,7 +26,8 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { loadProps } from '../props.js';
 
 // Meem's models: the great bronze door, the cabinets of scrolls on the far wall, jars and oil lamps
-const PROPS = await loadProps(['bronze_door', 'scroll_cabinet', 'amphora', 'oil_lamp']);
+const DOOR_MODEL = false;   // (the door model's texture came out patchy white: the code door stands in)
+const PROPS = await loadProps(['scroll_cabinet', 'amphora', 'oil_lamp']);
 
 const D2R = Math.PI / 180;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
@@ -299,7 +300,7 @@ export default class Ptolemy {
       k.box(HW * 2 + 1, HH + 0.4, 0.5, WALL, [0, (HH + 0.4) / 2, z]);
       k.box(HW * 2 + 1, 0.5, 0.52, RED, [0, SHELF_TOP + 0.55, z]);
     }
-    if (!MP.add('bronze_door', 0, 0, HL + 0.05, Math.PI, { w: 7.6, h: 6.0, d: 0.9 })) {   // Meem's great door in its stone frame
+    if (!(DOOR_MODEL && MP.add('bronze_door', 0, 0, HL + 0.05, Math.PI, { w: 7.6, h: 6.0, d: 0.9 }))) {   // Meem's great door in its stone frame
       k.box(3.6, 5.6, 0.3, 0x7a5a2a, [0, 2.8, HL - 0.05]);                     // the door
       for (let i = 0; i < 12; i++) k.box(0.16, 0.16, 0.1, 0xc8a040, [-1.4 + (i % 4) * 0.93, 0.9 + (i / 4 | 0) * 1.9, HL - 0.2]); // studs
       k.box(4.4, 0.5, 0.5, STONE, [0, 5.85, HL - 0.1]);

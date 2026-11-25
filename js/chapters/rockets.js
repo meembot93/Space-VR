@@ -37,7 +37,7 @@ import { loadProps } from '../props.js';
 // army truck (models/props), waited for before the chapter builds
 const PROPS = await loadProps(['house_log', 'house_log_lo', 'barrel', 'crate_basket_set', 'samovar', 'chalkboard', 'bicycle_1900',
   'farmhouse_clapboard', 'red_barn_silo', 'model_t', 'film_camera_tripod', 'ww2_truck'],
-{ samovar: { h: 1.15 }, bicycle_1900: { x: 1.6 }, model_t: { z: 3.4 }, film_camera_tripod: { h: 1.76 } });   // (the samovar stands on its own little round table; the Model T's length is along its z)
+{ samovar: { h: 1.15 }, bicycle_1900: { x: 1.6 }, model_t: { z: 3.4 }, film_camera_tripod: { h: 1.3 } });   // (the samovar stands on its own little round table; the Model T's length is along its z)
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(131), N2 = noise2(133), N3 = noise2(137);
@@ -896,7 +896,7 @@ export default class Rockets {
     // its own 1.7 m, 0.19 m behind its middle): turned to look west, its eyepiece where the old one's was.
     // Sized like a real 1920s hand-cranked camera: 1.76 m to the top of its film magazine, so the body's
     // top is 1.5 m up (at its own 1.7 m, the body runs 0.75..1.45 m), below Esther's eyes
-    const CS = 1.76 / 1.7, camM = FP.has('film_camera_tripod') && V3(cxm + 0.25 - 0.49 * CS, 0, czm);
+    const CS = 1.3 / 1.7, camM = FP.has('film_camera_tripod') && V3(cxm + 0.25 - 0.49 * CS, 0, czm);
     if (camM) FP.add('film_camera_tripod', camM.x, auburnHeight(camM.x, camM.z) - 0.03, camM.z, Math.PI);
     if (!camM) {
     for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) {
