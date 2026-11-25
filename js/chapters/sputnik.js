@@ -852,15 +852,15 @@ export default class Sputnik {
     const slot = (deg, r) => VS.clone().addScaledVector(f, Math.cos(deg * D2R) * r).addScaledVector(rr, Math.sin(deg * D2R) * r);
     this.korolevView = slot(-30, 3.0);
     const who = [
-      ['tsiolkovsky', 'Tsiolkovsky', -38, 4.0], ['goddard', 'Goddard', -47, 3.4], [null, 'Wernher von Braun', -58, 4.2], ['newton', 'Newton', -67, 3.3],
+      ['von_braun', 'Wernher von Braun', -38, 3.2], ['tsiolkovsky', 'Tsiolkovsky', -47, 4.0], ['goddard', 'Goddard', -58, 3.4], ['newton', 'Newton', -67, 3.3],
       ['galileo', 'Galileo', -78, 4.1], ['kepler', 'Kepler', -88, 3.3], ['tycho', 'Tycho', -100, 4.2], ['copernicus', 'Copernicus', -112, 3.4],
       ['storyteller', 'The storyteller', 28, 3.4], ['builder', 'A Stonehenge builder', 38, 4.0], ['priest', 'A priest of the Nile', 50, 3.3], ['skywatcher', 'A skywatcher of Babylon', 61, 4.2],
       ['chinese_astronomer', 'A Chinese astronomer', 72, 3.4], ['eratosthenes', 'Eratosthenes', 84, 4.2], ['aristotle', 'Aristotle', 95, 3.3], ['ptolemy', 'Ptolemy', 106, 4.2], ['diver', 'The sponge diver', 118, 3.4],
     ];
     this.crowd = who.map(([model, name, deg, r], i) => {
-      const P = model ? makePerson({ model, sd: true, seed: 90 + i * 5 }) : makeFolk({ seed: 77, kind: 'suit', coat: 0x1c1e26, trousers: 0x1c1e26, tie: 0x2a2a44, hair: 0x5a4028, height: 1.86, hat: 'none' });
+      const P = makePerson({ model, sd: true, seed: 90 + i * 5 });   // everyone in their own model (Meem's von Braun too, front and centre by Korolev)
       const p = slot(deg, r); P.g.position.copy(p).setY(siteH(p.x, p.z)); P.g.visible = false; this.site.add(P.g);
-      P.name = model || 'vonbraun'; P.home = p.clone(); P.yawR = Math.atan2(-p.x, -p.z); P.g.rotation.y = P.yawR;
+      P.name = model; P.home = p.clone(); P.yawR = Math.atan2(-p.x, -p.z); P.g.rotation.y = P.yawR;
       P.lab = label(name, 0.15); P.lab.material.opacity = 0; P.lab.visible = false; this.site.add(P.lab);
       P.halo = glowSprite(0xffd8a0, 1.5, 0); P.halo.visible = false; this.site.add(P.halo);
       P.k = 0; P.named = -1; P.i = i;
@@ -1110,12 +1110,12 @@ export default class Sputnik {
     for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28 + 0.3; k.ball(0.5, 0, 0x6a6a62, [Math.cos(a) * 6.5, hillH(Math.cos(a) * 6.5, Math.sin(a) * 6.5) + 0.15, Math.sin(a) * 6.5], [r(), r(), r()], [1.3, 0.6, 1]); }
     H.add(k.mesh());
     // everyone from both eras, in a ring round you
-    const who = [['storyteller', 'The storyteller, 30,000 years ago', 0xffd0a0], ['builder', 'The Stonehenge builders', 0xffe0b0], ['priest', 'The priests of the Nile', 0xffe8a0], ['skywatcher', 'The skywatchers of Babylon', 0xffc8a0], ['eratosthenes', 'Eratosthenes', 0xd8e8ff], ['ptolemy', 'Ptolemy', 0xd0d8ff], ['copernicus', 'Copernicus', 0xffd8a0], ['tycho', 'Tycho', 0xffe0c0], ['kepler', 'Kepler', 0xa8c8ff], ['galileo', 'Galileo', 0xc8e0ff], ['newton', 'Newton', 0xe0d0ff], ['tsiolkovsky', 'Tsiolkovsky', 0xbfd8ff], ['goddard', 'Goddard', 0xc0f0e0]];
+    const who = [['storyteller', 'The storyteller, 30,000 years ago', 0xffd0a0], ['builder', 'The Stonehenge builders', 0xffe0b0], ['priest', 'The priests of the Nile', 0xffe8a0], ['skywatcher', 'The skywatchers of Babylon', 0xffc8a0], ['eratosthenes', 'Eratosthenes', 0xd8e8ff], ['ptolemy', 'Ptolemy', 0xd0d8ff], ['copernicus', 'Copernicus', 0xffd8a0], ['tycho', 'Tycho', 0xffe0c0], ['kepler', 'Kepler', 0xa8c8ff], ['galileo', 'Galileo', 0xc8e0ff], ['newton', 'Newton', 0xe0d0ff], ['tsiolkovsky', 'Tsiolkovsky', 0xbfd8ff], ['goddard', 'Goddard', 0xc0f0e0], ['von_braun', 'Wernher von Braun', 0xd0e4ff]];
     this.ringEchoes = who.map(([model, name, tint], i) => {
       const a = (i / who.length) * Math.PI * 2 + 0.25, x = Math.sin(a) * 4.6, z = -Math.cos(a) * 4.6;
       const E = new Echo(this.G, H, { model, tint, pos: new THREE.Vector3(x, hillH(x, z), z), face: Math.atan2(-x, -z), seed: 81 + i * 3, look: { beard: i % 3 === 1 } });
       E.lab = label(name, 0.13); E.lab.position.set(x, hillH(x, z) + 2.15, z); E.lab.material.opacity = 0; H.add(E.lab);
-      E.i = i; return E;
+      E.i = i; E.vb = model === 'von_braun'; return E;
     });
     // a ring of light on the grass where they stand, and a little pool of light at each one's feet
     this.ringGlow = glowPoints(144 + who.length, { sizeScale: 300 }); H.add(this.ringGlow);
@@ -1205,7 +1205,8 @@ export default class Sputnik {
     await D.cue('Copernicus'); this.name('copernicus', 'tycho');
     await D.cue('Galileo'); this.name('galileo', 'kepler');
     await D.cue('Newton'); this.name('newton');
-    await D.cue('Each one stood'); this.name('tsiolkovsky', 'goddard', 'vonbraun');
+    await D.cue('Each one stood'); this.name('tsiolkovsky', 'goddard');
+    await D.cue('shoulders'); this.name('von_braun');   // his own moment: Meem wants von Braun seen at Sputnik
     await l14;
     const l15 = D.sayAsync('ch14_15');
     await D.cue('all of those dreams'); s.allGlow = 1;
@@ -1613,9 +1614,13 @@ export default class Sputnik {
       let ry = yaw - P.g.rotation.y; ry = Math.atan2(Math.sin(ry), Math.cos(ry)); P.g.rotation.y += ry * Math.min(1, dt * 3);
       // what they do
       const named = P.namedT != null ? G.t - P.namedT : 99;
-      if (pair) { P.pose = 'hold'; P.look = other.g.position.clone().add(this.site.position).setY(1.6); }
+      // von Braun turns to you and nods while he's named, so you see his face (Meem wants him seen here)
+      if (!pair && P.name === 'von_braun' && named < 4) { yaw = toMe; let r2 = yaw - P.g.rotation.y; r2 = Math.atan2(Math.sin(r2), Math.cos(r2)); P.g.rotation.y += r2 * Math.min(1, dt * 3); }
+      if (!pair && P.name === 'von_braun' && named < 4) { P.pose = 'idle'; P.look = me.clone(); }   // arms down: just looks at you and nods (a raised arm could read as a salute)
+      else if (pair) { P.pose = 'hold'; P.look = other.g.position.clone().add(this.site.position).setY(1.6); }
       else if (lr < 0) { P.pose = this.meetV > 0.5 && P.i % 5 === 0 ? 'wave' : 'idle'; P.look = this.meetV > 0.3 ? me.clone() : rocketTop.clone(); }
       else { P.pose = lr < 2.5 ? 'idle' : lr < 6 ? (P.i % 3 ? 'gasp' : 'point') : P.i % 3 === 0 ? 'point' : P.i % 3 === 1 ? 'cheer' : 'wave'; P.look = rocketTop.clone(); }
+      if (P.name === 'von_braun' && P.pose !== 'idle') P.pose = 'idle';   // von Braun keeps his arms down the whole time: no raised arm that could read as a salute
       P.pointAt.copy(rocketTop);
       animate(P, t, dt);
       // named: a nod and a soft warm light on them
@@ -1829,6 +1834,7 @@ export default class Sputnik {
       if (s.echoes && !E.on) { E.delay ??= 0.25 + i * 0.22; E.delay -= dt * this.F; if (E.delay <= 0) { E.show(true); if (i % 3 === 0) G.audio.chime(E.P.g.position, 0.2); } }
       E.P.look = look; E.P.pointAt.copy(look);
       E.P.pose = s.moon ? (i % 4 === 0 ? 'point' : 'idle') : (i % 3 === 0 ? 'point' : i % 5 === 1 ? 'gasp' : 'idle');
+      if (E.vb) E.P.pose = 'idle';   // arms always down for von Braun
       E.update(dt, t);
       for (const m of E.mats) if ('emissiveIntensity' in m) m.emissiveIntensity = 0.9 + 0.25 * Math.sin(t * 2.2 + i);
       E.lab.material.opacity = E.k * 0.85; E.lab.visible = E.k > 0.02;
