@@ -425,7 +425,7 @@ export default class Newton {
     const yaw = Math.atan2(-TOWARD.z, TOWARD.x) + 270 * D2R;
     const toWorld = (v) => v.clone().applyAxisAngle(UPV, yaw);
     const want = new THREE.Vector3().addScaledVector(TOWARD, 0.7).addScaledVector(SIDE, -0.45).setY(1.9).applyAxisAngle(UPV, -yaw);
-    this.heroTree = appleTree({ seed: 14, height: 5.4, apples: 30, windfalls: 9, reserveApples: 1, reserveNear: want,
+    this.heroTree = appleTree({ seed: 14, height: 6.2, apples: 30, windfalls: 9, reserveApples: 1, reserveNear: want,
       ground: (x, z) => { const w = toWorld(new THREE.Vector3(x, 0, z)); return groundHeight(TREE.x + w.x, TREE.z + w.z) - ty; } });
     this.heroTree.group.position.set(TREE.x, ty, TREE.z); this.heroTree.group.rotation.y = yaw; this.root.add(this.heroTree.group);
     const ra = this.heroTree.reserved[0];
@@ -459,7 +459,7 @@ export default class Newton {
       if (Math.hypot(x - KEPSPOT.x, z - KEPSPOT.z) < 2.5 || Math.hypot(x - BOOKSPOT.x, z - BOOKSPOT.z) < 2.5) continue;
       tree(x, z, 0.8 + r() * 0.35);
     }
-    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6, height: 4.6, trunkExtra: 0.7 }); this.root.add(g.group); }   // height + trunkExtra: tall enough to read as trees, not bushes (Meem)
+    for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6, height: 6.2, trunkExtra: 0.7 }); this.root.add(g.group); }   // height + trunkExtra: tall enough to read as trees, not bushes (Meem)
     // a wooden ladder against one tree and a basket of picked apples beside it
     const lt = this.trees[3] || TREE;
     if (PROPS.has('apple_ladder')) {   // Meem's step ladder and basket of apples, facing out from under the tree

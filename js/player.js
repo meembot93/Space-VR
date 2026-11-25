@@ -285,7 +285,8 @@ export class Player {
   // beam of light where you stand, then a blink back down. Your feet never leave that spot, so
   // nothing in the story moves; it's just a look round to get your bearings (Meem, 2026-11-25).
   peek() {
-    if (this.peekT > 0 || this.G.paused) return;
+    const ui = this.G.ui;
+    if (this.peekT > 0 || this.G.paused || ui.fade > 0.01 || ui.fadeTo > 0) return;   // not during a story fade
     this.peekT = 0.0001;
     if (!this.peekBeam) {
       const m = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.55, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
@@ -295,6 +296,12 @@ export class Player {
       this.peekBeam.visible = this.peekRing.visible = false;
       this.G.scene.add(this.peekBeam, this.peekRing);
     }
+  }
+  endPeek() {
+    if (!(this.peekT > 0)) return;
+    this.peekT = 0; this.peekUp = false; this.G.ui.blink = 0;
+    if (this.peekBeam) this.peekBeam.visible = this.peekRing.visible = false;
+    this.clampToGround();
   }
   updatePeek(dt) {
     if (!(this.peekT > 0)) return;
