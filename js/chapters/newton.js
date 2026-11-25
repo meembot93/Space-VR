@@ -307,9 +307,10 @@ export default class Newton {
     const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
     const M = (mx, my, mz) => P(mx * MS + MS, my * MS, mz * MS + 3.2 - 3.64 * MS);   // model coordinates -> world (front wall at 3.2, main block centred)
     const MP = PROPS.fresh(); MP.add('woolsthorpe_manor', ...P(MS, 0, 3.2 - 3.64 * MS), yaw, { s: MS * 9 / PROPS.size('woolsthorpe_manor').y });
-    // the lantern on a little iron bracket on the porch, by the door
-    const k = new Kit(), LP = M(-0.35, 1.72, 5.18 + 0.3);
-    k.box(0.04, 0.04, 0.34, 0x1e1c1a, M(-0.35, 1.72 + 0.32 / MS, 5.18 + 0.14), [0, yaw, 0]); k.box(0.12, 0.2, 0.03, 0x1e1c1a, M(-0.35, 1.72 + 0.28 / MS, 5.19), [0, yaw, 0]);
+    // the lantern on a little iron bracket by the door: on the front wall (z 3.57 on the model) just
+    // right of the porch, below the first-floor windows, its back plate flat against the stone
+    const WZ = 3.57, k = new Kit(), LP = M(0.75, 1.75, WZ + 0.3 / MS);
+    k.box(0.04, 0.04, 0.34, 0x1e1c1a, M(0.75, 1.75 + 0.32 / MS, WZ + 0.17 / MS), [0, yaw, 0]); k.box(0.12, 0.2, 0.03, 0x1e1c1a, M(0.75, 1.75 + 0.28 / MS, WZ + 0.015 / MS), [0, yaw, 0]);
     k.cyl(0.006, 0.006, 0.14, 4, 0x1e1c1a, [LP[0], LP[1] + 0.33, LP[2]]);
     MP.add('lantern', LP[0], LP[1], LP[2], yaw);
     this.root.add(MP.build({ glow: 0x231c16 }), k.mesh());

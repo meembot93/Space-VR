@@ -147,7 +147,7 @@ export default class Kepler {
     this.buildBridge(k);
     // Old Town: streets of tall houses all round. Near us they're a storey or two lower than our
     // attic (so you see over them), with a street running north to the square; further out, taller.
-    const TYN = TP.add('tyn_church', 32, -0.3, -161 - PROPS.size('tyn_church')?.z / 2, 0);   // Meem's Týn church, its towers to the square (code-built in buildSquare if it's missing)
+    const TYN = TP.add('tyn_church', 32, -0.3, -161 - PROPS.size('tyn_church')?.z / 2, 0), TYN_HALF = TYN && PROPS.size('tyn_church').clone().multiplyScalar(0.5);   // Meem's Týn church, its towers to the square (code-built in buildSquare if it's missing)
     const ROOFS = [0x8a3424, 0x9a4028, 0x7a3020, 0x6a3a2a, 0x8a4a30], WALLS = [0xe0d2b0, 0xd4c094, 0xc8a878, 0xb8b0a0, 0xd8c8b8, 0xe0c8a0, 0xc8b8a0, 0xd8b890];
     for (let gx = -280; gx <= 260; gx += 16) for (let gz = -520; gz <= 320; gz += 15) {
       let x = gx + (r() - 0.5) * 4; const z = gz + (r() - 0.5) * 4;
@@ -164,6 +164,10 @@ export default class Kepler {
       const w = 8 + wr * 4, h = near ? 6 + hr * 2.4 : 8 + hr * 6;
       if (street && Math.abs(x) < 16) x = Math.sign(x) * 8.6;                // line the street up: fronts 4 m from its middle
       const yaw = street ? (x > 0 ? -Math.PI / 2 : Math.PI / 2) : Math.round(rr * 4) * Math.PI / 2;
+      // the house's footprint (half sizes along x and z), turned by its yaw
+      const side = Math.abs(Math.sin(yaw)) > 0.5, hx = side ? 4.5 : w / 2, hz = side ? w / 2 : 4.5;
+      if (Math.abs(x) - hx < 3.9 && z + hz > -112) continue;                 // nothing standing in the street (fronts 4 m from its middle), right up into the square
+      if (TYN && Math.abs(x - 32) - hx - 0.5 < TYN_HALF.x && z - hz - 0.5 < -161 && z + hz + 0.5 > -161 - TYN_HALF.z * 2) continue;   // nor a roof poking out of the Týn church
       // Meem's house model within 150 m (simplified past 50 m); the plain shapes further out
       const dist = Math.hypot(x, z), model = dist < 50 ? 'house_north' : dist < 150 ? 'house_north_lo' : null;
       house(k, { x, y: groundHeight(x, z), z, w, d: 9, h, roof: near ? 3.4 + hr * 1.2 : undefined, yaw, wall: WALLS[Math.floor(wall * WALLS.length)], roofCol: ROOFS[Math.floor(roofC * ROOFS.length)], gableFront: gf < 0.6, stepped: st < 0.08, timber: tb < 0.15 ? 0x3a2a1c : null, props: model && TP, model }, wins);

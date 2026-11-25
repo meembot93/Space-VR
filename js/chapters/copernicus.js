@@ -29,6 +29,21 @@ import { loadProps } from '../props.js';
 // Meem's models (models/props): the brick town house with its stepped gable, a barrel and a small boat, the
 // cathedral, Copernicus's desk under its lean-to, the triquetrum, a handcart and a carrack; waited for before the chapter builds
 const PROPS = await loadProps(['house_north', 'house_north_lo', 'boat_small', 'barrel', 'crate_basket_set', 'frombork_cathedral', 'copernicus_desk', 'triquetrum', 'handcart', 'ship_carrack']);
+// The handcart model comes with a loose pile of logs on the ground that runs through its right wheel:
+// keep only the cart itself (its largest connected piece of mesh)
+if (PROPS.has('handcart')) keepLargestPart(PROPS.models.handcart.geometry);
+function keepLargestPart(g) {
+  if (g.userData.onePart || !g.index) return; g.userData.onePart = true;
+  const p = g.attributes.position, n = p.count, ix = g.index.array, par = new Int32Array(n).map((_, i) => i);
+  const find = (x) => { while (par[x] !== x) x = par[x] = par[par[x]]; return x; };
+  const weld = new Map();
+  for (let i = 0; i < n; i++) { const k = p.getX(i).toFixed(4) + ',' + p.getY(i).toFixed(4) + ',' + p.getZ(i).toFixed(4); if (weld.has(k)) par[find(i)] = find(weld.get(k)); else weld.set(k, i); }
+  for (let t = 0; t < ix.length; t += 3) { const a = find(ix[t]); par[find(ix[t + 1])] = a; par[find(ix[t + 2])] = a; }
+  const cnt = new Map(); for (let i = 0; i < n; i++) { const r = find(i); cnt.set(r, (cnt.get(r) || 0) + 1); }
+  let best = -1, bn = 0; for (const [r, c] of cnt) if (c > bn) { bn = c; best = r; }
+  const keep = []; for (let t = 0; t < ix.length; t += 3) if (find(ix[t]) === best) keep.push(ix[t], ix[t + 1], ix[t + 2]);
+  g.setIndex(keep); g.computeBoundingBox(); g.computeBoundingSphere();
+}
 import { D2R, ease, clamp01, at, sunAt, house, windows, steppedGable, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 54.36, YEAR = 1540, SUNLON = 215;     // Frombork, early November
