@@ -17,6 +17,11 @@ import { makePerson, animatePerson } from '../people.js';
 import { dress } from '../dress.js';
 import { makeFlock, makeDolphins, Life } from '../life.js';
 import { canvasTex, clamp, lerp, damp, angleWrap } from '../util.js';
+import { loadProps } from '../props.js';
+
+// Meem's models: the air pump on deck; on the seafloor the bronze youth, the ship's timbers, wine jars,
+// and the old ship herself (her shape for the ghost over the wreck)
+const PROPS = await loadProps(['air_pump', 'bronze_statue', 'wreck_timbers', 'amphora', 'ship_ancient']);
 
 const D2R = Math.PI / 180, TAU = Math.PI * 2;
 const DECK = 0.95;                       // deck height above the sea on the boat
@@ -88,6 +93,13 @@ function addCaustics(mat, uTime, strength = 0.5) {
   };
   mat.customProgramCacheKey = () => 'caustics' + strength;
   return mat;
+}
+
+// Meem's models on the seafloor: their own copy of the material, with the same dancing light as the sand
+function seaProps(P, uTime) {
+  const g = P.build();
+  for (const m of g.children) m.material = addCaustics(m.material.clone(), uTime);
+  return g;
 }
 
 // Seagrass that sways gently in the swell (top of each blade moves, roots stay put)
@@ -455,9 +467,15 @@ export default class Antikythera {
     deck.cyl(0.16, 0.16, 7.2, 8, 0xe6dcc0, [0.28, DECK + 4.5, -2.0], [0.15, 0, 1.15]);
     deck.cyl(0.04, 0.06, 2.6, 6, 0x6a4a2a, [0, 1.75, -6.4], [-1.25, 0, 0]);
     // the air pump: a wooden chest with two big flywheels the crew turn to send air down the hose
-    deck.box(0.62, 0.62, 0.48, 0x6e4a2a, [-0.6, DECK + 0.31, 2.3]);
-    deck.box(0.66, 0.05, 0.52, 0x4e3420, [-0.6, DECK + 0.64, 2.3]);
-    deck.cyl(0.05, 0.05, 1.05, 6, 0x333333, [-0.6, DECK + 0.45, 2.3], [0, 0, Math.PI / 2]);
+    // (Meem's pump, its hose outlet toward the bow; or the code-built chest, whose wheels turn)
+    const TP = PROPS.fresh(), pumpModel = TP.add('air_pump', -0.45, DECK + 0.012, 2.3, Math.PI, { h: 0.8 });
+    const PX = pumpModel ? -0.45 : -0.6;
+    if (pumpModel) { T.add(TP.build()); this.topBlk.push({ x: PX, z: 2.3, r: 0.6 }); }
+    else {
+      deck.box(0.62, 0.62, 0.48, 0x6e4a2a, [-0.6, DECK + 0.31, 2.3]);
+      deck.box(0.66, 0.05, 0.52, 0x4e3420, [-0.6, DECK + 0.64, 2.3]);
+      deck.cyl(0.05, 0.05, 1.05, 6, 0x333333, [-0.6, DECK + 0.45, 2.3], [0, 0, Math.PI / 2]);
+    }
     // oars along the rails, a barrel, coiled rope, a basket of sponges
     for (const sx of [-1, 1]) deck.box(0.06, 0.04, 4.2, 0x8a6a44, [sx * 1.45, DECK + 0.25, 0.8], [0, sx * 0.03, 0]);
     deck.cyl(0.24, 0.24, 0.6, 10, 0x7a5232, [0.9, DECK + 0.3, 3.0]);
@@ -478,7 +496,7 @@ export default class Antikythera {
     T.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x3a3022 })));
     // the pump's flywheels (they turn while the diver is down)
     this.wheels = [];
-    for (const sx of [-1, 1]) {
+    if (!pumpModel) for (const sx of [-1, 1]) {
       const wk = new Kit();
       wk.add(new THREE.TorusGeometry(0.42, 0.03, 5, 22), 0x7a2a22);
       for (let k = 0; k < 6; k++) wk.box(0.02, 0.8, 0.02, 0x7a2a22, [0, 0, 0], [0, 0, k * Math.PI / 6]);
@@ -494,7 +512,7 @@ export default class Antikythera {
     this.diverTop = makePerson({ model: 'diver', seed: 3 });
     this.diverTop.g.position.set(1.0, DECK + 0.015, 0.35); T.add(this.diverTop.g);
     this.crew = [];
-    for (const [x, face] of [[-1.25, Math.PI / 2], [0.05, -Math.PI / 2]]) {
+    for (const [x, face] of [[PX - (pumpModel ? 0.85 : 0.65), Math.PI / 2], [PX + (pumpModel ? 0.85 : 0.65), -Math.PI / 2]]) {
       const P = makePerson({ model: ['sailor', 'instrument_maker'][this.crew.length], seed: 50 + this.crew.length * 9, tunic: [0x5a6a8a, 0x8a7a5a][this.crew.length], beard: true, hair: 0x2a2018 });
       if (this.crew.length) dress(P, { mul: 0x6a7488, sat: 0.6, hair: 0x3a3430 });   // the old hand at the pump, in a faded blue smock
       P.g.position.set(x, DECK + 0.015, 2.3); P.g.rotation.y = face; P.pose = 'pull'; T.add(P.g); this.crew.push(P);
@@ -594,6 +612,7 @@ export default class Antikythera {
 
     this.buildWreck();
     this.buildStatues();
+    S.add(seaProps(this.seaP, uT));
     this.buildLife();
 
     // Shafts of light from the surface, faint and slow
@@ -629,11 +648,14 @@ export default class Antikythera {
   buildWreck() {
     const S = this.sea, k = new Kit(), r = rng(55), W = WRECK, cy = Math.cos(WRECK_YAW), sy = Math.sin(WRECK_YAW);
     const at = (along, across) => [W.x + across * cy + along * sy, W.z - across * sy + along * cy];
-    // the keel, half buried, and the ribs of the hull curving up out of the sand (a lot has rotted away)
-    for (let i = -10; i <= 10; i++) {
+    const SP = this.seaP = PROPS.fresh();
+    // the keel, half buried, and the ribs of the hull curving up out of the sand (a lot has rotted away):
+    // Meem's ship's bones, sunk deep in the sand and listing a little; or the code-built keel and ribs
+    const bones = SP.add('wreck_timbers', W.x, seabedHeight(W.x, W.z) - 1.5, W.z, WRECK_YAW - Math.PI / 2, { w: 15, d: 5.2, h: 4.2, tilt: [0.1, 0] });
+    if (!bones) for (let i = -10; i <= 10; i++) {
       const [x, z] = at(i * 0.7, 0); k.box(0.3, 0.25, 0.75, 0x3a2e22, [x, seabedHeight(x, z) + 0.02, z], [0, WRECK_YAW, 0]);
     }
-    for (let i = -8; i <= 8; i++) for (const side of [-1, 1]) {
+    if (!bones) for (let i = -8; i <= 8; i++) for (const side of [-1, 1]) {
       if (r() < 0.3) continue;
       const len = 0.8 + r() * 1.6 * (1 - Math.abs(i) / 10), pts = [];
       for (let j = 0; j <= 4; j++) { const t = j / 4, [x, z] = at(i * 0.85, side * (0.2 + t * 1.6)); pts.push([x, seabedHeight(x, z) + Math.sin(t * 1.4) * len - 0.1, z]); }
@@ -650,18 +672,21 @@ export default class Antikythera {
     const prof = [[0, 0], [0.025, 0.02], [0.055, 0.1], [0.12, 0.33], [0.14, 0.47], [0.115, 0.6], [0.05, 0.68], [0.04, 0.82], [0.055, 0.85], [0.03, 0.86]].map(([x, y]) => new THREE.Vector2(x, y));
     const ak = new Kit(); ak.add(new THREE.LatheGeometry(prof, 9), 0xffffff);
     for (const s of [-1, 1]) ak.add(new THREE.TorusGeometry(0.06, 0.012, 4, 8, Math.PI), 0xffffff, [s * 0.07, 0.72, 0], [0, 0, s > 0 ? -Math.PI / 2 : Math.PI / 2]);
-    const NA = 46, amph = new THREE.InstancedMesh(ak.geometry(), addCaustics(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), this.uTime), NA);
+    // (all 40 are Meem's jars if it loaded, about 2.5k triangles each; else 46 code-built ones. Mixed,
+    // the faceted code jars looked wrong beside the model's)
+    const NA = SP.has('amphora') ? 40 : 46, NM = SP.has('amphora') ? NA : 0, amph = new THREE.InstancedMesh(ak.geometry(), addCaustics(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), this.uTime), NA - NM);
     const mm = new THREE.Matrix4(), cc = new THREE.Color();
     for (let i = 0; i < NA; i++) {
       const pile = i < 20, [x, z] = pile ? at(2 + (r() - 0.5) * 4, (r() - 0.5) * 2.2) : at((r() - 0.5) * 18, (r() - 0.5) * 9);
       const lying = r() < 0.7;
       _e.set(lying ? Math.PI / 2 + (r() - 0.5) * 0.4 : (r() - 0.5) * 0.4, r() * TAU, (r() - 0.5) * 0.3, 'YXZ');
       _q.setFromEuler(_e);
-      const y = seabedHeight(x, z) + (lying ? 0.06 + (pile ? (i % 3) * 0.16 : 0) : -0.25 - r() * 0.3);
-      mm.compose(_b.set(x, y, z), _q, _c.setScalar(0.9 + r() * 0.25)); amph.setMatrixAt(i, mm);
-      amph.setColorAt(i, cc.setHex(0xb0643a).lerp(new THREE.Color(r() < 0.4 ? 0x6a6a48 : 0x8a5a3a), r() * 0.6));
+      const y = seabedHeight(x, z) + (lying ? 0.06 + (pile ? (i % 3) * 0.16 : 0) : -0.25 - r() * 0.3), sc = 0.9 + r() * 0.25;
+      if (i < NM) { SP.add('amphora', x, y + (lying ? 0.06 : 0), z, _e.y, { s: sc * 0.96, tilt: [_e.x, _e.z] }); r(); r(); continue; }
+      mm.compose(_b.set(x, y, z), _q, _c.setScalar(sc)); amph.setMatrixAt(i - NM, mm);
+      amph.setColorAt(i - NM, cc.setHex(0xb0643a).lerp(new THREE.Color(r() < 0.4 ? 0x6a6a48 : 0x8a5a3a), r() * 0.6));
     }
-    S.add(amph);
+    if (NA > NM) S.add(amph);
     // Glass bowls (some of the cargo) and bronze coins scattered among the timbers
     const bowl = new THREE.LatheGeometry([[0, 0], [0.06, 0.005], [0.09, 0.04], [0.095, 0.05], [0.088, 0.05], [0.05, 0.012], [0, 0.01]].map(([x, y]) => new THREE.Vector2(x, y)), 12);
     const glass = new THREE.InstancedMesh(bowl, new THREE.MeshLambertMaterial({ color: 0x7fd0c0, emissive: 0x0a3a3a, transparent: true, opacity: 0.6, side: THREE.DoubleSide }), 7);
@@ -679,9 +704,13 @@ export default class Antikythera {
     this.ghost = new THREE.Group();
     const gm = new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
     const lm = new THREE.LineBasicMaterial({ color: 0xbff2ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-    this.ghost.add(new THREE.Mesh(hg, gm), new THREE.LineSegments(new THREE.WireframeGeometry(hullGeo(26, 8, 2.6, -1.6, 13, 6)), lm));
+    const ship = null;   // (Meem's ship_ancient as the ghost read as a tangle of lines, so the code ghost ship stays)
+    if (ship) {   // Meem's Greek ship, her keel where the old hull's was, 26 m long
+      const sg = ship.geometry.clone(), k2 = 26 / ship.size.z; sg.scale(k2, k2, k2); sg.translate(0, -1.6, 0);
+      this.ghost.add(new THREE.Mesh(sg, gm), new THREE.LineSegments(new THREE.EdgesGeometry(sg, 35), lm));
+    } else this.ghost.add(new THREE.Mesh(hg, gm), new THREE.LineSegments(new THREE.WireframeGeometry(hullGeo(26, 8, 2.6, -1.6, 13, 6)), lm));
     const mastG = new THREE.BufferGeometry(); mastG.setAttribute('position', new THREE.Float32BufferAttribute([0, 1, -2, 0, 16, -2, -6, 14, -2, 6, 14, -2, 0, 16, -2, 0, 2.6, -13, 0, 16, -2, 0, 2.6, 13], 3));
-    this.ghost.add(new THREE.LineSegments(mastG, lm));
+    if (!ship) this.ghost.add(new THREE.LineSegments(mastG, lm));
     this.ghostMats = [gm, lm];
     this.ghost.position.set(W.x, 3.2, W.z); this.ghost.rotation.y = WRECK_YAW; this.ghost.visible = false;
     S.add(this.ghost);
@@ -690,13 +719,16 @@ export default class Antikythera {
   // Statues lying in the sand: one bronze, two marble (three of Meem's models, turned to bronze and stone)
   buildStatues() {
     this.statues = [];
+    let nm = 0;
     const add = (pos, yaw, rot, y, kind, pose) => {
+      // the bronze youth: Meem's green, crusted bronze statue, lying on his back half in the sand
+      if (kind === 'bronze' && this.seaP.add('bronze_statue', pos.x, seabedHeight(pos.x, pos.z) - 0.06, pos.z, yaw + Math.PI / 2)) { nm++; this.seaBlk.push({ x: pos.x, z: pos.z, r: 0.55 }); return; }
       const holder = new THREE.Group(); holder.position.set(pos.x, seabedHeight(pos.x, pos.z) + y, pos.z); holder.rotation.y = yaw;
-      const P = makePerson({ model: ['architect', 'aristotle', 'eratosthenes'][this.statues.length], seed: 70 + this.statues.length * 5, tunic: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, skin: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, hair: kind === 'bronze' ? 0x3d5a3a : 0xcfc8ba });
+      const P = makePerson({ model: ['architect', 'aristotle', 'eratosthenes'][nm], seed: 70 + nm * 5, tunic: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, skin: kind === 'bronze' ? 0x4d6b4a : 0xd8d2c6, hair: kind === 'bronze' ? 0x3d5a3a : 0xcfc8ba });
       P.g.rotation.set(...rot); P.pose = pose; P.kind = kind; holder.add(P.g); this.sea.add(holder);
       P.g.updateMatrixWorld(true);
       P.pointAt.copy(holder.localToWorld(new THREE.Vector3(-0.6, 0.9, -2.2)));
-      this.statues.push(P);
+      this.statues.push(P); nm++;
       this.seaBlk.push({ x: pos.x, z: pos.z, r: 0.55 });
     };
     // the bronze youth, on his back, one arm raised (like the famous one found here)

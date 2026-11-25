@@ -20,6 +20,12 @@ import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng } from '../shapes.js';
 import { moonFaceTexture } from '../moontex.js';
+import { loadProps } from '../props.js';
+// Meem's mud-brick house (simplified: the city is all 25 m below you), the Ishtar Gate, and up on the
+// terrace the tablet shelves, the scribes' table, clay tablets drying and the brazier, waited for
+// before the chapter builds (each falls back to the old code shapes if it is missing)
+const PROPS = await loadProps(['house_mudbrick_lo', 'babylon_gate', 'tablet_shelf', 'reading_desk', 'clay_tablet_lo', 'brazier']);
+const NIGHT = 0x231c16;   // the models' own faint light, so they don't sink into the dark
 import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
@@ -238,8 +244,10 @@ export default class Babylon {
       k.cyl(0.06, 0.06, 0.04, 8, 0xd4ac55, [x, 3.6, SZ1 + 0.03], [Math.PI / 2, 0, 0]);
     }
     // A low brazier on the east side, and tablets drying in a row on the east parapet's ledge
-    k.cyl(0.35, 0.25, 0.5, 10, 0x4a3a2a, [8.4, 0.25, ZIG_Z + 6]);
-    this.root.add(k.mesh());
+    const P = PROPS.fresh();
+    if (!P.add('brazier', 8.4, 0.01, ZIG_Z + 6, 0, { w: 0.9, h: 0.45 })) k.cyl(0.35, 0.25, 0.5, 10, 0x4a3a2a, [8.4, 0.25, ZIG_Z + 6]);
+    this.root.add(k.mesh(), P.build({ glow: NIGHT }));
+    G.world.blockers.push({ x: 8.4, z: ZIG_Z + 6, r: 0.5 });
     // Can't walk into the shrine (a row of round blockers along its front, behind the shelves)
     for (let x = -9.4; x <= 9.4; x += 0.5) G.world.blockers.push({ x, z: SZ1 - 0.1, r: 0.6 });
     this.shrineFront = SZ1;
@@ -251,15 +259,24 @@ export default class Babylon {
     const RIVER = -150, riverW = 34;
     const MUD = [0x9a8262, 0xa38a68, 0x8f7758, 0xb09774, 0x86705a];
     // Houses: flat mudbrick roofs on a rough grid of streets, all the way out to the city walls
+    // the Ishtar Gate model's footprint (built below at x 112 on the north wall, 25 m tall): no house in it
+    const GS = PROPS.size('babylon_gate'), gHW = GS ? GS.x * 25 / GS.y / 2 + 1 : 0, gHD = GS ? GS.z * 25 / GS.y / 2 + 1 : 0;
     for (let gx = -436; gx <= 436; gx += 15) for (let gz = -436; gz <= 436; gz += 15) {
       const x = gx + (r() - 0.5) * 4, z = gz + (r() - 0.5) * 4;
       if (inTemenos(x, z) || Math.abs(x - RIVER) < riverW + 14 || Math.abs(x - 112) < 9 || r() < 0.22) continue;
       if (Math.hypot(x - 0, z - 170) < 55 || Math.hypot(x + 85, z + 300) < 70) continue; // the big temple and the palace
       const w = 8 + r() * 5, d = 8 + r() * 5, h = 3.2 + r() * (r() < 0.25 ? 5 : 2.5), col = MUD[r() * 5 | 0];
       const yaw = (r() - 0.5) * 0.12;
-      k.box(w, h, d, col, [x, BASE + h / 2, z], [0, yaw, 0]);
-      if (r() < 0.6) k.box(w * 0.35, 1.8, d * 0.35, col, [x + (r() - 0.5) * w * 0.4, BASE + h + 0.9, z + (r() - 0.5) * d * 0.4], [0, yaw, 0]); // a roof room
-      k.box(1.1, 1.9, 0.2, 0x2a2018, [x, BASE + 0.95, z + d / 2 + 0.05], [0, yaw, 0]); // door
+      if (GS && Math.abs(x - 112) < gHW + w / 2 && Math.abs(z + 440) < gHD + d / 2) continue;
+      if (PROPS.has('house_mudbrick_lo') && Math.hypot(x, z - ZIG_Z) < 175) {
+        // nearer houses: Meem's mud-brick house (it has its own roof room and door, facing +z)
+        PROPS.add('house_mudbrick_lo', x, BASE, z, yaw, { w, d, h: h + 1.2 });
+        r();
+      } else {
+        k.box(w, h, d, col, [x, BASE + h / 2, z], [0, yaw, 0]);
+        if (r() < 0.6) k.box(w * 0.35, 1.8, d * 0.35, col, [x + (r() - 0.5) * w * 0.4, BASE + h + 0.9, z + (r() - 0.5) * d * 0.4], [0, yaw, 0]); // a roof room
+        k.box(1.1, 1.9, 0.2, 0x2a2018, [x, BASE + 0.95, z + d / 2 + 0.05], [0, yaw, 0]); // door
+      }
       if (r() < 0.33) lights.push(x + (r() - 0.5) * 2, BASE + 1.3, z + d / 2 + 0.4);   // a lamp in the doorway
       if (r() < 0.12) lights.push(x, BASE + h + 0.6, z);                               // a fire on the roof
     }
@@ -274,7 +291,8 @@ export default class Babylon {
     for (let i = 0; i < 40; i++) {
       const side = i % 4, t = -90 + (i / 4 | 0) * 18 + r() * 4, x = side < 2 ? t : (side === 2 ? -92 : 92), z = side < 2 ? (side ? 92 : -92) : t;
       if (Math.abs(x) < 12 && z > 0) continue;
-      k.box(12, 5, 9, 0xa08866, [x, BASE + 2.5, ZIG_Z + z]);
+      // facing in, toward the tower
+      if (!PROPS.add('house_mudbrick_lo', x, BASE, ZIG_Z + z, Math.atan2(-x, -z), { w: 12, d: 9, h: 5.5 })) k.box(12, 5, 9, 0xa08866, [x, BASE + 2.5, ZIG_Z + z]);
     }
     // Esagila, the great temple of Marduk, south of the tower
     k.box(70, 10, 60, 0x9e8664, [0, BASE + 5, 170]);
@@ -285,18 +303,26 @@ export default class Babylon {
     k.box(120, 14, 80, 0xa08866, [-85, BASE + 7, -300]); k.box(50, 22, 40, 0xab9270, [-70, BASE + 11, -310]);
     // The city walls with towers every 20 m
     const W = 440;
+    // The Ishtar Gate: blue glazed brick with gold lions and bulls, where the Processional Way leaves
+    // the city through the north wall (the wall is split round it)
+    const GX = 112, GP = PROPS.fresh(), gate = GP.add('babylon_gate', GX, BASE, -W, 0, { h: 25 }), GH = gate ? GP.size('babylon_gate').x * 25 / GP.size('babylon_gate').y / 2 - 1 : 0;
+    if (gate) this.root.add(GP.build({ glow: NIGHT }));
     for (const [x0, z0, x1, z1] of [[-W, -W, W, -W], [-W, W, W, W], [-W, -W, -W, W], [W, -W, W, W]]) {
       const len = Math.hypot(x1 - x0, z1 - z0), yaw = Math.atan2(x1 - x0, z1 - z0);
-      k.box(8, 14, len, 0x8a7356, [(x0 + x1) / 2, BASE + 7, (z0 + z1) / 2], [0, yaw, 0]);
+      if (gate && z0 === -W && z1 === -W) {
+        for (const [a, b] of [[x0, GX - GH], [GX + GH, x1]]) k.box(8, 14, b - a, 0x8a7356, [(a + b) / 2, BASE + 7, z0], [0, yaw, 0]);
+      } else k.box(8, 14, len, 0x8a7356, [(x0 + x1) / 2, BASE + 7, (z0 + z1) / 2], [0, yaw, 0]);
       for (let d = 0; d <= len; d += 20) {
         const x = lerp(x0, x1, d / len), z = lerp(z0, z1, d / len);
         if (Math.abs(x - RIVER) < riverW + 2) continue;
+        if (gate && z0 === -W && z1 === -W && Math.abs(x - GX) < GH + 6) continue;
         k.box(11, 19, 11, 0x8f7759, [x, BASE + 9.5, z], [0, yaw, 0]);
       }
     }
     // Torches along the Processional Way, the broad street east of the courtyard
     for (let z = -420; z <= 420; z += 14) for (const sx of [-1, 1]) torches.push(112 + sx * 6.5, BASE + 2.2, z);
     this.root.add(k.mesh());
+    this.root.add(PROPS.build());
 
     // Ground: paved courtyard, dusty streets, green fields by the river, desert beyond the walls
     const g = new THREE.PlaneGeometry(2600, 2600, 130, 130); g.rotateX(-Math.PI / 2);
@@ -495,10 +521,17 @@ export default class Babylon {
   // The tablet shelves along the shrine's front wall, and the reading desk in front of them
   buildShelvesAndDesk() {
     const k = new Kit(), r = rng(55), F = this.shrineFront;
-    const SHELF_Z = F + 0.2, ROWS = [0.32, 0.74, 1.16, 1.58, 2.0];
-    const WOOD = 0x6e4e30;
+    const SHELF_Z = F + 0.2, WOOD = 0x6e4e30;
+    // Meem's tablet shelves (two to each side, 2.1 m tall, full of tablets of their own): the four
+    // glowing tablets wait on their boards (heights measured off the model, x 1.05)
+    const SP = PROPS.fresh(), model = false;   // (Meem's tablet_shelf: its own stretched tablets poked through the posts and hid the glowing ones, so the code shelves stay for now)
+    const ROWS = model ? [0.44, 0.80, 1.17, 1.52, 1.90] : [0.32, 0.74, 1.16, 1.58, 2.0];
     this.shelfSpots = [];
-    for (const [x0, x1] of [[-6.8, -1.4], [1.4, 6.8]]) {
+    if (model) {
+      for (const [x0, x1] of [[-6.8, -1.4], [1.4, 6.8]]) for (const h of [0, 1]) SP.add('tablet_shelf', x0 + (x1 - x0) * (h + 0.5) / 2, 0.01, SHELF_Z, 0, { w: (x1 - x0) / 2, h: 2.1, d: 0.44 });
+      this.root.add(SP.build({ glow: NIGHT }));
+    }
+    for (const [x0, x1] of model ? [] : [[-6.8, -1.4], [1.4, 6.8]]) {
       k.box(x1 - x0, 0.06, 0.42, WOOD, [(x0 + x1) / 2, 2.38, SHELF_Z]);
       for (const y of ROWS) {
         k.box(x1 - x0, 0.05, 0.42, WOOD, [(x0 + x1) / 2, y - 0.025, SHELF_Z]);
@@ -524,7 +557,7 @@ export default class Babylon {
     const tg = new THREE.BoxGeometry(0.12, 0.17, 0.035); tg.translate(0, 0.085, 0);
     const keep = new Set();
     // four spots on the left shelves at hand height stay empty for the glowing ones
-    this.special = [[-5.15, 1.16], [-4.55, 1.58], [-3.75, 1.16], [-3.05, 1.58]];
+    this.special = [[-5.15, ROWS[2]], [-4.55, ROWS[3]], [-3.75, ROWS[2]], [-3.05, ROWS[3]]];
     const shelfTabs = new THREE.InstancedMesh(tg, new THREE.MeshLambertMaterial({ color: 0xffffff }), this.shelfSpots.length + 24);
     const m = new THREE.Matrix4(), cc = new THREE.Color(); let n = 0;
     for (const [x, y] of this.shelfSpots) {
@@ -534,14 +567,21 @@ export default class Babylon {
       m.compose(_a.set(x, y, SHELF_Z + 0.02), _q, _b.set(1, 0.9 + r() * 0.25, 1)); shelfTabs.setMatrixAt(n, m);
       shelfTabs.setColorAt(n++, cc.setHex(0xb89a72).multiplyScalar(0.75 + r() * 0.35));
     }
-    // a row drying on the east parapet's ledge
+    // a row drying on top of the east parapet (Meem's clay tablet, lying face up, if it loaded): two
+    // side by side in each gap between the battlements (wall top 0.8 m, battlements every 0.9 m from 0.4 m)
+    const DP = PROPS.fresh();
     for (let i = 0; i < 24; i++) {
-      _q.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, (r() - 0.5) * 0.3));
-      m.compose(_a.set(9.25 + (r() - 0.5) * 0.08, 0.96, ZIG_Z - 4 + i * 0.32), _q, _b.set(1, 1, 1)); shelfTabs.setMatrixAt(n, m);
+      const rz = (r() - 0.5) * 0.3, dx = (r() - 0.5) * 0.03, x = 9.8 + (i & 1 ? 0.11 : -0.11) + dx;
+      const z = ZIG_Z - 11 + 0.85 + 0.9 * (6 + (i >> 1));   // the middle of a gap
+      // (the model lies down from its foot toward -z: set its foot half a tablet past the gap's middle)
+      if (DP.add('clay_tablet_lo', x, 0.805, z + 0.06, 0, { w: 0.13, tilt: [-Math.PI / 2, rz] })) continue;
+      _q.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, rz));
+      m.compose(_a.set(x, 0.82, z + 0.085), _q, _b.set(1, 1, 1)); shelfTabs.setMatrixAt(n, m);
       shelfTabs.setColorAt(n++, cc.setHex(0x9e7c56).multiplyScalar(0.8 + r() * 0.2));
     }
     shelfTabs.count = n; void keep;
-    this.root.add(shelfTabs);
+    if (n) this.root.add(shelfTabs);
+    this.root.add(DP.build({ glow: NIGHT }));
 
     // The four old tablets you pull down (one for every 18 years), big and glowing on the shelf
     this.old = [];
@@ -599,8 +639,12 @@ export default class Babylon {
   // The writing table, the soft clay tablet for tonight, and the reed
   buildWritingTable() {
     const k = new Kit(), TX = 3.4, TZ = ZIG_Z - 3.5, TY = 0.88; // a tall scribe's table, easy to reach standing
-    k.box(1.15, 0.06, 0.7, 0x7a5636, [TX, TY, TZ]);
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(0.06, TY, 0.06, 0x5e4228, [TX + sx * 0.5, TY / 2, TZ + sz * 0.28]);
+    const P = PROPS.fresh();
+    if (P.add('reading_desk', TX, 0.01, TZ, 0, { w: 1.15, d: 0.7, h: TY + 0.02 })) this.root.add(P.build({ glow: NIGHT }));
+    else {
+      k.box(1.15, 0.06, 0.7, 0x7a5636, [TX, TY, TZ]);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(0.06, TY, 0.06, 0x5e4228, [TX + sx * 0.5, TY / 2, TZ + sz * 0.28]);
+    }
     k.cyl(0.13, 0.16, 0.2, 10, 0x8a5a3a, [TX + 0.45, TY + 0.13, TZ - 0.2]);             // a jar of water for wetting the clay
     k.cyl(0.11, 0.11, 0.02, 10, 0x3a4a5a, [TX + 0.45, TY + 0.235, TZ - 0.2]);
     k.cyl(0.08, 0.1, 0.06, 8, 0x9a6a40, [TX - 0.45, TY + 0.06, TZ - 0.22]);             // the lamp's dish

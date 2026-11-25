@@ -28,6 +28,10 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { grove, deciduousTree, conifer, bush } from '../trees.js';
 import { glowPoints, shatter, awe, shimmer } from '../wow/fx.js';
+import { loadProps } from '../props.js';
+// Meem's models (models/props): the brick town house with its stepped gable, books and lanterns, the Týn
+// church, market stalls, and the study's tiled stove, bookcases and globe; waited for before the chapter builds
+const PROPS = await loadProps(['house_north', 'house_north_lo', 'book_set', 'lantern', 'tyn_church', 'market_stall', 'tiled_stove', 'bookcase', 'globe_stand'], { tyn_church: { h: 70 } });
 import { ease, clamp01, sunAt, house, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const TOP = 13, LAT = 50.09, SUNLON = 205;
@@ -128,7 +132,7 @@ export default class Kepler {
 
   // ---------- Prague by night ----------
   buildCity() {
-    const k = new Kit(), r = rng(8), wins = [];
+    const k = new Kit(), r = rng(8), wins = [], TP = PROPS.fresh();
     const SIZE = 3000, SEG = 140, g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI / 2);
     const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color(), cob = new THREE.Color(0x5a544c), grass = new THREE.Color(0x3a4a2e), sq = new THREE.Color(0x6a6258);
     for (let i = 0; i < p.count; i++) {
@@ -143,6 +147,7 @@ export default class Kepler {
     this.buildBridge(k);
     // Old Town: streets of tall houses all round. Near us they're a storey or two lower than our
     // attic (so you see over them), with a street running north to the square; further out, taller.
+    const TYN = TP.add('tyn_church', 32, -0.3, -161 - PROPS.size('tyn_church')?.z / 2, 0), TYN_HALF = TYN && PROPS.size('tyn_church').clone().multiplyScalar(0.5);   // Meem's Týn church, its towers to the square (code-built in buildSquare if it's missing)
     const ROOFS = [0x8a3424, 0x9a4028, 0x7a3020, 0x6a3a2a, 0x8a4a30], WALLS = [0xe0d2b0, 0xd4c094, 0xc8a878, 0xb8b0a0, 0xd8c8b8, 0xe0c8a0, 0xc8b8a0, 0xd8b890];
     for (let gx = -280; gx <= 260; gx += 16) for (let gz = -520; gz <= 320; gz += 15) {
       let x = gx + (r() - 0.5) * 4; const z = gz + (r() - 0.5) * 4;
@@ -152,26 +157,32 @@ export default class Kepler {
       if (Math.abs(x) < 5 && z < 0 && z > -100) continue;                     // the street north to the square
       if (Math.hypot(x - SQ.x, z - SQ.z) < SQ.r) continue;                    // the square
       if (Math.abs(x - GD.x) < 15 && Math.abs(z - GD.z) < 13) continue;     // a walled garden
-      if ((Math.abs(x - 32) < 22 && z < -150 && z > -222) || (x > -48 && x < -10 && z > -120 && z < -100)) continue;   // the Týn church, the Town Hall
+      if ((Math.abs(x - 32) < (TYN ? 28 : 22) && z < -150 && z > (TYN ? -242 : -222)) || (x > -48 && x < -10 && z > -120 && z < -100)) continue;   // the Týn church, the Town Hall
       if (Math.abs(x - RIVER(z)) < 80) continue;
       if (roll < 0.08) continue;
       const near = Math.hypot(x, z) < 95, street = Math.abs(x) < 22 && z < 0 && z > -100;
       const w = 8 + wr * 4, h = near ? 6 + hr * 2.4 : 8 + hr * 6;
       if (street && Math.abs(x) < 16) x = Math.sign(x) * 8.6;                // line the street up: fronts 4 m from its middle
       const yaw = street ? (x > 0 ? -Math.PI / 2 : Math.PI / 2) : Math.round(rr * 4) * Math.PI / 2;
-      house(k, { x, y: groundHeight(x, z), z, w, d: 9, h, roof: near ? 3.4 + hr * 1.2 : undefined, yaw, wall: WALLS[Math.floor(wall * WALLS.length)], roofCol: ROOFS[Math.floor(roofC * ROOFS.length)], gableFront: gf < 0.6, stepped: st < 0.08, timber: tb < 0.15 ? 0x3a2a1c : null }, wins);
+      // the house's footprint (half sizes along x and z), turned by its yaw
+      const side = Math.abs(Math.sin(yaw)) > 0.5, hx = side ? 4.5 : w / 2, hz = side ? w / 2 : 4.5;
+      if (Math.abs(x) - hx < 3.9 && z + hz > -112) continue;                 // nothing standing in the street (fronts 4 m from its middle), right up into the square
+      if (TYN && Math.abs(x - 32) - hx - 0.5 < TYN_HALF.x && z - hz - 0.5 < -161 && z + hz + 0.5 > -161 - TYN_HALF.z * 2) continue;   // nor a roof poking out of the Týn church
+      // Meem's house model within 150 m (simplified past 50 m); the plain shapes further out
+      const dist = Math.hypot(x, z), model = dist < 50 ? 'house_north' : dist < 150 ? 'house_north_lo' : null;
+      house(k, { x, y: groundHeight(x, z), z, w, d: 9, h, roof: near ? 3.4 + hr * 1.2 : undefined, yaw, wall: WALLS[Math.floor(wall * WALLS.length)], roofCol: ROOFS[Math.floor(roofC * ROOFS.length)], gableFront: gf < 0.6, stepped: st < 0.08, timber: tb < 0.15 ? 0x3a2a1c : null, props: model && TP, model }, wins);
     }
     // lanterns on iron brackets along the street, so you can see the people walking below
     for (let i = 0; i < 6; i++) {
       const z = -20 - i * 14, sx = i % 2 ? 1 : -1, x = sx * 3.3;
-      k.box(0.7, 0.05, 0.05, 0x1a1a1a, [x - sx * 0.35, 3.6, z]); k.box(0.22, 0.3, 0.22, 0x2a2418, [x - sx * 0.6, 3.4, z]);
+      k.box(0.7, 0.05, 0.05, 0x1a1a1a, [x - sx * 0.35, 3.6, z]); if (!TP.add('lantern', x - sx * 0.6, 3.6 - PROPS.size('lantern').y * 1.4, z, 0, { s: 1.4 })) k.box(0.22, 0.3, 0.22, 0x2a2418, [x - sx * 0.6, 3.4, z]);
       const gl = glow(0xffc070, 2.2, 0.9); gl.position.set(x - sx * 0.6, 3.35, z); this.root.add(gl);
     }
     // the house we're in: tall plastered walls under the study, with a cornice
     k.box(RX * 2 + 0.6, TOP, RZ * 2 + 0.6, 0xd8c8a8, [0, TOP / 2, 0]);
     k.box(RX * 2 + 0.9, 0.3, RZ * 2 + 0.9, 0xb8a888, [0, TOP - 0.2, 0]);
     k.add(gableRoof(RX * 2 + 0.6, RZ * 2 + 0.6, 3.2, 0.35), 0x7a3020, [0, TOP + 3.4, 0]);
-    this.buildSquare(k, wins);
+    this.buildSquare(k, wins, TYN, TP);
     // the walled garden: a low stone wall with a gate, two old trees turning gold, bushes, a bench
     for (const [w, d, ox, oz] of [[22, 0.5, 0, -9], [22, 0.5, 0, 9], [0.5, 18, -11, 0], [0.5, 18, 11, 0]]) {
       if (oz === 9) { for (const sx of [-1, 1]) k.box(9.5, 1.6, 0.5, 0x8a8070, [GD.x + sx * 6.25, 0.8, GD.z + oz]); k.box(0.6, 2.2, 0.6, 0x7a7060, [GD.x - 1.5, 1.1, GD.z + oz]); k.box(0.6, 2.2, 0.6, 0x7a7060, [GD.x + 1.5, 1.1, GD.z + oz]); continue; }
@@ -183,7 +194,7 @@ export default class Kepler {
     const gb = grove(bush, [[-9, -7], [-8.5, 6], [8.5, 7], [9, -1], [0, -7.5]].map(([ox, oz], i) => ({ x: GD.x + ox, y: 0, z: GD.z + oz, s: 0.9 + (i % 3) * 0.2 })), { detail: 'mid', variants: 2, seed: 6, leafColors: [0xd8e0a0, 0xe8c878] });
     this.root.add(gb.group); this.gardenTris = gt[0] + gt[1] + gb.tris;
     this.buildCastle(k, wins);
-    this.root.add(k.mesh());
+    this.root.add(k.mesh(), TP.build({ glow: 0x231c16 }));
     this.root.add(winQuads(wins, { lit: 0.35, seed: 3 }));
     // smoke from chimneys, bells, a few horses in the square
     this.smokes = [[40, 14, -40], [-60, 20, -80], [20, 22, 60], [-120, 18, -200]].map((q) => this.life.add(makeSmoke(new THREE.Vector3(...q), { n: 6, rise: 9, size: 1.4, opacity: 0.12, color: 0x8a90a0 })));
@@ -224,28 +235,30 @@ export default class Kepler {
   }
 
   // The Old Town Square: the Týn church's twin towers, the Town Hall's clock tower, market stalls
-  buildSquare(k, wins) {
+  buildSquare(k, wins, tyn, TP) {
     const TS = 0x8a8478, TS2 = 0x9a9488, SL = 0x2e2e36, GOLD = 0xd8b040, DK = 0x1a1a22;
     const tx = 32, tz = -166;
-    // the nave behind the towers: buttresses, tall pointed windows, a steep slate roof
-    k.box(20, 30, 44, TS, [tx, 15, tz - 26]); k.add(gableRoof(44, 20, 20, 0.3).rotateY(Math.PI / 2), SL, [tx, 30, tz - 26]);
-    for (let i = 0; i < 6; i++) for (const s of [-1, 1]) {
-      const z = tz - 8 - i * 7.2;
-      k.box(1.6, 24, 2.2, TS2, [tx + s * 10.8, 12, z]); k.cyl(0.001, 0.9, 5, 4, SL, [tx + s * 10.8, 26.5, z]);
-      if (i < 5) k.box(0.2, 11, 2.6, DK, [tx + s * 10.05, 15, z - 3.6]);
-    }
-    // the front gable between the towers, with the gold Madonna
-    k.add(gableWall(13, 15, 0.6), TS, [tx, 30, tz - 3.4]); k.cyl(1.5, 1.5, 0.3, 16, GOLD, [tx, 35, tz - 3], [Math.PI / 2, 0, 0]);
-    k.box(3, 9, 0.3, DK, [tx, 20, tz - 3.9]);
-    for (const s of [-1, 1]) {
-      const sx = tx + s * 8.5;
-      k.box(9, 48, 9, TS, [sx, 24, tz]);
-      for (const y of [12, 24, 36, 46]) k.box(9.6, 0.6, 9.6, TS2, [sx, y, tz]);
-      for (const y of [30, 41]) { k.box(1.4, 5.5, 0.3, DK, [sx, y, tz + 4.6]); k.box(0.3, 5.5, 1.4, DK, [sx + s * 4.6, y, tz]); }
-      k.box(10.2, 1.4, 10.2, TS2, [sx, 48.7, tz]);
-      k.cyl(0.001, 4.6, 26, 8, SL, [sx, 49.4 + 13, tz]); k.ball(0.75, 0, GOLD, [sx, 75.8, tz]);
-      for (const [ox, oz] of [[-4.2, -4.2], [4.2, -4.2], [-4.2, 4.2], [4.2, 4.2]]) { k.cyl(0.9, 0.9, 4, 8, TS2, [sx + ox, 51.4, tz + oz]); k.cyl(0.001, 1.1, 9, 8, SL, [sx + ox, 57.9, tz + oz]); k.ball(0.3, 0, GOLD, [sx + ox, 62.6, tz + oz]); }
-      for (const [ox, oz] of [[0, -4.4], [0, 4.4], [-4.4, 0], [4.4, 0]]) { k.cyl(0.001, 0.7, 7, 6, SL, [sx + ox, 53, tz + oz]); k.ball(0.22, 0, GOLD, [sx + ox, 56.7, tz + oz]); }
+    if (!tyn) {
+      // the nave behind the towers: buttresses, tall pointed windows, a steep slate roof
+      k.box(20, 30, 44, TS, [tx, 15, tz - 26]); k.add(gableRoof(44, 20, 20, 0.3).rotateY(Math.PI / 2), SL, [tx, 30, tz - 26]);
+      for (let i = 0; i < 6; i++) for (const s of [-1, 1]) {
+        const z = tz - 8 - i * 7.2;
+        k.box(1.6, 24, 2.2, TS2, [tx + s * 10.8, 12, z]); k.cyl(0.001, 0.9, 5, 4, SL, [tx + s * 10.8, 26.5, z]);
+        if (i < 5) k.box(0.2, 11, 2.6, DK, [tx + s * 10.05, 15, z - 3.6]);
+      }
+      // the front gable between the towers, with the gold Madonna
+      k.add(gableWall(13, 15, 0.6), TS, [tx, 30, tz - 3.4]); k.cyl(1.5, 1.5, 0.3, 16, GOLD, [tx, 35, tz - 3], [Math.PI / 2, 0, 0]);
+      k.box(3, 9, 0.3, DK, [tx, 20, tz - 3.9]);
+      for (const s of [-1, 1]) {
+        const sx = tx + s * 8.5;
+        k.box(9, 48, 9, TS, [sx, 24, tz]);
+        for (const y of [12, 24, 36, 46]) k.box(9.6, 0.6, 9.6, TS2, [sx, y, tz]);
+        for (const y of [30, 41]) { k.box(1.4, 5.5, 0.3, DK, [sx, y, tz + 4.6]); k.box(0.3, 5.5, 1.4, DK, [sx + s * 4.6, y, tz]); }
+        k.box(10.2, 1.4, 10.2, TS2, [sx, 48.7, tz]);
+        k.cyl(0.001, 4.6, 26, 8, SL, [sx, 49.4 + 13, tz]); k.ball(0.75, 0, GOLD, [sx, 75.8, tz]);
+        for (const [ox, oz] of [[-4.2, -4.2], [4.2, -4.2], [-4.2, 4.2], [4.2, 4.2]]) { k.cyl(0.9, 0.9, 4, 8, TS2, [sx + ox, 51.4, tz + oz]); k.cyl(0.001, 1.1, 9, 8, SL, [sx + ox, 57.9, tz + oz]); k.ball(0.3, 0, GOLD, [sx + ox, 62.6, tz + oz]); }
+        for (const [ox, oz] of [[0, -4.4], [0, 4.4], [-4.4, 0], [4.4, 0]]) { k.cyl(0.001, 0.7, 7, 6, SL, [sx + ox, 53, tz + oz]); k.ball(0.22, 0, GOLD, [sx + ox, 56.7, tz + oz]); }
+      }
     }
     // the Old Town Hall: the hall itself and its tall tower, with the astronomical clock facing the square
     const hx = -18, hz = -110;
@@ -265,6 +278,7 @@ export default class Kepler {
     const STR = [0xa83a2a, 0x2a5a8a, 0xc8a040, 0x3a6a3a];
     for (let i = 0; i < 6; i++) {
       const a = 0.5 + i * 0.9, x = SQ.x + Math.cos(a) * 20, z = SQ.z + Math.sin(a) * 20, yaw = -a + Math.PI / 2;
+      if (i % 3 !== 1 && TP.add('market_stall', x, groundHeight(x, z), z, yaw + Math.PI)) continue;   // Meem's stall (four of them), its counter to the well
       k.box(2.6, 0.9, 1.4, 0x5a3a22, [x, 0.45, z], [0, yaw, 0]);
       for (const ox of [-1.2, 1.2]) k.box(0.1, 2.3, 0.1, 0x3a2a1a, [x + Math.cos(yaw) * ox, 1.15, z - Math.sin(yaw) * ox], [0, yaw, 0]);
       k.box(3, 0.08, 1.9, STR[i % 4], [x, 2.35, z], [0.25, yaw, 0]);
@@ -359,37 +373,43 @@ export default class Kepler {
     }
     k.box(RX * 2 - 0.25, 0.12, 0.06, BEAM, [0, TOP + 0.12, -RZ + 0.21]);
     // the bookcase on the west wall: sides, back, cornice, books upright and lying flat
-    const bx0 = -RX + 0.32;
-    for (const z of [-0.92, 1.72]) k.box(0.34, 2.6, 0.05, WOOD, [bx0, TOP + 1.3, z]);
-    k.box(0.02, 2.6, 2.64, DARK, [-RX + 0.15, TOP + 1.3, 0.4]);
-    k.box(0.42, 0.1, 2.76, WOOD, [bx0 + 0.02, TOP + 2.65, 0.4]); k.box(0.36, 0.08, 2.66, WOOD, [bx0, TOP + 0.08, 0.4]);
-    for (let j = 0; j < 4; j++) {
-      const y0 = TOP + 0.5 + j * 0.6;
-      k.box(0.32, 0.04, 2.6, WOOD, [bx0, y0, 0.4]);
-      let z = -0.87;
-      while (z < 1.6) {
-        const col = [0x6a2a1a, 0x2a3a2a, 0x4a3a1a, 0x3a2a3a, 0x5a4a2a, 0x7a5a2a, 0x2a2a3a][Math.floor(r() * 7)];
-        if (r() < 0.08) { for (let q = 0; q < 3; q++) k.box(0.24, 0.05, 0.3, col, [bx0, y0 + 0.045 + q * 0.052, z + 0.16], [0, (r() - 0.5) * 0.2, 0]); z += 0.36; continue; }
-        const h = 0.26 + r() * 0.22, t = 0.04 + r() * 0.05, lean = r() < 0.06 ? 0.18 : 0;
-        k.box(0.22 + r() * 0.04, h, t, col, [bx0, y0 + 0.02 + h / 2, z + t / 2], [lean, 0, 0]);
-        k.box(0.005, 0.03, t * 0.8, 0xc8a040, [bx0 + 0.13, y0 + 0.02 + h * 0.75, z + t / 2]);   // gilt band on the spine
-        z += t + 0.004 + (lean ? 0.06 : 0);
+    const SP = PROPS.fresh();   // Meem's bookcases, stove and globe (the code-built ones if they're missing)
+    if (!(SP.add('bookcase', -RX + 0.335, TOP + 0.02, 0.93, Math.PI / 2, { w: 1.23, d: 0.42, h: 2.5 }) && SP.add('bookcase', -RX + 0.335, TOP + 0.02, -0.3, Math.PI / 2, { w: 1.23, d: 0.42, h: 2.5 }))) {
+      const bx0 = -RX + 0.32;
+      for (const z of [-0.92, 1.72]) k.box(0.34, 2.6, 0.05, WOOD, [bx0, TOP + 1.3, z]);
+      k.box(0.02, 2.6, 2.64, DARK, [-RX + 0.15, TOP + 1.3, 0.4]);
+      k.box(0.42, 0.1, 2.76, WOOD, [bx0 + 0.02, TOP + 2.65, 0.4]); k.box(0.36, 0.08, 2.66, WOOD, [bx0, TOP + 0.08, 0.4]);
+      for (let j = 0; j < 4; j++) {
+        const y0 = TOP + 0.5 + j * 0.6;
+        k.box(0.32, 0.04, 2.6, WOOD, [bx0, y0, 0.4]);
+        let z = -0.87;
+        while (z < 1.6) {
+          const col = [0x6a2a1a, 0x2a3a2a, 0x4a3a1a, 0x3a2a3a, 0x5a4a2a, 0x7a5a2a, 0x2a2a3a][Math.floor(r() * 7)];
+          if (r() < 0.08) { for (let q = 0; q < 3; q++) k.box(0.24, 0.05, 0.3, col, [bx0, y0 + 0.045 + q * 0.052, z + 0.16], [0, (r() - 0.5) * 0.2, 0]); z += 0.36; continue; }
+          const h = 0.26 + r() * 0.22, t = 0.04 + r() * 0.05, lean = r() < 0.06 ? 0.18 : 0;
+          k.box(0.22 + r() * 0.04, h, t, col, [bx0, y0 + 0.02 + h / 2, z + t / 2], [lean, 0, 0]);
+          k.box(0.005, 0.03, t * 0.8, 0xc8a040, [bx0 + 0.13, y0 + 0.02 + h * 0.75, z + t / 2]);   // gilt band on the spine
+          z += t + 0.004 + (lean ? 0.06 : 0);
+        }
       }
     }
     // the tiled stove in the south-east corner: plinth, green tiles in a grid, cornice, a glowing door
     const sx = RX - 0.6, sz = RZ - 0.55;
-    k.box(1.0, 0.18, 0.9, 0x5a5048, [sx, TOP + 0.09, sz]);
-    k.box(0.9, 1.7, 0.8, 0x2a4a3a, [sx, TOP + 1.03, sz]);
-    for (let y = 0; y < 10; y++) for (let i = 0; i < 6; i++) {
-      const cc = [0x3a6a5a, 0x346252, 0x407260][(y + i) % 3];
-      k.box(0.13, 0.15, 0.02, cc, [sx - 0.375 + i * 0.15, TOP + 0.28 + y * 0.165, sz - 0.41]);
-      if (i < 5) k.box(0.02, 0.15, 0.13, cc, [sx - 0.46, TOP + 0.28 + y * 0.165, sz - 0.32 + i * 0.15]);
+    const stoveM = SP.add('tiled_stove', sx, TOP + 0.03, sz + 0.03, Math.PI, { w: 1.0, d: 0.95, h: 2.5 });   // its fire door toward the room
+    if (!stoveM) {
+      k.box(1.0, 0.18, 0.9, 0x5a5048, [sx, TOP + 0.09, sz]);
+      k.box(0.9, 1.7, 0.8, 0x2a4a3a, [sx, TOP + 1.03, sz]);
+      for (let y = 0; y < 10; y++) for (let i = 0; i < 6; i++) {
+        const cc = [0x3a6a5a, 0x346252, 0x407260][(y + i) % 3];
+        k.box(0.13, 0.15, 0.02, cc, [sx - 0.375 + i * 0.15, TOP + 0.28 + y * 0.165, sz - 0.41]);
+        if (i < 5) k.box(0.02, 0.15, 0.13, cc, [sx - 0.46, TOP + 0.28 + y * 0.165, sz - 0.32 + i * 0.15]);
+      }
+      for (const y of [0.18, 1.9]) k.box(1.0, 0.1, 0.9, 0x2a4a3a, [sx, TOP + y + 0.05, sz]);
+      k.box(0.7, 0.6, 0.6, 0x3a6a5a, [sx, TOP + 2.25, sz]); k.box(0.8, 0.06, 0.7, 0x2a4a3a, [sx, TOP + 2.58, sz]);
+      k.box(0.3, 0.24, 0.03, 0x2a2a2a, [sx, TOP + 0.4, sz - 0.43]);
     }
-    for (const y of [0.18, 1.9]) k.box(1.0, 0.1, 0.9, 0x2a4a3a, [sx, TOP + y + 0.05, sz]);
-    k.box(0.7, 0.6, 0.6, 0x3a6a5a, [sx, TOP + 2.25, sz]); k.box(0.8, 0.06, 0.7, 0x2a4a3a, [sx, TOP + 2.58, sz]);
-    k.box(0.3, 0.24, 0.03, 0x2a2a2a, [sx, TOP + 0.4, sz - 0.43]);
     k.cyl(0.07, 0.07, 0.7, 8, 0x2a2a2a, [sx + 0.2, TOP + 2.9, sz + 0.1]);
-    this.fireDoor = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.16), new THREE.MeshBasicMaterial({ color: 0xff7a30 })); this.fireDoor.position.set(sx, TOP + 0.4, sz - 0.453); this.fireDoor.rotation.y = Math.PI; this.root.add(this.fireDoor);
+    this.fireDoor = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.16), new THREE.MeshBasicMaterial({ color: 0xff7a30 })); if (stoveM) { this.fireDoor.position.set(sx, TOP + 0.6, sz + 0.03 - 0.46); this.fireDoor.scale.set(1.1, 1.4, 1); } else this.fireDoor.position.set(sx, TOP + 0.4, sz - 0.453); this.fireDoor.rotation.y = Math.PI; this.root.add(this.fireDoor);
     // the door in the south wall: planks, iron straps, a ring
     // (the leaf swings open on its hinge, so it's its own little mesh; behind it, the dark stairwell)
     const dk = new Kit();
@@ -429,20 +449,24 @@ export default class Kepler {
     k.box(sw, 0.12, 0.04, WOOD, [KX, TOP + SEAT + 0.56, cz0 + sd / 2 - 0.03]); k.box(sw - 0.06, 0.06, 0.03, WOOD, [KX, TOP + SEAT + 0.28, cz0 + sd / 2 - 0.03]);
     for (const sx2 of [-1, 1]) k.box(0.03, 0.03, sd - 0.06, DARK, [KX + sx2 * (sw / 2 - 0.03), TOP + 0.12, cz0]);
     // the globe on its stand, and the chest by the south wall
-    k.cyl(0.04, 0.12, 0.6, 8, DARK, [-1.25, TOP + 0.3, 1.0]); k.cyl(0.18, 0.2, 0.04, 12, DARK, [-1.25, TOP + 0.02, 1.0]);
-    k.add(new THREE.TorusGeometry(0.4, 0.018, 4, 32), 0xb08a52, [-1.25, TOP + 1.0, 1.0], [Math.PI / 2, 0, 0.3]);
-    k.add(new THREE.TorusGeometry(0.39, 0.012, 4, 32), 0xb08a52, [-1.25, TOP + 1.0, 1.0], [0, 0.4, 0.4]);
+    // (Meem's globe stand: its rings and legs round the code globe, which turns, just covering the model's own)
+    const globeM = SP.add('globe_stand', -1.25, TOP + 0.03, 1.0, 0.5);
+    if (!globeM) {
+      k.cyl(0.04, 0.12, 0.6, 8, DARK, [-1.25, TOP + 0.3, 1.0]); k.cyl(0.18, 0.2, 0.04, 12, DARK, [-1.25, TOP + 0.02, 1.0]);
+      k.add(new THREE.TorusGeometry(0.4, 0.018, 4, 32), 0xb08a52, [-1.25, TOP + 1.0, 1.0], [Math.PI / 2, 0, 0.3]);
+      k.add(new THREE.TorusGeometry(0.39, 0.012, 4, 32), 0xb08a52, [-1.25, TOP + 1.0, 1.0], [0, 0.4, 0.4]);
+    }
     k.box(0.9, 0.48, 0.46, 0x5a3a22, [-1.75, TOP + 0.24, RZ - 0.4]); k.box(0.92, 0.06, 0.48, 0x4a2e1a, [-1.75, TOP + 0.5, RZ - 0.4]);
     for (const x of [-2.05, -1.45]) k.box(0.05, 0.5, 0.48, 0x2a2a2a, [x, TOP + 0.26, RZ - 0.4]);
     // a brass quadrant on the east wall, above the desk
     const qk = (g, col, p, rot) => k.add(g, col, p, rot);
     qk(new THREE.RingGeometry(0.38, 0.44, 16, 1, 0, Math.PI / 2), 0xb08a42, [RX - 0.21, TOP + 1.4, -1.25], [0, -Math.PI / 2, 0]);
     for (const a of [0, Math.PI / 4, Math.PI / 2]) k.box(0.01, 0.44, 0.02, 0x9a7a3a, [RX - 0.215, TOP + 1.4 + Math.sin(a) * 0.22, -1.25 + Math.cos(a) * 0.22], [a - Math.PI / 2, 0, 0]);
-    this.root.add(k.mesh());
+    this.root.add(k.mesh(), SP.build({ glow: 0x231c16 }));
     // the chart on the wall: Kepler's planets nested inside the five perfect solids (his first book, 1596)
     const chart = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshLambertMaterial({ map: canvasTex(512, 512, drawChart) }));
     chart.position.set(-0.9, TOP + 1.65, RZ - 0.13); chart.rotation.y = Math.PI; this.root.add(chart);
-    this.globe = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 16), new THREE.MeshLambertMaterial({ map: canvasTex(256, 128, drawGlobe) })); this.globe.position.set(-1.25, TOP + 1.0, 1.0); this.globe.rotation.z = 0.4; this.root.add(this.globe);
+    this.globe = new THREE.Mesh(new THREE.SphereGeometry(globeM ? 0.425 : 0.34, 24, 16), new THREE.MeshLambertMaterial({ map: canvasTex(256, 128, drawGlobe) })); this.globe.position.set(-1.25, TOP + (globeM ? 0.70 : 1.0), 1.0); this.globe.rotation.z = 0.4; this.root.add(this.globe);
     // candles in brass dishes, and the stove's glow
     this.candle = new THREE.PointLight(0xffa860, 3.2, 9, 1.6); this.candle.position.set(DX + 0.1, TOP + 1.25, DZ - 0.15); this.root.add(this.candle);
     this.flames = [];

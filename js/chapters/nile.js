@@ -23,6 +23,11 @@ import { makeHerd, makeFlock, makeSmoke, Life } from '../life.js';
 import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
+import { loadProps } from '../props.js';
+// Meem's mud-brick house, jars, reed boats, granaries, temple gateway and Sphinx (models/props),
+// waited for before the chapter builds (each falls back to the old code shapes if it is missing)
+const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'amphora', 'crate_basket_set', 'reed_boat_lo', 'granary', 'granary_lo', 'temple_pylon', 'sphinx'],
+  { sphinx: { z: 52, turn: 90 } });
 import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
@@ -386,8 +391,24 @@ export default class Nile {
     const MUDB = [0xa88a64, 0x9a7c58, 0xb4986e, 0x8e7452], WHITE = 0xe4dccb, DARK = 0x231a12;
     this.lampSpots = [];
     this.roofSpots = [];
+    const P = PROPS;
+    const houses = [];   // footprints, so the granaries can keep clear of the walls
     const house = (x, z, w, d, hgt, yaw = 0) => {
+      houses.push({ x, z, hw: w / 2, hd: d / 2 });
       const y = groundHeight(x, z) - 0.3, col = MUDB[(r() * 4) | 0], top = y + hgt;
+      // within 120 m: Meem's mud-brick house model (its door turned to the side the lamps are on; the
+      // simplified one past 40 m); further out, plain blocks (hundreds of them, too far to tell)
+      const dist = Math.hypot(x, z), hm = dist < 40 ? 'house_mudbrick' : 'house_mudbrick_lo';
+      if (P.has(hm) && dist < 120) {
+        const side = (r() * 4) | 0, a = yaw + side * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), half = side % 2 ? w / 2 : d / 2;
+        P.add(hm, x, y, z, a, side % 2 ? { w: d, d: w, h: hgt + 0.3 } : { w, d, h: hgt + 0.3 });
+        this.lampSpots.push(new THREE.Vector3(x + sa * (half + 0.4), y + 1.6, z + ca * (half + 0.4)));
+        // water jars by the door, and now and then baskets and a sack
+        if (dist < 60 && r() < 0.6) P.add('amphora', x + sa * (half + 0.45) + ca * 1.3, y + 0.3, z + ca * (half + 0.45) - sa * 1.3, r() * 6, { s: 0.7 + r() * 0.3 });
+        if (dist < 60 && r() < 0.25) P.add('crate_basket_set', x + sa * (half + 0.8) - ca * 1.6, y + 0.3, z + ca * (half + 0.8) + sa * 1.6, a + 2.8);
+        this.roofSpots.push(new THREE.Vector3(x, top, z));
+        return;
+      }
       k.box(w, hgt + 0.3, d, col, [x, y + (hgt + 0.3) / 2, z], [0, yaw, 0]);
       // a low lip round the roof
       const lip = 0.45;
@@ -417,6 +438,7 @@ export default class Nile {
     // a lattice of houses on the mound, with lanes between them; the houses near you are built by hand
     const near = [[-10.4, 0, 8.5, 9, 4.3], [0, 10.2, 9, 8, 4.6], [0, -10.4, 9, 8.5, 3.8], [-10, 10, 8, 8, 5.2], [-10.2, -10.2, 8, 8, 4.8], [2, 21, 8, 8, 3.6], [1, -22, 9, 8, 3.4]];
     for (const [x, z, w, d, h] of near) house(x, z, w, d, h);
+    const granaries = [];
     for (let gx = -290; gx < 40; gx += 12) for (let gz = -320; gz < 320; gz += 12) {
       if (Math.abs(gx) < 18 && Math.abs(gz) < 18) continue;
       const x = gx + (r() - 0.5) * 3, z = gz + (r() - 0.5) * 3;
@@ -425,21 +447,36 @@ export default class Nile {
       // east of you, houses stay low so the view to the horizon is clear
       const h = Math.hypot(x, z) < 40 ? 3.2 + r() * 1.2 : 3.2 + r() * 2.8;
       house(x, z, 7 + r() * 3, 7 + r() * 3, h, (r() - 0.5) * 0.12);
-      if (r() < 0.06) { const gy = groundHeight(x + 6, z); k.cyl(0.1, 1.6, 3.4, 10, 0xc0a074, [x + 6, gy + 1.7, z]); }
+      // now and then a round mud granary in the yard
+      if (r() < 0.06) granaries.push([x, z]);
+    }
+    // (placed once every house is down: the first spot beside its house that is clear of all walls)
+    houses.push({ x: -150, z: -230, hw: 31, hd: 34 });   // the temple's walls (built below)
+    const clearOf = (gx, gz) => vmound(gx, gz) <= 0.92 && !(gx > -14 && Math.abs(gz) < 60) && houses.every((h) => Math.abs(gx - h.x) > h.hw + 2.0 || Math.abs(gz - h.z) > h.hd + 2.0);
+    for (const [x, z] of granaries) {
+      const o = [[6, 0], [-6, 0], [0, 6], [0, -6], [6, 6], [-6, 6], [6, -6], [-6, -6], [8, 0], [-8, 0], [0, 8], [0, -8]].find(([ox, oz]) => clearOf(x + ox, z + oz));
+      if (!o) continue;
+      const gx = x + o[0], gz = z + o[1], gy = groundHeight(gx, gz);
+      houses.push({ x: gx, z: gz, hw: 1.6, hd: 1.6 });
+      if (!P.add(Math.hypot(gx, gz) < 60 ? 'granary' : 'granary_lo', gx, gy - 0.1, gz, -Math.PI / 2, { w: 3.0, h: 3.6 })) k.cyl(0.1, 1.6, 3.4, 10, 0xc0a074, [gx, gy + 1.7, gz]);
     }
     // the temple: whitewashed walls round a courtyard, a gateway, to the north of the village
     const tz = -230, tx = -150, ty = groundHeight(tx, tz);
     for (const [ox, oz, w, d] of [[0, -32, 60, 2], [0, 32, 60, 2], [-30, 0, 2, 64], [30, 0, 2, 64]]) k.box(w, 6, d, WHITE, [tx + ox, ty + 3, tz + oz]);
-    k.box(20, 10, 4, WHITE, [tx, ty + 5, tz + 32]); k.box(4, 7, 4.4, DARK, [tx, ty + 3.5, tz + 32]);
+    // its gateway (pylon) facing the village
+    if (!P.add('temple_pylon', tx, ty - 0.2, tz + 32.5, 0, { w: 24 })) { k.box(20, 10, 4, WHITE, [tx, ty + 5, tz + 32]); k.box(4, 7, 4.4, DARK, [tx, ty + 3.5, tz + 32]); }
     k.box(18, 9, 14, WHITE, [tx, ty + 4.5, tz - 12]);
     this.lampSpots.push(new THREE.Vector3(tx - 4, ty + 3, tz + 35), new THREE.Vector3(tx + 4, ty + 3, tz + 35));
     // reed boats pulled up on the river bank
     for (let i = 0; i < 9; i++) {
       const z = -200 + i * 47 + r() * 20, x = riverX(z) - RIVER_W - 4 + r() * 3, y = groundHeight(x, z);
+      const yaw = Math.PI / 2 + (r() - 0.5) * 0.4;
+      if (P.add('reed_boat_lo', x, y - 0.05, z, yaw, { w: 6.5 })) continue;
       const b = new THREE.CylinderGeometry(0.5, 0.5, 6, 8, 1, false, 0, Math.PI); b.rotateZ(Math.PI / 2); b.rotateX(Math.PI); b.scale(1, 0.55, 1);
-      k.add(b, 0xb79a5a, [x, y + 0.35, z], [0, Math.PI / 2 + (r() - 0.5) * 0.4, 0]);
+      k.add(b, 0xb79a5a, [x, y + 0.35, z], [0, yaw, 0]);
     }
     this.village = k.mesh(); this.egypt.add(this.village);
+    this.egypt.add(P.build());
   }
 
   // Date palms along the river and round the village (none in the line of sight to Sirius)
@@ -570,12 +607,20 @@ export default class Nile {
     // the Sphinx: a lion lying down with a king's head, carved from the bedrock, looking east
     {
       const sx = -640 + OX, sz = -160, sy = base0(sx, sz, 30);
+      // Meem's Sphinx, 52 m long, its face to the east (turned to face +z, then yawed east)
+      const SP = PROPS.fresh();
+      const model = SP.add('sphinx', sx - 3, sy + 0.3, sz, Math.PI / 2, { d: 52 });
+      if (model) this.egypt.add(SP.build({ glow: 0x1a1712 }));
+      else {
       plain.box(46, 6, 15, 0xc8a878, [sx - 8, sy + 3, sz]);                      // the rock cut round it
       plain.box(36, 11, 12, 0xd2b484, [sx - 6, sy + 9, sz]);                     // body
       plain.box(18, 4, 4, 0xd2b484, [sx + 18, sy + 5, sz - 3.5]); plain.box(18, 4, 4, 0xd2b484, [sx + 18, sy + 5, sz + 3.5]); // paws
       plain.box(9, 11, 9, 0xd2b484, [sx + 8, sy + 18, sz]);                      // chest and head
       plain.add(new THREE.CylinderGeometry(2, 7.5, 10, 4, 1), 0xc0a070, [sx + 7, sy + 19, sz], [0, Math.PI / 4, 0], [0.7, 1, 1.4]); // the nemes headdress
-      plain.box(40, 12, 34, 0xd8cbaa, [sx + 45, sy + 6, sz]);                    // the Sphinx temple in front
+      }
+      // the Sphinx temple in front (kept low beside the model, which it would otherwise hide from the chest down)
+      if (model) plain.box(36, 4, 34, 0xd8cbaa, [sx + 50, sy + 2, sz]);
+      else plain.box(40, 12, 34, 0xd8cbaa, [sx + 45, sy + 6, sz]);
     }
     // the valley temples at the edge of the green, where boats tied up
     plain.box(42, 10, 42, 0xd8cbaa, [-520 + OX, groundHeight(-520 + OX, -330) + 4, -330]);
@@ -698,12 +743,24 @@ export default class Nile {
     this.boats = [];
     for (let i = 0; i < 4; i++) {
       const k = new Kit(), g = new THREE.Group();
-      k.cyl(0.35, 0.25, 5.2, 8, 0xb8a060, [0, 0.15, 0], [Math.PI / 2, 0, 0], [1, 1, 0.55]);   // a bundle of papyrus reeds
-      k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, 2.8], [Math.PI / 2 - 0.6, 0, 0]); k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, -2.8], [-Math.PI / 2 + 0.6, 0, 0]);
-      k.cyl(0.03, 0.03, 3.2, 4, 0x5a4030, [0.3, 1.0, -1.2], [0.5, 0, 0.2]);                // the pole
-      k.cyl(0.2, 0.26, 0.9, 6, 0xe8e0cc, [0, 0.75, -1], 0); k.ball(0.14, 1, 0x7a4e32, [0, 1.35, -1]);   // the fisherman, seated
+      const RB = PROPS.models.reed_boat_lo;
+      let deck = 0;   // where the fisherman sits: the top of the reeds amidships
+      if (RB) {   // Meem's reed boat, 6.5 m long along the drift (z)
+        const m = new THREE.Mesh(RB.geometry, RB.material), sc = 6.5 / RB.size.x; m.rotation.y = Math.PI / 2; m.scale.setScalar(sc); m.position.y = -0.2; g.add(m);
+        if (RB.deck == null) {   // (the model rises high at bow and stern: measure its middle)
+          const pa = RB.geometry.attributes.position; let top = 0;
+          for (let j = 0; j < pa.count; j++) if (Math.abs(pa.getX(j)) < RB.size.x * 0.12) top = Math.max(top, pa.getY(j));
+          RB.deck = top;
+        }
+        deck = Math.max(0, RB.deck * sc - 0.2 - 0.3);
+      } else {
+        k.cyl(0.35, 0.25, 5.2, 8, 0xb8a060, [0, 0.15, 0], [Math.PI / 2, 0, 0], [1, 1, 0.55]);   // a bundle of papyrus reeds
+        k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, 2.8], [Math.PI / 2 - 0.6, 0, 0]); k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, -2.8], [-Math.PI / 2 + 0.6, 0, 0]);
+      }
+      k.cyl(0.03, 0.03, 3.2, 4, 0x5a4030, [0.3, deck + 1.0, -1.2], [0.5, 0, 0.2]);                // the pole
+      k.cyl(0.2, 0.26, 0.9, 6, 0xe8e0cc, [0, deck + 0.75, -1], 0); k.ball(0.14, 1, 0x7a4e32, [0, deck + 1.35, -1]);   // the fisherman, seated
       g.add(k.mesh());
-      const lamp = new THREE.Sprite(glowMat('rgba(255,190,100,1)')); lamp.position.set(0, 1.1, 2.4); lamp.scale.setScalar(5); g.add(lamp);
+      const lamp = new THREE.Sprite(glowMat('rgba(255,190,100,1)')); lamp.position.set(0, deck + 1.1, 2.4); lamp.scale.setScalar(5); g.add(lamp);
       g.userData = { z: -260 + i * 170, x: 205 + (i % 2) * 40 + i * 6, v: (i % 2 ? 1 : -1) * (0.6 + i * 0.1), lamp };
       this.egypt.add(g); this.boats.push(g);
     }

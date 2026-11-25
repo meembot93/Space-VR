@@ -14,6 +14,10 @@ import { makeJournalPage } from '../journal.js';
 import { rng, noise2, roughStone } from '../shapes.js';
 import { grove, conifer, bareTree } from '../trees.js';
 import { loadModel } from '../models.js';
+import { loadProps } from '../props.js';
+
+// Meem's camp models (each falls back to the old code shapes if it is missing)
+const PROPS = await loadProps(['hide_tent', 'fire_pit', 'sitting_log', 'drying_rack', 'mammoth_tusks']);
 
 const D2R = Math.PI / 180;
 const MARKS = 29;                // nights in one round of the Moon's phases (29.5)
@@ -149,26 +153,49 @@ export default class Campfire {
 
   buildCamp() {
     const k = new Kit(), r = rng(9), G = this.G;
+    const P = PROPS.fresh();
     // Fire pit: a ring of stones, logs, a bed of glowing embers
-    for (let i = 0; i < 12; i++) { const a = i / 12 * 360; const geo = roughStone(0.32, 0.22, 0.25, 200 + i, [2, 2, 2]); geo.rotateY(-a * D2R); const p = at(a, 0.75); geo.translate(p.x, -0.05, p.z); k.add(geo, 0x6e6860); }
-    for (let i = 0; i < 5; i++) k.cyl(0.07, 0.08, 1.1, 7, 0x3a2a1c, [0, 0.12, 0], [Math.PI / 2 - 0.35, i * 1.25, 0]);
+    if (!P.add('fire_pit', 0, -0.02, 0, 0.3, { w: 1.85, d: 1.85, h: 0.5 })) {
+      for (let i = 0; i < 12; i++) { const a = i / 12 * 360; const geo = roughStone(0.32, 0.22, 0.25, 200 + i, [2, 2, 2]); geo.rotateY(-a * D2R); const p = at(a, 0.75); geo.translate(p.x, -0.05, p.z); k.add(geo, 0x6e6860); }
+      for (let i = 0; i < 5; i++) k.cyl(0.07, 0.08, 1.1, 7, 0x3a2a1c, [0, 0.12, 0], [Math.PI / 2 - 0.35, i * 1.25, 0]);
+    }
     // logs to sit on, hides on the ground, two hide tents on poles, a drying rack with a skin
-    const logAt = (x, z, yaw) => { k.cyl(0.18, 0.2, 2.2, 10, 0x5a4430, [x, 0.18, z], [0, yaw, Math.PI / 2]); G.world.blockers.push({ x, z, r: 0.35 }); };
+    const logAt = (x, z, yaw) => {
+      if (!P.add('sitting_log', x, -0.02, z, yaw, { w: 2.2, d: 0.48, h: 0.44 })) k.cyl(0.18, 0.2, 2.2, 10, 0x5a4430, [x, 0.18, z], [0, yaw, Math.PI / 2]);
+      G.world.blockers.push({ x, z, r: 0.35 });
+    };
     logAt(0, -3.0, 0); logAt(2.6, 1.4, 1.0); logAt(-2.6, 1.4, -1.0);
-    for (const [x, z, s] of [[-1.4, -2.5, 1], [1.7, 2.8, 0.9], [-2.2, 2.9, 1.1]]) k.cyl(0.9 * s, 0.95 * s, 0.03, 12, 0x8a6a48, [x, 0.02, z]);
+    // (the flat hides and the firewood pile are only for the code fire: the fire_pit model brings its own)
+    const codeFire = !P.has('fire_pit');
+    if (codeFire) for (const [x, z, s] of [[-1.4, -2.5, 1], [1.7, 2.8, 0.9], [-2.2, 2.9, 1.1]]) k.cyl(0.9 * s, 0.95 * s, 0.03, 12, 0x8a6a48, [x, 0.02, z]);
     const tent = (x, z, rad, h, col) => {
-      k.cyl(0.05, rad, h, 14, col, [x, h / 2, z]);
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; k.cyl(0.03, 0.035, h + 0.8, 5, 0x4a3828, [x + Math.cos(a) * rad * 0.42, h / 2 + 0.2, z + Math.sin(a) * rad * 0.42], [Math.sin(a) * 0.38, 0, -Math.cos(a) * 0.38]); }
-      k.box(0.7, 1.1, 0.05, 0x1a120c, [x, 0.55, z + rad * 0.98]);
+      // door toward the fire
+      if (!P.add('hide_tent', x, 0, z, Math.atan2(-x, -z), { w: rad * 2, d: rad * 2, h: h + 0.6 })) {
+        k.cyl(0.05, rad, h, 14, col, [x, h / 2, z]);
+        for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; k.cyl(0.03, 0.035, h + 0.8, 5, 0x4a3828, [x + Math.cos(a) * rad * 0.42, h / 2 + 0.2, z + Math.sin(a) * rad * 0.42], [Math.sin(a) * 0.38, 0, -Math.cos(a) * 0.38]); }
+        k.box(0.7, 1.1, 0.05, 0x1a120c, [x, 0.55, z + rad * 0.98]);
+      }
       G.world.blockers.push({ x, z, r: rad + 0.2 });
     };
     tent(-6.5, -5.2, 2.2, 3.2, 0x9a7a58); tent(6.8, -4.8, 2.0, 3.0, 0x8a6c4c);
-    k.cyl(0.04, 0.04, 2.2, 5, 0x4a3828, [4.2, 1.1, 2.6]); k.cyl(0.04, 0.04, 2.2, 5, 0x4a3828, [5.8, 1.1, 2.6]);
-    k.cyl(0.035, 0.035, 1.8, 5, 0x4a3828, [5.0, 2.0, 2.6], [0, 0, Math.PI / 2]);
-    k.box(1.4, 1.2, 0.04, 0xb09070, [5.0, 1.35, 2.6]);
+    if (!P.add('drying_rack', 5.0, 0, 2.6, Math.atan2(-5.0, -2.6), { w: 1.9, h: 2.0 })) {
+      k.cyl(0.04, 0.04, 2.2, 5, 0x4a3828, [4.2, 1.1, 2.6]); k.cyl(0.04, 0.04, 2.2, 5, 0x4a3828, [5.8, 1.1, 2.6]);
+      k.cyl(0.035, 0.035, 1.8, 5, 0x4a3828, [5.0, 2.0, 2.6], [0, 0, Math.PI / 2]);
+      k.box(1.4, 1.2, 0.04, 0xb09070, [5.0, 1.35, 2.6]);
+    }
+    G.world.blockers.push({ x: 5.0, z: 2.6, r: 1.0 });
     // mammoth tusks propped by the tents, and a pile of firewood
-    for (const [x, z, a] of [[-4.2, -4.3, 0.5], [4.4, -4.0, -0.5]]) k.tube([[x, 0, z], [x + Math.sin(a) * 0.6, 1.2, z + 0.4], [x + Math.sin(a) * 1.2, 2.0, z + 1.3]], 0.09, 0xe8dcc0, 8);
-    for (let i = 0; i < 9; i++) k.cyl(0.06, 0.07, 1.3, 6, 0x4a3420, [-3.6 + (i % 3) * 0.14, 0.08 + Math.floor(i / 3) * 0.13, -1.0 + r() * 0.1], [0, 0.3, Math.PI / 2]);
+    // (the model lies along its own x: turned to point from the tent toward the fire, and set out
+    // past the tent's edge so neither tip pokes into the hide)
+    for (const [tx, tz, rad] of [[-6.5, -5.2, 2.2], [6.8, -4.8, 2.0]]) {
+      const L = Math.hypot(tx, tz), ux = -tx / L, uz = -tz / L, d = rad + 1.9;
+      if (P.add('mammoth_tusks', tx + ux * d, 0, tz + uz * d, Math.atan2(-uz, ux), { w: 2.4 })) G.world.blockers.push({ x: tx + ux * d, z: tz + uz * d, r: 0.8 });
+    }
+    if (!P.has('mammoth_tusks')) for (const [x, z, a] of [[-4.2, -4.3, 0.5], [4.4, -4.0, -0.5]]) {
+      k.tube([[x, 0, z], [x + Math.sin(a) * 0.6, 1.2, z + 0.4], [x + Math.sin(a) * 1.2, 2.0, z + 1.3]], 0.09, 0xe8dcc0, 8);
+    }
+    if (codeFire) for (let i = 0; i < 9; i++) k.cyl(0.06, 0.07, 1.3, 6, 0x4a3420, [-3.6 + (i % 3) * 0.14, 0.08 + Math.floor(i / 3) * 0.13, -1.0 + r() * 0.1], [0, 0.3, Math.PI / 2]);
+    this.root.add(P.build({ glow: 0x231c16 }));
     this.root.add(k.mesh());
 
     // The fire itself: flickering flame shapes, a glow, embers, smoke, and warm light

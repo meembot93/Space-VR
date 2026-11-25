@@ -25,6 +25,25 @@ import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2, roughStone } from '../shapes.js';
 import { glowPoints } from '../wow/fx.js';
 import { grove, deciduousTree, bareTree, conifer } from '../trees.js';
+import { loadProps } from '../props.js';
+// Meem's models (models/props): the brick town house with its stepped gable, a barrel and a small boat, the
+// cathedral, Copernicus's desk under its lean-to, the triquetrum, a handcart and a carrack; waited for before the chapter builds
+const PROPS = await loadProps(['house_north', 'house_north_lo', 'boat_small', 'barrel', 'crate_basket_set', 'frombork_cathedral', 'copernicus_desk', 'triquetrum', 'handcart', 'ship_carrack']);
+// The handcart model comes with a loose pile of logs on the ground that runs through its right wheel:
+// keep only the cart itself (its largest connected piece of mesh)
+if (PROPS.has('handcart')) keepLargestPart(PROPS.models.handcart.geometry);
+function keepLargestPart(g) {
+  if (g.userData.onePart || !g.index) return; g.userData.onePart = true;
+  const p = g.attributes.position, n = p.count, ix = g.index.array, par = new Int32Array(n).map((_, i) => i);
+  const find = (x) => { while (par[x] !== x) x = par[x] = par[par[x]]; return x; };
+  const weld = new Map();
+  for (let i = 0; i < n; i++) { const k = p.getX(i).toFixed(4) + ',' + p.getY(i).toFixed(4) + ',' + p.getZ(i).toFixed(4); if (weld.has(k)) par[find(i)] = find(weld.get(k)); else weld.set(k, i); }
+  for (let t = 0; t < ix.length; t += 3) { const a = find(ix[t]); par[find(ix[t + 1])] = a; par[find(ix[t + 2])] = a; }
+  const cnt = new Map(); for (let i = 0; i < n; i++) { const r = find(i); cnt.set(r, (cnt.get(r) || 0) + 1); }
+  let best = -1, bn = 0; for (const [r, c] of cnt) if (c > bn) { bn = c; best = r; }
+  const keep = []; for (let t = 0; t < ix.length; t += 3) if (find(ix[t]) === best) keep.push(ix[t], ix[t + 1], ix[t + 2]);
+  g.setIndex(keep); g.computeBoundingBox(); g.computeBoundingSphere();
+}
 import { D2R, ease, clamp01, at, sunAt, house, windows, steppedGable, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 54.36, YEAR = 1540, SUNLON = 215;     // Frombork, early November
@@ -231,66 +250,70 @@ export default class Copernicus {
   // Round it the cathedral close's wall with its towers (you're on top of the north-west one).
   buildCathedral() {
     const k = new Kit(), kb = new Kit(), kt = new Kit(), B = 0x9a4630, B2 = 0x8a3c28, ROOF = 0x8a3424, STONE = 0xb8a890, DARKW = 0x120c0a;
-    const x0 = 30, x1 = 98, z0 = 14, z1 = 32, H = 17;   // the nave (west end at x0)
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, L = x1 - x0, W = z1 - z0;
-    kb.box(L, H, W, B, [cx, H / 2, cz]);
-    k.box(L + 0.8, 1.0, W + 0.8, STONE, [cx, 0.3, cz]); k.box(L + 0.5, 0.12, W + 0.5, STONE, [cx, 0.86, cz]);
-    // the roof, very steep and high, tiled; a corbel frieze and a moulded cornice under the eaves
-    kt.add(gableRoof(L, W, 15, 0.5), ROOF, [cx, H, cz]);
-    steppedGable(kb, W, 15, 6, B, [x0 - 0.25, H, cz], Math.PI / 2, 0.8, B2);
-    steppedGable(kb, W, 15, 6, B, [x1 + 0.25, H, cz], Math.PI / 2, 0.8, B2);
-    for (const sz of [-1, 1]) {
-      const z = sz < 0 ? z0 : z1;
-      k.box(L, 0.18, 0.3, STONE, [cx, H - 0.3, z + sz * 0.12]);
-      for (let x = x0 + 0.6; x < x1 - 0.4; x += 0.9) kb.box(0.3, 0.4, 0.22, B2, [x, H - 0.62, z + sz * 0.1]);
-      k.box(L, 0.14, 0.12, STONE, [cx, 2.6, z + sz * 0.06]);                         // a stone band under the windows
-    }
-    // buttresses with stepped stone weatherings, and the tall pointed windows between them: a
-    // stone frame, two mullions, a transom and the glass (some panes lit from candles inside)
-    this.cathWins = [];
-    for (let i = 0; i <= 9; i++) {
-      const x = x0 + 2 + i * (L - 4) / 9;
+    // Meem's model of the cathedral (its west front, with the porch and turrets, toward you); the
+    // code-built one below if it's missing
+    const CP = PROPS.fresh(); this.cathWins = [];
+    if (!CP.add('frombork_cathedral', 64, -0.2, 23, Math.PI, { w: 74, d: 34, h: 40 })) {
+      const x0 = 30, x1 = 98, z0 = 14, z1 = 32, H = 17;   // the nave (west end at x0)
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, L = x1 - x0, W = z1 - z0;
+      kb.box(L, H, W, B, [cx, H / 2, cz]);
+      k.box(L + 0.8, 1.0, W + 0.8, STONE, [cx, 0.3, cz]); k.box(L + 0.5, 0.12, W + 0.5, STONE, [cx, 0.86, cz]);
+      // the roof, very steep and high, tiled; a corbel frieze and a moulded cornice under the eaves
+      kt.add(gableRoof(L, W, 15, 0.5), ROOF, [cx, H, cz]);
+      steppedGable(kb, W, 15, 6, B, [x0 - 0.25, H, cz], Math.PI / 2, 0.8, B2);
+      steppedGable(kb, W, 15, 6, B, [x1 + 0.25, H, cz], Math.PI / 2, 0.8, B2);
       for (const sz of [-1, 1]) {
-        const z = sz < 0 ? z0 : z1, yaw = sz < 0 ? Math.PI : 0;
-        kb.box(1.4, H - 1, 1.6, B2, [x, (H - 1) / 2, z + sz * 0.8]);
-        kb.box(1.4, 6, 0.8, B2, [x, 3, z + sz * 1.95]);
-        for (const [y, d] of [[6.05, 2.4], [H - 0.95, 1.65]]) k.box(1.55, 0.12, d + 0.1, STONE, [x, y, z + sz * d / 2]);
-        k.cyl(0.001, 1.0, 1.6, 4, STONE, [x, H - 0.1, z + sz * 0.8], [0, Math.PI / 4, 0], [1, 1, 0.9]);
-        if (i < 9) {
-          const wx = x + (L - 4) / 18;
-          this.cathWins.push({ p: new THREE.Vector3(wx, 8.5, z + sz * 0.06), yaw });
-          k.add(archRing(2.3, 11.2, 0.22, 0.2), STONE, [wx, 3, z + sz * 0.11], [0, yaw, 0]);
-          k.add(archGeo(1.9, 10.9, 0.02), DARKW, [wx, 3.05, z + sz * 0.02], [0, yaw, 0]);
-          for (const ox of [-0.27, 0.27]) k.box(0.08, 8.6, 0.06, STONE, [wx + ox, 7.6, z + sz * 0.1]);
-          k.box(1.6, 0.08, 0.06, STONE, [wx, 8.6, z + sz * 0.1]);
+        const z = sz < 0 ? z0 : z1;
+        k.box(L, 0.18, 0.3, STONE, [cx, H - 0.3, z + sz * 0.12]);
+        for (let x = x0 + 0.6; x < x1 - 0.4; x += 0.9) kb.box(0.3, 0.4, 0.22, B2, [x, H - 0.62, z + sz * 0.1]);
+        k.box(L, 0.14, 0.12, STONE, [cx, 2.6, z + sz * 0.06]);                         // a stone band under the windows
+      }
+      // buttresses with stepped stone weatherings, and the tall pointed windows between them: a
+      // stone frame, two mullions, a transom and the glass (some panes lit from candles inside)
+      for (let i = 0; i <= 9; i++) {
+        const x = x0 + 2 + i * (L - 4) / 9;
+        for (const sz of [-1, 1]) {
+          const z = sz < 0 ? z0 : z1, yaw = sz < 0 ? Math.PI : 0;
+          kb.box(1.4, H - 1, 1.6, B2, [x, (H - 1) / 2, z + sz * 0.8]);
+          kb.box(1.4, 6, 0.8, B2, [x, 3, z + sz * 1.95]);
+          for (const [y, d] of [[6.05, 2.4], [H - 0.95, 1.65]]) k.box(1.55, 0.12, d + 0.1, STONE, [x, y, z + sz * d / 2]);
+          k.cyl(0.001, 1.0, 1.6, 4, STONE, [x, H - 0.1, z + sz * 0.8], [0, Math.PI / 4, 0], [1, 1, 0.9]);
+          if (i < 9) {
+            const wx = x + (L - 4) / 18;
+            this.cathWins.push({ p: new THREE.Vector3(wx, 8.5, z + sz * 0.06), yaw });
+            k.add(archRing(2.3, 11.2, 0.22, 0.2), STONE, [wx, 3, z + sz * 0.11], [0, yaw, 0]);
+            k.add(archGeo(1.9, 10.9, 0.02), DARKW, [wx, 3.05, z + sz * 0.02], [0, yaw, 0]);
+            for (const ox of [-0.27, 0.27]) k.box(0.08, 8.6, 0.06, STONE, [wx + ox, 7.6, z + sz * 0.1]);
+            k.box(1.6, 0.08, 0.06, STONE, [wx, 8.6, z + sz * 0.1]);
+          }
         }
       }
+      // the slender octagonal turrets at the west front, with tall pointed spires
+      for (const tz of [z0 - 0.4, z1 + 0.4]) {
+        kb.cyl(1.4, 1.5, 32, 8, B2, [x0 - 0.4, 16, tz]);
+        for (let j = 1; j < 6; j++) k.cyl(1.55, 1.55, 0.35, 8, STONE, [x0 - 0.4, j * 5.5, tz]);
+        for (let j = 0; j < 8; j++) { const a = (j + 0.5) / 8 * Math.PI * 2; if (j % 2) k.add(archGeo(0.32, 1.1, 0.04), DARKW, [x0 - 0.4 + Math.sin(a) * 1.44, 27, tz + Math.cos(a) * 1.44], [0, a, 0]); }
+        kt.cyl(0.001, 1.6, 9, 8, ROOF, [x0 - 0.4, 36.5, tz]);
+        k.ball(0.18, 0, 0xc8a040, [x0 - 0.4, 41.1, tz]);
+      }
+      for (const tz of [z0 + 4, z1 - 4]) { kb.cyl(0.7, 0.75, 8, 8, B2, [x0 - 0.5, H + 12, tz]); kt.cyl(0.001, 0.85, 5, 8, ROOF, [x0 - 0.5, H + 18.5, tz]); }
+      // the west front: two tall pointed windows either side of the porch
+      for (const oz of [-5.2, 5.2]) {
+        k.add(archRing(2.3, 11.2, 0.22, 0.2), STONE, [x0 - 0.11, 3.6, cz + oz], [0, -Math.PI / 2, 0]);
+        k.add(archGeo(1.9, 10.9, 0.02), DARKW, [x0 - 0.02, 3.65, cz + oz], [0, -Math.PI / 2, 0]);
+        for (const m of [-0.27, 0.27]) k.box(0.06, 8.6, 0.08, STONE, [x0 - 0.1, 8.2, cz + oz + m]);
+        this.cathWins.push({ p: new THREE.Vector3(x0 - 0.06, 9.1, cz + oz), yaw: -Math.PI / 2 });
+      }
+      // the porch at the west door, with its own little stepped gable, and the great door in a
+      // deep pointed portal (stepped stone orders)
+      kb.box(7, 9, 6, B, [x0 - 3.5, 4.5, cz]); kt.add(gableRoof(6, 7, 4, 0.2).rotateY(Math.PI / 2), ROOF, [x0 - 3.5, 9, cz]);
+      steppedGable(kb, 7, 4, 3, B, [x0 - 6.5, 9, cz], Math.PI / 2, 0.5, B2);
+      for (let o = 0; o < 3; o++) k.add(archRing(4.2 - o * 0.5, 6.4 - o * 0.45, 0.12, 0.25), STONE, [x0 - 7.06 + o * 0.0, 0.6, cz], [0, -Math.PI / 2, 0], [1, 1, 1 + o * 0.6]);
+      k.add(archGeo(2.6, 5.1, 0.04), 0x3a2414, [x0 - 7.02, 0.6, cz], [0, -Math.PI / 2, 0]);
+      for (let i = 0; i < 6; i++) k.box(0.03, 3.6, 0.04, 0x241408, [x0 - 7.05, 2.4, cz - 1.0 + i * 0.4]);
+      // a little ridge turret (the signal bell) in the middle of the roof
+      k.cyl(0.9, 0.9, 3, 6, 0x5a4a38, [cx, H + 15.5, cz]); k.cyl(0.001, 1.1, 5, 6, 0x4a6a5a, [cx, H + 19.5, cz]);
     }
-    // the slender octagonal turrets at the west front, with tall pointed spires
-    for (const tz of [z0 - 0.4, z1 + 0.4]) {
-      kb.cyl(1.4, 1.5, 32, 8, B2, [x0 - 0.4, 16, tz]);
-      for (let j = 1; j < 6; j++) k.cyl(1.55, 1.55, 0.35, 8, STONE, [x0 - 0.4, j * 5.5, tz]);
-      for (let j = 0; j < 8; j++) { const a = (j + 0.5) / 8 * Math.PI * 2; if (j % 2) k.add(archGeo(0.32, 1.1, 0.04), DARKW, [x0 - 0.4 + Math.sin(a) * 1.44, 27, tz + Math.cos(a) * 1.44], [0, a, 0]); }
-      kt.cyl(0.001, 1.6, 9, 8, ROOF, [x0 - 0.4, 36.5, tz]);
-      k.ball(0.18, 0, 0xc8a040, [x0 - 0.4, 41.1, tz]);
-    }
-    for (const tz of [z0 + 4, z1 - 4]) { kb.cyl(0.7, 0.75, 8, 8, B2, [x0 - 0.5, H + 12, tz]); kt.cyl(0.001, 0.85, 5, 8, ROOF, [x0 - 0.5, H + 18.5, tz]); }
-    // the west front: two tall pointed windows either side of the porch
-    for (const oz of [-5.2, 5.2]) {
-      k.add(archRing(2.3, 11.2, 0.22, 0.2), STONE, [x0 - 0.11, 3.6, cz + oz], [0, -Math.PI / 2, 0]);
-      k.add(archGeo(1.9, 10.9, 0.02), DARKW, [x0 - 0.02, 3.65, cz + oz], [0, -Math.PI / 2, 0]);
-      for (const m of [-0.27, 0.27]) k.box(0.06, 8.6, 0.08, STONE, [x0 - 0.1, 8.2, cz + oz + m]);
-      this.cathWins.push({ p: new THREE.Vector3(x0 - 0.06, 9.1, cz + oz), yaw: -Math.PI / 2 });
-    }
-    // the porch at the west door, with its own little stepped gable, and the great door in a
-    // deep pointed portal (stepped stone orders)
-    kb.box(7, 9, 6, B, [x0 - 3.5, 4.5, cz]); kt.add(gableRoof(6, 7, 4, 0.2).rotateY(Math.PI / 2), ROOF, [x0 - 3.5, 9, cz]);
-    steppedGable(kb, 7, 4, 3, B, [x0 - 6.5, 9, cz], Math.PI / 2, 0.5, B2);
-    for (let o = 0; o < 3; o++) k.add(archRing(4.2 - o * 0.5, 6.4 - o * 0.45, 0.12, 0.25), STONE, [x0 - 7.06 + o * 0.0, 0.6, cz], [0, -Math.PI / 2, 0], [1, 1, 1 + o * 0.6]);
-    k.add(archGeo(2.6, 5.1, 0.04), 0x3a2414, [x0 - 7.02, 0.6, cz], [0, -Math.PI / 2, 0]);
-    for (let i = 0; i < 6; i++) k.box(0.03, 3.6, 0.04, 0x241408, [x0 - 7.05, 2.4, cz - 1.0 + i * 0.4]);
-    // a little ridge turret (the signal bell) in the middle of the roof
-    k.cyl(0.9, 0.9, 3, 6, 0x5a4a38, [cx, H + 15.5, cz]); k.cyl(0.001, 1.1, 5, 6, 0x4a6a5a, [cx, H + 19.5, cz]);
 
     // The close's wall: brick on a stone plinth, buttressed every eight metres, a blind pointed arch
     // in every bay, a corbel table carrying the crenellated breastwork (each merlon with an arrow
@@ -363,20 +386,19 @@ export default class Copernicus {
     }
     // the canons' houses (curias) inside and just outside the close
     this.closeWins = [];
-    const hr = rng(5);
+    const hr = rng(5), closeP = PROPS.fresh();
     for (const [x, z, yaw] of [[14, 44, 0], [24, 46, 0], [70, 46, 0], [82, 45, 0], [94, 46, 0], [10, 10, Math.PI / 2], [104, 12, -Math.PI / 2], [104, 30, -Math.PI / 2], [30, 70, Math.PI], [46, 72, Math.PI], [66, 70, Math.PI], [86, 71, Math.PI]]) {
-      house(k, { x, y: groundHeight(x, z), z, w: 8 + hr() * 3, d: 7, h: 6 + hr() * 2, yaw, wall: [0xd6c4a2, 0xc8b08a, 0x9a4a32][Math.floor(hr() * 3)], roofCol: ROOF, gableFront: hr() < 0.4, timber: hr() < 0.35 ? 0x3a2a1c : null }, this.closeWins);
+      house(k, { x, y: groundHeight(x, z), z, w: 8 + hr() * 3, d: 7, h: 6 + hr() * 2, yaw, wall: [0xd6c4a2, 0xc8b08a, 0x9a4a32][Math.floor(hr() * 3)], roofCol: ROOF, gableFront: hr() < 0.4, timber: hr() < 0.35 ? 0x3a2a1c : null, props: closeP, model: 'house_north' }, this.closeWins);
     }
-    this.root.add(k.mesh(), kb.mesh(BRICK), kt.mesh(TILES));
-    const wl = windows(this.cathWins.map((w) => ({ p: w.p, yaw: w.yaw })), { lit: 0.35, w: 1.5, h: 9, warm: 0xc0803a, seed: 9 });
-    this.root.add(wl);
+    this.root.add(k.mesh(), kb.mesh(BRICK), kt.mesh(TILES), closeP.build({ glow: 0x231c16 }), CP.build({ glow: 0x231c16 }));
+    if (this.cathWins.length) this.root.add(windows(this.cathWins.map((w) => ({ p: w.p, yaw: w.yaw })), { lit: 0.35, w: 1.5, h: 9, warm: 0xc0803a, seed: 9 }));
     this.root.add(windows(this.closeWins, { lit: 0.5, seed: 4 }));
   }
 
   // The town of Frombork down the hill: lanes of tall narrow houses with their gables to the street,
   // a market square with the town hall, St Nicholas's church, the harbour and its fishing boats.
   buildTown() {
-    const k = new Kit(), r = rng(12), wins = [];
+    const k = new Kit(), r = rng(12), wins = [], TP = PROPS.fresh();
     const ROOFS = [0x8a3424, 0x9a4028, 0x7a3020, 0x5a4a44], WALLS = [0xe0d2b0, 0xd4c094, 0xc8a878, 0xb8b0a0, 0x9a4a32, 0xd8c8b8];
     this.chimneys = [];
     const street = (x0, z0, x1, z1, side) => {
@@ -384,7 +406,7 @@ export default class Copernicus {
       for (let d = 2; d < len - 3;) {
         const w = 5 + r() * 3, x = x0 + dx * (d + w / 2) + side * -dz * 6.5, z = z0 + dz * (d + w / 2) + side * dx * 6.5;
         const y = groundHeight(x, z);
-        house(k, { x, y: y - 0.3, z, w, d: 9, h: 6 + r() * 4, yaw, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], gableFront: r() < 0.75, stepped: r() < 0.2, timber: r() < 0.3 ? 0x3a2a1c : null }, wins);
+        house(k, { x, y: y - 0.3, z, w, d: 9, h: 6 + r() * 4, yaw, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], gableFront: r() < 0.75, stepped: r() < 0.2, timber: r() < 0.3 ? 0x3a2a1c : null, props: TP, model: 'house_north_lo' }, wins);
         if (r() < 0.25) this.chimneys.push(new THREE.Vector3(x, y + 13, z));
         d += w + 0.3;
       }
@@ -406,7 +428,13 @@ export default class Copernicus {
     for (let i = 0; i < 12; i++) k.cyl(0.18, 0.18, 3, 5, 0x3a2a1c, [-42 + (i % 2) * 4, WATER - 0.6, -158 - Math.floor(i / 2) * 10]);
     this.boats = [];
     for (let i = 0; i < 6; i++) {
-      const bk = new Kit(), L = 7 + r() * 4;
+      const L = 7 + r() * 4;
+      if (PROPS.has('boat_small')) {   // Meem's fishing boat (one each, so they can bob on their own)
+        const bp = PROPS.fresh(); bp.add('boat_small', 0, -0.55, 0, 0, { s: L / 5 });
+        const b = bp.build(); b.position.set(-48 + (i % 2) * 16 + r() * 2, WATER + 0.25, -170 - i * 9); b.rotation.y = (r() - 0.5) * 0.3; b.userData.ph = r() * 6;
+        this.root.add(b); this.boats.push(b); continue;
+      }
+      const bk = new Kit();
       bk.cyl(0.9, 0.7, L, 8, 0x4a3420, [0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.45]);
       bk.box(1.4, 0.15, L * 0.8, 0x6a5038, [0, 0.38, 0]);
       bk.cyl(0.06, 0.08, 7, 5, 0x3a2a1c, [0, 3.6, L * 0.1]);
@@ -414,7 +442,13 @@ export default class Copernicus {
       const b = bk.mesh(); b.position.set(-48 + (i % 2) * 16 + r() * 2, WATER + 0.25, -170 - i * 9); b.rotation.y = (r() - 0.5) * 0.3; b.userData.ph = r() * 6;
       this.root.add(b); this.boats.push(b);
     }
-    this.root.add(k.mesh());
+    // Meem's carrack riding at anchor out past the pier (it bobs with the boats)
+    for (const [x, z, yaw, ph] of [[-30, -240, -0.5, 4.1]]) {   // (one: each is 14k triangles)
+      const sp = PROPS.fresh(); if (!sp.add('ship_carrack', 0, -2.6, 0, 0)) break;
+      const b = sp.build({ glow: 0x231c16 }); b.position.set(x, WATER + 0.25, z); b.rotation.y = yaw; b.userData.ph = ph;
+      this.root.add(b); this.boats.push(b);
+    }
+    this.root.add(k.mesh(), TP.build({ glow: 0x231c16 }));
     this.root.add(windows(wins, { lit: 0.33, seed: 8 }));
   }
 
@@ -462,12 +496,20 @@ export default class Copernicus {
       k.box(1.8, 0.12, 0.12, DARK, [wx, wy + 1.85, wz]); k.cyl(0.08, 0.08, 1.5, 8, WOOD, [wx, wy + 1.6, wz], [0, 0, Math.PI / 2]);
       kt.add(gableRoof(1.9, 1.4, 0.6, 0.15), 0x7a2e22, [wx, wy + 1.95, wz]);
       k.cyl(0.16, 0.13, 0.3, 8, 0x5a3e26, [wx + 0.45, wy + 0.95, wz + 0.1]); }
-    for (const [x, z] of [[4.0, 4.3], [4.5, 5.0], [3.9, 5.1]]) { const y = groundHeight(x, z); k.cyl(0.3, 0.26, 0.85, 10, 0x5a3e26, [x, y + 0.425, z]); for (const h of [0.15, 0.7]) k.cyl(0.31, 0.31, 0.04, 10, IRON, [x, y + h, z]); }
+    { const fp = PROPS.fresh();   // Meem's barrels, and a crate, basket and sack beside them
+      for (const [x, z] of [[4.0, 4.3], [4.5, 5.0], [3.9, 5.1]]) {
+        const y = groundHeight(x, z);
+        if (fp.add('barrel', x, y, z, x * 3, { s: 0.9 })) continue;
+        k.cyl(0.3, 0.26, 0.85, 10, 0x5a3e26, [x, y + 0.425, z]); for (const h of [0.15, 0.7]) k.cyl(0.31, 0.31, 0.04, 10, IRON, [x, y + h, z]);
+      }
+      fp.add('crate_basket_set', 5.6, groundHeight(5.6, 4.9), 4.9, -0.4);
+      this.root.add(fp.build()); }
     { const y = groundHeight(-0.5, 4.2);
       for (let i = 0; i < 24; i++) k.cyl(0.09, 0.09, 1.0, 6, i % 4 ? 0x7a5a3a : 0x8a6a44, [-1.6 + (i % 8) * 0.19, y + 0.1 + Math.floor(i / 8) * 0.18, 4.0], [Math.PI / 2, 0, 0]);
       for (const x of [-1.8, 0.0]) k.box(0.1, 1.5, 0.1, DARK, [x, y + 0.75, 4.6]);
       k.box(2.1, 0.06, 1.3, 0x5a3e28, [-0.9, y + 1.45, 4.1], [0.35, 0, 0]); }
-    { const cx = 15, cz = 3.6, y = groundHeight(cx, cz);
+    const TP = PROPS.fresh();   // Meem's models for the tower top and its foot (built at the end)
+    if (!TP.add('handcart', 15, groundHeight(15, 3.6), 3.6, 0)) { const cx = 15, cz = 3.6, y = groundHeight(cx, cz);
       k.box(1.6, 0.06, 0.9, WOOD, [cx, y + 0.62, cz], [0, 0, -0.12]); for (const sz of [-1, 1]) k.box(1.6, 0.25, 0.04, WOOD, [cx, y + 0.76, cz + sz * 0.44], [0, 0, -0.12]);
       for (const sz of [-1, 1]) { k.cyl(0.42, 0.42, 0.05, 12, 0x4a3420, [cx + 0.2, y + 0.42, cz + sz * 0.5], [Math.PI / 2, 0, 0]); k.cyl(0.05, 0.05, 0.08, 6, IRON, [cx + 0.2, y + 0.42, cz + sz * 0.53], [Math.PI / 2, 0, 0]); }
       for (const sz of [-1, 1]) beam(k, [cx - 0.75, y + 0.68, cz + sz * 0.3], [cx - 1.8, y + 0.05, cz + sz * 0.3], 0.06, 0.06, WOOD); }
@@ -515,48 +557,59 @@ export default class Copernicus {
     { const [y, z] = dP(0.025, -0.45); k.box(HH * 2 - 0.02, 0.05, 0.9, 0x6a4a30, [HX, y, z], [ang, 0, 0]); }
     for (const lz of [-0.72, -0.18]) { const [y, z] = dP(-0.02, lz); k.box(HH * 2 - 0.1, 0.03, 0.12, 0x553a24, [HX, y, z], [ang, 0, 0]); }   // battens underneath
     for (const lx of [-0.28, 0.28]) { const [y, z] = dP(0.055, -0.25); k.box(0.05, 0.008, 0.5, IRON, [HX + lx, y, z], [ang, 0, 0]); }       // strap hinges
-    // ---- the lean-to over the desk (east side): four posts, two beams, rafters, a board-and-batten roof
-    const X1 = 1.35, X2 = HALF - 0.3, Y1 = 2.75, Y2 = 2.3, slope = Math.atan2(Y1 - Y2, X2 - X1);
-    for (const z of [-1.4, 1.4]) {
-      k.box(0.14, Y1, 0.14, DARK, [X1, TOP + Y1 / 2, z]); k.box(0.14, Y2, 0.14, DARK, [X2, TOP + Y2 / 2, z]);
-      beam(k, [X1, TOP + Y1 - 0.5, z], [X1, TOP + Y1 - 0.01, z - Math.sign(z) * 0.45], 0.08, 0.08, DARK);   // knee braces up to the beams
-      beam(k, [X2, TOP + Y2 - 0.5, z], [X2, TOP + Y2 - 0.01, z - Math.sign(z) * 0.45], 0.08, 0.08, DARK);
-    }
-    k.box(0.16, 0.16, 3.2, 0x4a3220, [X1, TOP + Y1 + 0.08, 0]); k.box(0.16, 0.16, 3.2, 0x4a3220, [X2, TOP + Y2 + 0.08, 0]);
-    const RL = (X2 - X1) / Math.cos(slope) + 0.9, rc = [(X1 + X2) / 2, TOP + (Y1 + Y2) / 2 + 0.16, 0];
-    const rP = (lx, ly, lz) => [rc[0] + lx * Math.cos(slope) + ly * Math.sin(slope), rc[1] - lx * Math.sin(slope) + ly * Math.cos(slope), lz];
-    for (let i = 0; i < 7; i++) k.box(RL, 0.09, 0.07, 0x4a3220, rP(0, 0.045, -1.5 + i * 0.5), [0, 0, -slope]);            // rafters
-    for (let i = 0; i < 13; i++) k.box(RL + 0.05, 0.025, 0.26, i % 3 ? 0x5a3e28 : 0x52381f, rP(0, 0.1, -1.68 + i * 0.28), [0, 0, -slope]);   // boards
-    for (let i = 0; i < 12; i++) k.box(RL + 0.05, 0.03, 0.06, 0x3e2a18, rP(0, 0.125, -1.54 + i * 0.28), [0, 0, -slope]);  // battens over the joints
     // ---- the desk: a tall writing desk (he writes standing, the way scholars did), a slanted
     // book-rest with his great manuscript open on it, a shelf underneath with more books
     const dx = HALF - 0.85, dz = 0.15, DH = 0.95; this.DESK = { x: dx, z: dz, y: TOP + DH };
-    k.box(0.78, 0.05, 1.56, 0x6e4c2e, [dx, TOP + DH - 0.025, dz]); k.box(0.8, 0.02, 1.58, 0x5a3c22, [dx, TOP + DH - 0.06, dz]);
-    for (const [ox, oz] of [[-0.31, -0.68], [0.31, -0.68], [-0.31, 0.68], [0.31, 0.68]]) {
-      k.cyl(0.035, 0.035, DH - 0.07, 8, DARK, [dx + ox, TOP + (DH - 0.07) / 2, dz + oz]);
-      k.cyl(0.05, 0.05, 0.08, 8, DARK, [dx + ox, TOP + DH * 0.55, dz + oz]); k.cyl(0.045, 0.04, 0.06, 8, DARK, [dx + ox, TOP + 0.03, dz + oz]);
+    // Meem's desk under its board lean-to, its front edge where the code desk's is (he stands at it);
+    // its top slants up toward the parapet, 0.3 m per metre of its depth. The code-built ones if it's missing.
+    const MX = 2.17, MS = 0.85, MD = PROPS.size('copernicus_desk');
+    const deskModel = !!MD && TP.add('copernicus_desk', MX, TOP, dz, -Math.PI / 2, { w: MD.x, d: MD.z * MS, h: MD.y });
+    this.deskTop = deskModel ? (x) => TOP + 0.9 + (0.45 - (MX - x) / MS) * 0.3 : () => TOP + DH;
+    this.deskTilt = deskModel ? Math.atan(0.3 / MS) : 0;
+    if (!deskModel) {
+      // ---- the lean-to over the desk (east side): four posts, two beams, rafters, a board-and-batten roof
+      const X1 = 1.35, X2 = HALF - 0.3, Y1 = 2.75, Y2 = 2.3, slope = Math.atan2(Y1 - Y2, X2 - X1);
+      for (const z of [-1.4, 1.4]) {
+        k.box(0.14, Y1, 0.14, DARK, [X1, TOP + Y1 / 2, z]); k.box(0.14, Y2, 0.14, DARK, [X2, TOP + Y2 / 2, z]);
+        beam(k, [X1, TOP + Y1 - 0.5, z], [X1, TOP + Y1 - 0.01, z - Math.sign(z) * 0.45], 0.08, 0.08, DARK);   // knee braces up to the beams
+        beam(k, [X2, TOP + Y2 - 0.5, z], [X2, TOP + Y2 - 0.01, z - Math.sign(z) * 0.45], 0.08, 0.08, DARK);
+      }
+      k.box(0.16, 0.16, 3.2, 0x4a3220, [X1, TOP + Y1 + 0.08, 0]); k.box(0.16, 0.16, 3.2, 0x4a3220, [X2, TOP + Y2 + 0.08, 0]);
+      const RL = (X2 - X1) / Math.cos(slope) + 0.9, rc = [(X1 + X2) / 2, TOP + (Y1 + Y2) / 2 + 0.16, 0];
+      const rP = (lx, ly, lz) => [rc[0] + lx * Math.cos(slope) + ly * Math.sin(slope), rc[1] - lx * Math.sin(slope) + ly * Math.cos(slope), lz];
+      for (let i = 0; i < 7; i++) k.box(RL, 0.09, 0.07, 0x4a3220, rP(0, 0.045, -1.5 + i * 0.5), [0, 0, -slope]);            // rafters
+      for (let i = 0; i < 13; i++) k.box(RL + 0.05, 0.025, 0.26, i % 3 ? 0x5a3e28 : 0x52381f, rP(0, 0.1, -1.68 + i * 0.28), [0, 0, -slope]);   // boards
+      for (let i = 0; i < 12; i++) k.box(RL + 0.05, 0.03, 0.06, 0x3e2a18, rP(0, 0.125, -1.54 + i * 0.28), [0, 0, -slope]);  // battens over the joints
+      k.box(0.78, 0.05, 1.56, 0x6e4c2e, [dx, TOP + DH - 0.025, dz]); k.box(0.8, 0.02, 1.58, 0x5a3c22, [dx, TOP + DH - 0.06, dz]);
+      for (const [ox, oz] of [[-0.31, -0.68], [0.31, -0.68], [-0.31, 0.68], [0.31, 0.68]]) {
+        k.cyl(0.035, 0.035, DH - 0.07, 8, DARK, [dx + ox, TOP + (DH - 0.07) / 2, dz + oz]);
+        k.cyl(0.05, 0.05, 0.08, 8, DARK, [dx + ox, TOP + DH * 0.55, dz + oz]); k.cyl(0.045, 0.04, 0.06, 8, DARK, [dx + ox, TOP + 0.03, dz + oz]);
+      }
+      for (const sx of [-1, 1]) k.box(0.03, 0.12, 1.36, 0x5a3c22, [dx + sx * 0.31, TOP + DH - 0.13, dz]);   // aprons
+      for (const sz of [-1, 1]) k.box(0.62, 0.12, 0.03, 0x5a3c22, [dx, TOP + DH - 0.13, dz + sz * 0.68]);
+      k.box(0.62, 0.03, 1.36, 0x5e4026, [dx, TOP + 0.24, dz]);                                              // the low shelf
+      for (let i = 0; i < 7; i++) { const h = 0.24 + r() * 0.08; k.box(0.2 + r() * 0.06, h, 0.05 + r() * 0.03, [0x6a2a1a, 0x3a3020, 0x5a4a2a, 0x2a3a4a, 0x7a5a2a][i % 5], [dx + 0.05, TOP + 0.255 + h / 2, dz - 0.6 + i * 0.075], [0, 0, (i === 6 ? 0.35 : 0)]); }
+      for (let i = 0; i < 3; i++) k.cyl(0.04, 0.04, 0.42, 8, 0xe0d2b0, [dx - 0.05, TOP + 0.295, dz + 0.25 + i * 0.09], [0, 0, Math.PI / 2]);  // rolled charts
+      // the book-rest: a slanted board facing him, the manuscript open on it
+      const tilt = 0.4, lp = [dx + 0.17, TOP + DH + 0.1, dz + 0.3];
+      k.box(0.32, 0.025, 0.44, 0x5a3c22, lp, [0, 0, tilt]); k.box(0.03, 0.15, 0.4, 0x5a3c22, [dx + 0.3, TOP + DH + 0.075, dz + 0.3]);
+      k.box(0.03, 0.03, 0.44, 0x5a3c22, [lp[0] - 0.15, lp[1] - 0.07, lp[2]]);                           // the ledge that holds the book
+      for (const sz of [-1, 1]) k.box(0.28, 0.025, 0.2, 0xece0c0, [lp[0] - 0.01 * Math.sin(tilt) + 0.0, lp[1] + 0.026, lp[2] + sz * 0.1], [sz * 0.06, 0, tilt]);
+      k.box(0.3, 0.012, 0.42, 0x6a3a1e, [lp[0] + 0.004, lp[1] + 0.008, lp[2]], [0, 0, tilt]);            // its binding underneath
+      // books, loose papers, ink and quill, a brass astrolabe, the candle (below)
+      const bookCols = [0x6a2a1a, 0x3a3020, 0x5a4a2a, 0x2a3a4a, 0x7a5a2a];
+      for (let i = 0; i < 5; i++) { const w = 0.28 - i * 0.02, d = 0.36 - i * 0.02, y = TOP + DH + 0.031 + i * 0.061, ry = (r() - 0.5) * 0.4;
+        k.box(w, 0.06, d, bookCols[i], [dx + 0.12, y, dz - 0.52], [0, ry, 0]); k.box(w - 0.01, 0.046, d - 0.03, 0xe6d8b4, [dx + 0.12 + 0.01 * Math.cos(ry), y, dz - 0.52 - 0.01 * Math.sin(ry)], [0, ry, 0]); }
+      for (let i = 0; i < 4; i++) k.box(0.21, 0.003, 0.29, i % 2 ? 0xece0c0 : 0xe4d6b0, [dx - 0.16 + i * 0.012, TOP + DH + 0.002 + i * 0.003, dz + 0.0 + i * 0.03], [0, -0.3 + i * 0.22, 0]);
+      k.cyl(0.03, 0.035, 0.05, 8, 0x1a1a1a, [dx - 0.2, TOP + DH + 0.025, dz - 0.28]);
+      beam(k, [dx - 0.2, TOP + DH + 0.03, dz - 0.28], [dx - 0.13, TOP + DH + 0.24, dz - 0.33], 0.006, 0.004, 0xf0f0e8);
+      beam(k, [dx - 0.16, TOP + DH + 0.13, dz - 0.305], [dx - 0.11, TOP + DH + 0.27, dz - 0.34], 0.025, 0.003, 0xe8e8e0);   // the feather's vane
+      k.cyl(0.09, 0.09, 0.012, 16, BRASS, [dx + 0.2, TOP + DH + 0.006, dz + 0.7]); k.cyl(0.07, 0.07, 0.006, 16, 0x8a6a2a, [dx + 0.2, TOP + DH + 0.015, dz + 0.7]);
+      beam(k, [dx + 0.11, TOP + DH + 0.022, dz + 0.7], [dx + 0.29, TOP + DH + 0.022, dz + 0.7], 0.012, 0.006, BRASS);
+      // a lantern hanging from the lean-to's beam
+      k.box(0.12, 0.16, 0.12, 0x2a2a2a, [X1, TOP + Y1 - 0.25, -0.9]); k.cyl(0.001, 0.1, 0.07, 4, 0x2a2a2a, [X1, TOP + Y1 - 0.135, -0.9], [0, Math.PI / 4, 0]);
+      beam(k, [X1, TOP + Y1 - 0.1, -0.9], [X1, TOP + Y1, -0.9], 0.01, 0.01, IRON);
     }
-    for (const sx of [-1, 1]) k.box(0.03, 0.12, 1.36, 0x5a3c22, [dx + sx * 0.31, TOP + DH - 0.13, dz]);   // aprons
-    for (const sz of [-1, 1]) k.box(0.62, 0.12, 0.03, 0x5a3c22, [dx, TOP + DH - 0.13, dz + sz * 0.68]);
-    k.box(0.62, 0.03, 1.36, 0x5e4026, [dx, TOP + 0.24, dz]);                                              // the low shelf
-    for (let i = 0; i < 7; i++) { const h = 0.24 + r() * 0.08; k.box(0.2 + r() * 0.06, h, 0.05 + r() * 0.03, [0x6a2a1a, 0x3a3020, 0x5a4a2a, 0x2a3a4a, 0x7a5a2a][i % 5], [dx + 0.05, TOP + 0.255 + h / 2, dz - 0.6 + i * 0.075], [0, 0, (i === 6 ? 0.35 : 0)]); }
-    for (let i = 0; i < 3; i++) k.cyl(0.04, 0.04, 0.42, 8, 0xe0d2b0, [dx - 0.05, TOP + 0.295, dz + 0.25 + i * 0.09], [0, 0, Math.PI / 2]);  // rolled charts
-    // the book-rest: a slanted board facing him, the manuscript open on it
-    const tilt = 0.4, lp = [dx + 0.17, TOP + DH + 0.1, dz + 0.3];
-    k.box(0.32, 0.025, 0.44, 0x5a3c22, lp, [0, 0, tilt]); k.box(0.03, 0.15, 0.4, 0x5a3c22, [dx + 0.3, TOP + DH + 0.075, dz + 0.3]);
-    k.box(0.03, 0.03, 0.44, 0x5a3c22, [lp[0] - 0.15, lp[1] - 0.07, lp[2]]);                           // the ledge that holds the book
-    for (const sz of [-1, 1]) k.box(0.28, 0.025, 0.2, 0xece0c0, [lp[0] - 0.01 * Math.sin(tilt) + 0.0, lp[1] + 0.026, lp[2] + sz * 0.1], [sz * 0.06, 0, tilt]);
-    k.box(0.3, 0.012, 0.42, 0x6a3a1e, [lp[0] + 0.004, lp[1] + 0.008, lp[2]], [0, 0, tilt]);            // its binding underneath
-    // books, loose papers, ink and quill, a brass astrolabe, the candle (below)
-    const bookCols = [0x6a2a1a, 0x3a3020, 0x5a4a2a, 0x2a3a4a, 0x7a5a2a];
-    for (let i = 0; i < 5; i++) { const w = 0.28 - i * 0.02, d = 0.36 - i * 0.02, y = TOP + DH + 0.031 + i * 0.061, ry = (r() - 0.5) * 0.4;
-      k.box(w, 0.06, d, bookCols[i], [dx + 0.12, y, dz - 0.52], [0, ry, 0]); k.box(w - 0.01, 0.046, d - 0.03, 0xe6d8b4, [dx + 0.12 + 0.01 * Math.cos(ry), y, dz - 0.52 - 0.01 * Math.sin(ry)], [0, ry, 0]); }
-    for (let i = 0; i < 4; i++) k.box(0.21, 0.003, 0.29, i % 2 ? 0xece0c0 : 0xe4d6b0, [dx - 0.16 + i * 0.012, TOP + DH + 0.002 + i * 0.003, dz + 0.0 + i * 0.03], [0, -0.3 + i * 0.22, 0]);
-    k.cyl(0.03, 0.035, 0.05, 8, 0x1a1a1a, [dx - 0.2, TOP + DH + 0.025, dz - 0.28]);
-    beam(k, [dx - 0.2, TOP + DH + 0.03, dz - 0.28], [dx - 0.13, TOP + DH + 0.24, dz - 0.33], 0.006, 0.004, 0xf0f0e8);
-    beam(k, [dx - 0.16, TOP + DH + 0.13, dz - 0.305], [dx - 0.11, TOP + DH + 0.27, dz - 0.34], 0.025, 0.003, 0xe8e8e0);   // the feather's vane
-    k.cyl(0.09, 0.09, 0.012, 16, BRASS, [dx + 0.2, TOP + DH + 0.006, dz + 0.7]); k.cyl(0.07, 0.07, 0.006, 16, 0x8a6a2a, [dx + 0.2, TOP + DH + 0.015, dz + 0.7]);
-    beam(k, [dx + 0.11, TOP + DH + 0.022, dz + 0.7], [dx + 0.29, TOP + DH + 0.022, dz + 0.7], 0.012, 0.006, BRASS);
     // a stool, pushed aside; the chest with iron bands; an hourglass on it
     const st = [dx + 0.1, -1.15];
     k.cyl(0.19, 0.19, 0.04, 12, WOOD, [st[0], TOP + 0.5, st[1]]);
@@ -568,29 +621,29 @@ export default class Copernicus {
     k.cyl(0.05, 0.05, 0.015, 10, WOOD, [ch[0], TOP + 0.508, ch[1] + 0.25]); k.cyl(0.05, 0.05, 0.015, 10, WOOD, [ch[0], TOP + 0.665, ch[1] + 0.25]);
     k.cyl(0.04, 0.004, 0.07, 10, 0xd8e0e8, [ch[0], TOP + 0.55, ch[1] + 0.25]); k.cyl(0.004, 0.04, 0.07, 10, 0xd8e0e8, [ch[0], TOP + 0.62, ch[1] + 0.25]);
     for (const a of [0.8, 2.4, 4.0, 5.6]) k.box(0.012, 0.15, 0.012, WOOD, [ch[0] + Math.cos(a) * 0.045, TOP + 0.587, ch[1] + 0.25 + Math.sin(a) * 0.045]);
-    // a lantern hanging from the lean-to's beam
-    k.box(0.12, 0.16, 0.12, 0x2a2a2a, [X1, TOP + Y1 - 0.25, -0.9]); k.cyl(0.001, 0.1, 0.07, 4, 0x2a2a2a, [X1, TOP + Y1 - 0.135, -0.9], [0, Math.PI / 4, 0]);
-    beam(k, [X1, TOP + Y1 - 0.1, -0.9], [X1, TOP + Y1, -0.9], 0.01, 0.01, IRON);
     // ---- the triquetrum (Ptolemy's rulers), set up in the meridian on the west side: a post on
     // braced feet, the sighting arm hinged at its top (two brass sights), the graduated ruler hinged
     // low on the post, the arm's end resting on it; a plumb line to keep the post true.
     const TX = -HALF + 0.75, TZ = 0.55, PH = 2.7, L = 2.1, ZD = 36 * D2R;   // ZD: the star's distance from the zenith
     this.TRI = { x: TX, z: TZ };
-    for (const a of [0, Math.PI / 2]) k.box(0.9, 0.07, 0.11, DARK, [TX, TOP + 0.035, TZ], [0, a + Math.PI / 4, 0]);
-    for (const a of [0.785, 2.356, 3.927, 5.498]) beam(k, [TX + Math.cos(a) * 0.38, TOP + 0.07, TZ + Math.sin(a) * 0.38], [TX + Math.cos(a) * 0.05, TOP + 0.75, TZ + Math.sin(a) * 0.05], 0.05, 0.05, DARK);
-    k.box(0.12, PH, 0.12, WOOD, [TX, TOP + 0.07 + PH / 2, TZ]); k.box(0.15, 0.05, 0.15, BRASS, [TX, TOP + PH + 0.095, TZ]);
-    const T = [TX + 0.145, TOP + PH, TZ], E = [TX + 0.145, TOP + PH - L * Math.cos(ZD), TZ - L * Math.sin(ZD)], P0 = [TX + 0.09, TOP + PH - L, TZ];
-    beam(k, T, E, 0.06, 0.05, 0x8a6a42);
-    k.cyl(0.03, 0.03, 0.34, 8, BRASS, [TX + 0.07, TOP + PH, TZ], [0, 0, Math.PI / 2]); k.cyl(0.03, 0.03, 0.22, 8, BRASS, [TX + 0.06, P0[1], TZ], [0, 0, Math.PI / 2]);
-    for (const f of [0.06, 0.94]) { const p = [T[0], T[1] + (E[1] - T[1]) * f, T[2] + (E[2] - T[2]) * f]; k.box(0.08, 0.1, 0.01, BRASS, [p[0], p[1] + 0.05, p[2]], [ZD - Math.PI / 2, 0, 0]); }
-    const rd = new THREE.Vector3(0, E[1] - P0[1], E[2] - P0[2]); const rl = rd.length(); rd.normalize();
-    const R1 = [P0[0], P0[1] + rd.y * (rl + 0.18), P0[2] + rd.z * (rl + 0.18)];
-    beam(k, P0, R1, 0.05, 0.05, 0xb08a52);
-    const pn = new THREE.Vector3(0, -rd.z, rd.y); if (pn.y < 0) pn.negate();   // the ruler's upper face
-    for (let i = 1; i < 30; i++) { const s0 = 0.15 + i * (rl + 0.0 - 0.15) / 30, y = P0[1] + rd.y * s0 + pn.y * 0.028, z = P0[2] + rd.z * s0 + pn.z * 0.028; beam(k, [P0[0] - 0.02, y, z], [P0[0] + (i % 5 ? 0.0 : 0.02), y, z], 0.006, 0.006, 0x2a1a10); }
-    k.box(0.12, 0.03, 0.03, BRASS, [TX + 0.06, TOP + PH - 0.08, TZ + 0.1]);
-    beam(k, [TX + 0.1, TOP + PH - 0.09, TZ + 0.11], [TX + 0.1, TOP + 0.62, TZ + 0.11], 0.004, 0.004, 0xd8d0c0);
-    k.cyl(0.001, 0.025, 0.07, 8, BRASS, [TX + 0.1, TOP + 0.6, TZ + 0.11], [Math.PI, 0, 0]);
+    // Meem's triquetrum, its post where the code one's is (the code-built one if it's missing)
+    if (!TP.add('triquetrum', TX, TOP, TZ, Math.PI / 2, { s: 1.15 })) {
+      for (const a of [0, Math.PI / 2]) k.box(0.9, 0.07, 0.11, DARK, [TX, TOP + 0.035, TZ], [0, a + Math.PI / 4, 0]);
+      for (const a of [0.785, 2.356, 3.927, 5.498]) beam(k, [TX + Math.cos(a) * 0.38, TOP + 0.07, TZ + Math.sin(a) * 0.38], [TX + Math.cos(a) * 0.05, TOP + 0.75, TZ + Math.sin(a) * 0.05], 0.05, 0.05, DARK);
+      k.box(0.12, PH, 0.12, WOOD, [TX, TOP + 0.07 + PH / 2, TZ]); k.box(0.15, 0.05, 0.15, BRASS, [TX, TOP + PH + 0.095, TZ]);
+      const T = [TX + 0.145, TOP + PH, TZ], E = [TX + 0.145, TOP + PH - L * Math.cos(ZD), TZ - L * Math.sin(ZD)], P0 = [TX + 0.09, TOP + PH - L, TZ];
+      beam(k, T, E, 0.06, 0.05, 0x8a6a42);
+      k.cyl(0.03, 0.03, 0.34, 8, BRASS, [TX + 0.07, TOP + PH, TZ], [0, 0, Math.PI / 2]); k.cyl(0.03, 0.03, 0.22, 8, BRASS, [TX + 0.06, P0[1], TZ], [0, 0, Math.PI / 2]);
+      for (const f of [0.06, 0.94]) { const p = [T[0], T[1] + (E[1] - T[1]) * f, T[2] + (E[2] - T[2]) * f]; k.box(0.08, 0.1, 0.01, BRASS, [p[0], p[1] + 0.05, p[2]], [ZD - Math.PI / 2, 0, 0]); }
+      const rd = new THREE.Vector3(0, E[1] - P0[1], E[2] - P0[2]); const rl = rd.length(); rd.normalize();
+      const R1 = [P0[0], P0[1] + rd.y * (rl + 0.18), P0[2] + rd.z * (rl + 0.18)];
+      beam(k, P0, R1, 0.05, 0.05, 0xb08a52);
+      const pn = new THREE.Vector3(0, -rd.z, rd.y); if (pn.y < 0) pn.negate();   // the ruler's upper face
+      for (let i = 1; i < 30; i++) { const s0 = 0.15 + i * (rl + 0.0 - 0.15) / 30, y = P0[1] + rd.y * s0 + pn.y * 0.028, z = P0[2] + rd.z * s0 + pn.z * 0.028; beam(k, [P0[0] - 0.02, y, z], [P0[0] + (i % 5 ? 0.0 : 0.02), y, z], 0.006, 0.006, 0x2a1a10); }
+      k.box(0.12, 0.03, 0.03, BRASS, [TX + 0.06, TOP + PH - 0.08, TZ + 0.1]);
+      beam(k, [TX + 0.1, TOP + PH - 0.09, TZ + 0.11], [TX + 0.1, TOP + 0.62, TZ + 0.11], 0.004, 0.004, 0xd8d0c0);
+      k.cyl(0.001, 0.025, 0.07, 8, BRASS, [TX + 0.1, TOP + 0.6, TZ + 0.11], [Math.PI, 0, 0]);
+    }
     this.triSky = new THREE.Vector3(0, Math.cos(ZD), Math.sin(ZD));   // the way it points
     // ---- a quadrant on its stand by the south wall, and an iron brazier on legs
     const qx = -0.35, qz = HALF - 0.55, QC = qx + 0.31, QY = TOP + 1.05, qf = qz - 0.07;   // its face looks north, toward you
@@ -605,17 +658,17 @@ export default class Copernicus {
     k.cyl(0.29, 0.29, 0.02, 12, 0x4a1a0a, [bx, TOP + 0.7, bz]);
     for (let i = 0; i < 9; i++) { const a = r() * 6.28, rr = r() * 0.2; k.ball(0.05 + r() * 0.03, 0, i % 3 ? 0x2a1a14 : 0x6a2a10, [bx + Math.cos(a) * rr, TOP + 0.72, bz + Math.sin(a) * rr]); }
     for (const a of [0, 2.1, 4.2]) beam(k, [bx + Math.cos(a) * 0.18, TOP + 0.5, bz + Math.sin(a) * 0.18], [bx + Math.cos(a) * 0.3, TOP, bz + Math.sin(a) * 0.3], 0.035, 0.035, 0x1a1a1a);
-    this.root.add(kb.mesh(BRICK), kt.mesh(TILES), k.mesh());
+    this.root.add(kb.mesh(BRICK), kt.mesh(TILES), k.mesh(), TP.build({ glow: 0x231c16 }));
     // the shaft below the hatch glows faintly from a lamp on the stair
     const glowBelow = new THREE.Mesh(new THREE.PlaneGeometry(HH * 2 - 0.02, HH * 2 - 0.02).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x3a2412 }));
     glowBelow.position.set(HX, TOP - 2.75, HZ); this.root.add(glowBelow);
     // the candle on the desk and its light; the brazier's coals and glow
-    const cx = dx + 0.2, cz = dz - 0.2;
-    this.candle = new THREE.PointLight(0xffa860, 3.2, 9, 1.6); this.candle.position.set(cx, TOP + DH + 0.25, cz); this.root.add(this.candle);
+    const [cx, cz, cb] = deskModel ? [MX + 0.25 * MS, dz + 0.45, TOP + 1.43] : [dx + 0.2, dz - 0.2, TOP + DH];   // (the model has its own candle, on its back shelf)
+    this.candle = new THREE.PointLight(0xffa860, 3.2, 9, 1.6); this.candle.position.set(cx, cb + 0.25, cz); this.root.add(this.candle);
     const ck = new Kit(); ck.cyl(0.022, 0.022, 0.14, 8, 0xf0e8d0, [0, 0.085, 0]); ck.cyl(0.05, 0.06, 0.015, 10, 0x8a6a3a, [0, 0.008, 0]); ck.cyl(0.012, 0.012, 0.02, 6, 0x8a6a3a, [0, 0.02, 0]);
     ck.box(0.035, 0.004, 0.025, 0xf0e8d0, [0.03, 0.017, 0.02]);   // a drip of wax on the dish
-    this.candleStick = ck.mesh(); this.candleStick.position.set(cx, TOP + DH, cz); this.root.add(this.candleStick);
-    this.flame = glow(0xffb050, 0.12); this.flame.position.set(cx, TOP + DH + 0.19, cz); this.root.add(this.flame);
+    this.candleStick = ck.mesh(); this.candleStick.position.set(cx, cb, cz); if (!deskModel) this.root.add(this.candleStick);
+    this.flame = glow(0xffb050, 0.12); this.flame.position.set(cx, cb + 0.19, cz); this.root.add(this.flame);
     this.coals = glow(0xff6a20, 0.7, 0.8); this.coals.position.set(bx, TOP + 0.8, bz); this.root.add(this.coals);
     this.brazierLight = new THREE.PointLight(0xff7a30, 1.5, 5, 1.8); this.brazierLight.position.set(bx, TOP + 1.05, bz); this.root.add(this.brazierLight);
     this.smoke = makeSmoke(new THREE.Vector3(bx, TOP + 0.85, bz), { n: 6, rise: 3, size: 0.4, opacity: 0.15, color: 0x8a8a8a });
@@ -625,7 +678,7 @@ export default class Copernicus {
     this.HATCH = { x: HX, z: HZ + 0.12 };   // where people come up the ladder
     // the pile of manuscript pages (grows through ch8_08)
     const pk = new Kit(); for (let i = 0; i < 60; i++) pk.box(0.3, 0.006, 0.4, i % 7 ? 0xece0c0 : 0xd8c8a0, [((i * 37) % 7 - 3) * 0.003, 0.003 + i * 0.007, ((i * 11) % 5 - 2) * 0.004], [0, ((i * 13) % 9 - 4) * 0.02, 0]);
-    this.pages = pk.mesh(); this.pages.position.set(dx - 0.17, TOP + DH, dz + 0.5); this.root.add(this.pages);
+    this.pages = pk.mesh(); this.pages.position.set(dx - 0.17, this.deskTop(dx - 0.17), dz + 0.5); this.pages.rotation.z = this.deskTilt; this.root.add(this.pages);
     this.pageN = 20; this.pages.geometry.setDrawRange(0, 20 * 36);
   }
 
@@ -932,7 +985,7 @@ export default class Copernicus {
     const arrived = this.copDown ? true : walkToward(C, want[0], want[1], dt, { speed: 0.7, height: () => TOP });
     this.copBlk.x = C.g.position.x; this.copBlk.z = C.g.position.z;
     if (leaving) {
-      if (!this.bookOnDesk && arrived && this.bookPassed) { this.bookOnDesk = true; dropProp(C, 'Right'); this.root.add(this.book); this.book.position.set(this.DESK.x - 0.15, this.DESK.y + 0.026, this.DESK.z - 0.53); this.book.rotation.set(0, 0.2, 0); this.book.scale.setScalar(1); this.sparkT = 4; }
+      if (!this.bookOnDesk && arrived && this.bookPassed) { this.bookOnDesk = true; dropProp(C, 'Right'); this.root.add(this.book); this.book.position.set(this.DESK.x - 0.15, this.deskTop(this.DESK.x - 0.15) + 0.026, this.DESK.z - 0.53); this.book.rotation.set(0, 0.2, this.deskTilt, 'ZYX'); this.book.scale.setScalar(1); this.sparkT = 4; }
       else if (this.bookOnDesk && arrived) { this.copDown = true; C.pose = 'walk'; C.stride = (C.stride || 0) + dt * 4; C.g.position.y -= dt * 0.9; if (C.g.position.y < TOP - 2.5) C.g.visible = false; }
     } else if (arrived) {
       C.look = null;

@@ -23,6 +23,11 @@ import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
 import { dress } from '../dress.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
+import { loadProps } from '../props.js';
+
+// Meem's models: the great bronze door, the cabinets of scrolls on the far wall, jars and oil lamps
+const DOOR_MODEL = false;   // (the door model's texture came out patchy white: the code door stands in)
+const PROPS = await loadProps(['scroll_cabinet', 'amphora', 'oil_lamp']);
 
 const D2R = Math.PI / 180;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
@@ -272,7 +277,7 @@ export default class Ptolemy {
 
   // ---------- Building the hall ----------
   buildHall() {
-    const H = this.hall, k = new Kit(), r = rng(3);
+    const H = this.hall, k = new Kit(), r = rng(3), MP = PROPS.fresh();
     // Floor: polished marble tiles
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2, HL * 2), new THREE.MeshLambertMaterial({ map: marbleTex() }));
     floor.rotation.x = -Math.PI / 2; H.add(floor);
@@ -295,9 +300,11 @@ export default class Ptolemy {
       k.box(HW * 2 + 1, HH + 0.4, 0.5, WALL, [0, (HH + 0.4) / 2, z]);
       k.box(HW * 2 + 1, 0.5, 0.52, RED, [0, SHELF_TOP + 0.55, z]);
     }
-    k.box(3.6, 5.6, 0.3, 0x7a5a2a, [0, 2.8, HL - 0.05]);                     // the door
-    for (let i = 0; i < 12; i++) k.box(0.16, 0.16, 0.1, 0xc8a040, [-1.4 + (i % 4) * 0.93, 0.9 + (i / 4 | 0) * 1.9, HL - 0.2]); // studs
-    k.box(4.4, 0.5, 0.5, STONE, [0, 5.85, HL - 0.1]);
+    if (!(DOOR_MODEL && MP.add('bronze_door', 0, 0, HL + 0.05, Math.PI, { w: 7.6, h: 6.0, d: 0.9 }))) {   // Meem's great door in its stone frame
+      k.box(3.6, 5.6, 0.3, 0x7a5a2a, [0, 2.8, HL - 0.05]);                     // the door
+      for (let i = 0; i < 12; i++) k.box(0.16, 0.16, 0.1, 0xc8a040, [-1.4 + (i % 4) * 0.93, 0.9 + (i / 4 | 0) * 1.9, HL - 0.2]); // studs
+      k.box(4.4, 0.5, 0.5, STONE, [0, 5.85, HL - 0.1]);
+    }
     // Ceiling: coffered wood, with beams across
     k.box(HW * 2 + 1, 0.3, HL * 2 + 1, 0x4a3020, [0, HH + 0.55, 0]);
     for (let z = -HL; z <= HL; z += BAY) k.box(HW * 2, 0.5, 0.45, WOOD, [0, HH + 0.2, z]);
@@ -345,7 +352,10 @@ export default class Ptolemy {
       k.box(0.06, 3.0, 3.6, WALL, [sx * (HW - 0.02), SHELF_TOP - 0.3 + 1.6, 0], 0, [1, 0.3, 1]);
       this.G.world.blockers.push({ x: sx * (HW - 0.2), z: 0, r: 0.6 });
     }
-    {
+    const NCAB = 7, CW = (HW * 2 - 0.8) / NCAB;   // the far wall: a row of Meem's scroll cabinets, floor to frieze
+    for (let i = 0; i < NCAB; i++) MP.add('scroll_cabinet', -HW + 0.4 + (i + 0.5) * CW, 0, -HL + 0.32, 0, { w: CW - 0.02, h: SHELF_TOP + 0.1, d: 0.62 });
+    if (MP.count('scroll_cabinet')) for (let x = -HW + 0.6; x < HW; x += 1.1) this.G.world.blockers.push({ x, z: -HL + 0.4, r: 0.55 });
+    else {
       const len = HW * 2 - 0.8, z = -HL + DEPTH / 2;
       const cab = cabinet(len, (s, p, c) => k.box(s[0], s[1], s[2], c, [p[0], p[1], z + p[2]]));
       for (let j = 0; j < cab.n; j++) for (let i = 0; i < ROWS; i++) this.cells.push({ p: new THREE.Vector3(-cab.L / 2 + (j + 0.5) * CELL, BOT + (i + 0.5) * cab.rowH, z + 0.12), axis: 'z' });
@@ -367,14 +377,16 @@ export default class Ptolemy {
     }
     // Tall pottery jars and a couple of bronze lamp stands
     for (const [x, z] of [[-4, 13.5], [4, 13.5], [-7.4, -1.9], [7.4, 1.9]]) {
+      this.G.world.blockers.push({ x, z, r: 0.35 });
+      if (MP.add('amphora', x, 0, z, x * 1.3 + z, { h: 1.15 })) continue;
       k.cyl(0.18, 0.12, 0.15, 10, 0x9a5a34, [x, 0.08, z]); k.ball(0.32, 1, 0xa8643a, [x, 0.55, z], 0, [1, 1.35, 1]);
       k.cyl(0.12, 0.18, 0.25, 10, 0x9a5a34, [x, 1.0, z]); k.cyl(0.33, 0.33, 0.04, 14, 0x2a2018, [x, 0.6, z], 0, [1, 1, 1]);
-      this.G.world.blockers.push({ x, z, r: 0.35 });
     }
     this.lamps = [];
     for (const [x, z] of [[-3.2, -3.5], [3.2, -3.5], [-3.2, 4], [3.2, 4]]) {
       k.cyl(0.3, 0.38, 0.12, 10, 0x8a6a30, [x, 0.06, z]); k.cyl(0.04, 0.05, 1.6, 6, 0x9a7a3a, [x, 0.9, z]);
       k.cyl(0.25, 0.12, 0.14, 10, 0xb08a40, [x, 1.75, z]);
+      MP.add('oil_lamp', x, 1.82, z, x > 0 ? Math.PI : 0, { s: 1.8 });   // a clay oil lamp in the bronze dish, under the flame
       this.G.world.blockers.push({ x, z, r: 0.3 }); this.lamps.push(new THREE.Vector3(x, 1.95, z));
     }
     // Painted banners between the windows: blue and red cloth hangings with gold edges
@@ -382,7 +394,7 @@ export default class Ptolemy {
       k.box(0.04, 1.5, 1.0, z % 2 ? BLUE : RED, [sx * (HW - 0.02), SHELF_TOP + 1.75, z]);
       k.box(0.05, 0.08, 1.04, 0xd8b050, [sx * (HW - 0.03), SHELF_TOP + 1.03, z]);
     }
-    const m = k.mesh(FLAT); H.add(m);
+    const m = k.mesh(FLAT); H.add(m, MP.build());
     // The scrolls themselves: thousands of rolled ends peeking out of the pigeonholes (one draw)
     const geo = new THREE.CylinderGeometry(0.055, 0.055, 0.34, 7, 1, false);
     const N = this.cells.length * 4;

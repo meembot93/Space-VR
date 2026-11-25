@@ -82,6 +82,9 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
 - `js/narration.js` + `js/script.js`: every narration line, numbered. Meem's recorded clip plays if
   it exists (`sounds/narration/`), otherwise the line shows as a subtitle for about as long as it
   takes to say. No generated voices. How to record: docs/RECORDING.md.
+- `js/props.js`: Meem's building and prop models (`models/props/`, from the model wish list), each placed
+  many times as one InstancedMesh. Houses also come as `<name>_lo` (about 400 triangles) for far-off streets;
+  past that, towns keep their code shapes. Sizes in metres are in its SIZE table.
 - `js/guide.js`: Astra, the guide star (Meem's `models/star_guide.glb`).
 - `js/people.js`: characters. Meem's Tripo models (rigged, Mixamo bone names, no animation clips)
   are posed in code: idle, haul, point, cheer. Anyone without a model yet is a plain "clay" stand-in.

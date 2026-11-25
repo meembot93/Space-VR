@@ -85,6 +85,9 @@ export function house(k, o, win = []) {
   const roof = o.roof ?? (gableFront ? w : d) * 0.85;
   const c = Math.cos(yaw), s = Math.sin(yaw);
   const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
+  // o.props + o.model: Meem's house model (js/props.js) in this footprint instead of the shapes below.
+  // (No code window panes on it: they didn't line up with the model's own windows.)
+  if (o.props?.add(o.model, x, y, z, yaw, { w, d, h: h + roof * 0.9 })) return win;
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.box(w + 0.1, 0.35, d + 0.1, 0x6a6058, P(0, 0.17, 0), [0, yaw, 0]);          // stone footing
   if (gableFront) {

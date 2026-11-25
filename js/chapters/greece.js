@@ -24,9 +24,14 @@ import { makeCard } from '../ui.js';
 import { rng, noise2 } from '../shapes.js';
 import { grove, grassTuft, palm as palmTree, olive as oliveTree, cypress as cypressTree } from '../trees.js';
 import { buildAthens } from './athens.js';
+import { loadProps } from '../props.js';
+// Meem's houses and the Greek ship (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'house_greek_lo', 'ship_ancient', 'amphora', 'oil_lamp', 'table_stool',
+  'lampstand', 'greek_statue', 'fire_tripod', 'well_syene', 'chinese_pavilion', 'inkstone_set']);
 import { moonFaceTexture } from '../moontex.js';
 
 const D2R = Math.PI / 180;
+const SHIP_HULL = 0.36;   // ship_ancient: how much of the model's height is hull (measured off the model)
 const MOON_AZ = 160, MOON_EL = 24;           // the eclipsed Moon, over the sea to the south
 const ANGLE = 7.2;                           // Eratosthenes' angle: Alexandria's Sun is 7.2° from overhead
 const STICK_H = 1.6;                         // the measuring stick (gnomon)
@@ -251,7 +256,14 @@ function doricTemple({ L = 31.8, W = 13.7, nL = 13, nW = 6, colH = 5.7, colD = 1
 }
 
 // A flat-roofed mud-brick or whitewashed house
+// (k.P, if set, is a PropSet: then it's Meem's house model instead, mud-brick or, for white walls,
+// the whitewashed Greek one; simplified past 40 m from the middle of the place)
 function house(k, x, z, w, d, h, yaw, wall, y = 0) {
+  if (k.P) {
+    const far = Math.hypot(x, z) > 40, kind = wall === 0xe8dcc0 ? 'house_greek' : 'house_mudbrick';
+    const name = far || kind === 'house_greek' ? kind + '_lo' : kind;
+    if (k.P.add(name, x, y - 0.1, z, yaw, { w, d, h: h + (kind === 'house_greek' ? 1.6 : 0.5) })) return;
+  }
   k.box(w, h, d, wall, [x, y + h / 2, z], [0, yaw, 0]);
   k.box(w + 0.2, 0.15, d + 0.2, 0x8a7458, [x, y + h + 0.07, z], [0, yaw, 0]);
   const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -530,9 +542,16 @@ export default class Greece {
     // a clay oil lamp on a tall bronze lampstand beside the table
     const LX = 0.62, LZ = -3.05, LY = 1.22;
     this.lampPos = new THREE.Vector3(LX, LY + 0.06, LZ);
-    k.cyl(0.015, 0.02, LY - 0.03, 6, 0x6a5030, [LX, (LY - 0.03) / 2, LZ]); k.cyl(0.14, 0.16, 0.03, 8, 0x6a5030, [LX, 0.015, LZ]); k.cyl(0.07, 0.04, 0.03, 8, 0x6a5030, [LX, LY - 0.02, LZ]);
-    k.ball(0.06, 1, 0xa0603a, [LX, LY + 0.02, LZ], 0, [1.2, 0.5, 0.9]);
-    k.cyl(0.018, 0.022, 0.05, 6, 0x8a5030, [LX - 0.06, LY + 0.04, LZ], [0, 0, -1.1]);
+    const FP = PROPS.fresh();   // Meem's bronze lampstand with its clay lamp on top; jars, a table and stool along the wall
+    // (the stand's own lamp sits just under the flame, lampPos, so the shadows still come from the same point)
+    if (!FP.add('lampstand', LX, 0, LZ + 0.06, 0, { h: LY + 0.05 })) {   // (the model's centre is 6 cm off its lamp)
+      k.cyl(0.015, 0.02, LY - 0.03, 6, 0x6a5030, [LX, (LY - 0.03) / 2, LZ]); k.cyl(0.14, 0.16, 0.03, 8, 0x6a5030, [LX, 0.015, LZ]); k.cyl(0.07, 0.04, 0.03, 8, 0x6a5030, [LX, LY - 0.02, LZ]);
+      if (!FP.add('oil_lamp', LX, LY - 0.005, LZ, 0)) { k.ball(0.06, 1, 0xa0603a, [LX, LY + 0.02, LZ], 0, [1.2, 0.5, 0.9]); k.cyl(0.018, 0.022, 0.05, 6, 0x8a5030, [LX - 0.06, LY + 0.04, LZ], [0, 0, -1.1]); }
+    }
+    // (jars to the right of the lamp, out of the shadows' way; the table round the east side of the house)
+    FP.add('amphora', 1.05, 0, this.wallZ + 0.35, 2); FP.add('amphora', 1.5, 0, this.wallZ + 0.4, 1); FP.add('amphora', 3.75, 0, this.wallZ - 0.3, 0.4);
+    if (FP.add('table_stool', 4.1, 0, this.wallZ - 1.7, -Math.PI / 2)) S.blockers.push({ x: 4.1, z: this.wallZ - 1.7, r: 0.9 });
+    this.farmProps = FP.build();
     S.blockers.push({ x: LX, z: LZ, r: 0.12 });
     // a low dry-stone terrace wall and a few big jars
     for (let i = 0; i < 26; i++) { const x = -14 + i * 1.1; k.box(1.1, 0.5 + r() * 0.2, 0.6, 0x8a8068, [x, 0.25 + H(x, 9) * 0.9, 9 + Math.sin(i) * 0.3], [0, r() * 0.2, 0]); }
@@ -550,10 +569,12 @@ export default class Greece {
     k.box(3.2, 1.2, 1.6, 0xd8ceb6, [front.x + 9, TERR + 0.6, TC.z]); k.box(3.5, 0.15, 1.9, 0xe8e0cc, [front.x + 9, TERR + 1.25, TC.z]);
     S.blockers.push({ x: front.x + 9, z: TC.z - 0.8, r: 1.1 }, { x: front.x + 9, z: TC.z + 0.8, r: 1.1 });
     this.fires = [];
+    const GP = PROPS.fresh();   // Meem's bronze fire tripods and marble statues (built with a little glow of their own, for the night)
     const bowl = (x, z, y) => {
+      this.fires.push(new THREE.Vector3(x, y + 0.55, z));
+      if (GP.add('fire_tripod', x, H(x, z), z, 0.4, { h: y + 0.38 - H(x, z) })) return;   // its rim where the code bowl's was
       for (let i = 0; i < 3; i++) { const a = i * 2.09; k.cyl(0.03, 0.03, y, 5, 0x5a4020, [x + Math.cos(a) * 0.25, y / 2, z + Math.sin(a) * 0.25], [Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12]); }
       k.add(new THREE.SphereGeometry(0.42, 10, 4, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 0x8a6a2a, [x, y + 0.38, z]);
-      this.fires.push(new THREE.Vector3(x, y + 0.55, z));
     };
     bowl(front.x + 2.2, TC.z - 5.2, TERR + 1.1); bowl(front.x + 2.2, TC.z + 5.2, TERR + 1.1);
     this.fires.push(new THREE.Vector3(front.x + 9, TERR + 1.55, TC.z));
@@ -566,15 +587,18 @@ export default class Greece {
       S.blockers.push({ x, z, r: 0.8 });
     }
     for (let i = 0; i < 3; i++) {
-      const t = 0.3 + i * 0.22, x = lerp(front.x + 12, -3, t), z = lerp(TC.z, 0, t) + 3.2;
+      // (the middle one stood where the two arguing thinkers stand (-6.5, -7.2), so the last two sit further along)
+      const t = [0.3, 0.6, 0.8][i], x = lerp(front.x + 12, -3, t), z = lerp(TC.z, 0, t) + 3.2;
       const y = H(x, z);
+      S.blockers.push({ x, z, r: 0.7 });
+      // Meem's marble statue on its plinth, turned to look out over the path toward the farm
+      if (GP.add('greek_statue', x, y - 0.03, z, 1.75 + i * 0.15, { h: 2.75 })) continue;
       k.box(0.9, 1.1, 0.9, 0xd8ceb6, [x, y + 0.55, z]);
       // a marble figure (a herm-like statue): body, head, arm
       k.cyl(0.2, 0.26, 1.3, 8, 0xeee6d2, [x, y + 1.75, z]); k.ball(0.15, 1, 0xeee6d2, [x, y + 2.55, z]);
       k.cyl(0.06, 0.06, 0.6, 5, 0xeee6d2, [x + 0.25, y + 2.0, z], [0, 0, 0.6]);
-      S.blockers.push({ x, z, r: 0.7 });
     }
-    g.add(k.mesh(), grove(cypressTree, cyp, { detail: 'high', height: 11, seed: 5, variants: 5 }).group);
+    g.add(k.mesh(), this.farmProps, GP.build({ glow: 0x231c16 }), grove(cypressTree, cyp, { detail: 'high', height: 11, seed: 5, variants: 5 }).group);
     const nearOl = trunks.filter((p) => Math.hypot(p.x, p.z) < 18), farOl = trunks.filter((p) => Math.hypot(p.x, p.z) >= 18);
     if (nearOl.length) g.add(grove(oliveTree, nearOl, { detail: 'high', height: 4.6, seed: 7, variants: 5 }).group);
     if (farOl.length) g.add(grove(oliveTree, farOl, { detail: 'mid', height: 4.6, seed: 9, variants: 5 }).group);
@@ -622,10 +646,17 @@ export default class Greece {
       -l[3] * P[0], -l[3] * P[1], -l[3] * P[2], d - l[3] * P[3]);
 
     // The ship far out at sea
-    const sk = new Kit();
-    sk.box(3, 1.6, 12, 0x5a3a22, [0, 0.4, 0]); sk.box(2.4, 0.3, 11, 0x7a5432, [0, 1.25, 0]);
-    sk.cyl(0.15, 0.18, 10, 6, 0x5a3a22, [0, 6, 0]); sk.box(7, 6, 0.1, 0xe8dcc0, [0, 7, 0.3]);
-    this.ship = sk.mesh(); g.add(this.ship);
+    const sp = PROPS.fresh();
+    // (Meem's Greek merchant ship: its hull is the lowest third or so of the model, mast and sail above;
+    // the group rides 0.6 m under the sea's surface, and the hull sits 40% of its height in the water)
+    if (sp.add('ship_ancient', 0, 0.6 - 0.4 * SHIP_HULL * (sp.size('ship_ancient')?.y || 0), 0, 0)) this.ship = sp.build();
+    else {
+      const sk = new Kit();
+      sk.box(3, 1.6, 12, 0x5a3a22, [0, 0.4, 0]); sk.box(2.4, 0.3, 11, 0x7a5432, [0, 1.25, 0]);
+      sk.cyl(0.15, 0.18, 10, 6, 0x5a3a22, [0, 6, 0]); sk.box(7, 6, 0.1, 0xe8dcc0, [0, 7, 0.3]);
+      this.ship = sk.mesh();
+    }
+    g.add(this.ship);
     this.shipLamp = new THREE.Sprite(glowMat('rgba(255,190,110,1)')); this.shipLamp.scale.setScalar(5); g.add(this.shipLamp);
 
     // The Moon (our own, so we can draw Earth's shadow on it)
@@ -668,16 +699,26 @@ export default class Greece {
     this.buildWell(S.g, k, W);
     S.blockers.push({ x: W.x, z: W.z, r: 1.3 }, { x: W.x - 1.9, z: W.z + 1.5, r: 0.7 });
     // Mud-brick houses, palms along the river, rocks
+    k.P = PROPS.fresh();
+    const homes = [];   // (a house that would run into one already standing is left out)
     for (let i = 0; i < 16; i++) {
-      const x = 12 + r() * 16, z = -40 + i * 5 + r() * 2;
-      house(k, x, z, 4 + r() * 2, 4 + r() * 2, 2.6 + r() * 0.8, (r() - 0.5) * 0.3 - Math.PI / 2, 0xb89068, H(x, z)); S.blockers.push({ x, z, r: 2.6 });
+      const x = 12 + r() * 16, z = -40 + i * 5 + r() * 2, w = 4 + r() * 2, d = 4 + r() * 2, h = 2.6 + r() * 0.8, yaw = (r() - 0.5) * 0.3 - Math.PI / 2, rad = Math.hypot(w, d) / 2;
+      if (homes.some((o) => Math.hypot(o.x - x, o.z - z) < o.rad + rad + 0.3)) continue;
+      homes.push({ x, z, rad });
+      house(k, x, z, w, d, h, yaw, 0xb89068, H(x, z)); S.blockers.push({ x, z, r: 2.6 });
     }
     for (let i = 0; i < 40; i++) { const x = 32 + r() * 36, z = -120 + r() * 240; if (Math.abs(x - 52) < 14) continue; palm(k, x, H(x, z), z, 6 + r() * 4, 300 + i); }
     for (let i = 0; i < 6; i++) { const x = -8 + r() * 6, z = -14 + r() * 24; palm(k, x, H(x, z), z, 6 + r() * 3, 400 + i); S.blockers.push({ x, z, r: 0.4 }); }
     for (let i = 0; i < 30; i++) { const a = r() * 360, d = 8 + r() * 60, p = at(a, d); k.ball(0.3 + r() * 0.8, 0, 0x9a7650, [p.x, H(p.x, p.z), p.z], [r(), r(), r()], [1.3, 0.6, 1]); }
     // a few boats with triangular sails on the Nile
-    for (let i = 0; i < 3; i++) { const z = -60 + i * 50; k.box(1.4, 0.5, 6, 0x6a4a2a, [52, -0.7, z]); k.cyl(0.06, 0.06, 6, 5, 0x5a3a22, [52, 2.3, z]); k.add(new THREE.CircleGeometry(2.4, 3), 0xe8dcc0, [52.05, 3, z], [0, Math.PI / 2, 0]); }
-    S.g.add(k.mesh()); addPalms(S.g, k);
+    for (let i = 0; i < 3; i++) {
+      const z = -60 + i * 50;
+      // (Meem's ship, scaled down to a Nile boat 8 m long, its hull 40% under the water at -0.9)
+      const SS = k.P.size('ship_ancient'), sc = SS ? 8 / SS.z : 1;
+      if (SS && k.P.add('ship_ancient', 52, -0.9 - 0.4 * SHIP_HULL * SS.y * sc, z, 0.2 * i, { s: sc })) continue;
+      k.box(1.4, 0.5, 6, 0x6a4a2a, [52, -0.7, z]); k.cyl(0.06, 0.06, 6, 5, 0x5a3a22, [52, 2.3, z]); k.add(new THREE.CircleGeometry(2.4, 3), 0xe8dcc0, [52.05, 3, z], [0, Math.PI / 2, 0]);
+    }
+    S.g.add(k.mesh(), k.P.build()); addPalms(S.g, k);
     S.g.add(tufts(900, 23, (r2, p) => { at(r2() * 360, 4 + Math.pow(r2(), 1.2) * 60, 0, p); p.y = H(p.x, p.z); }, 0x8a8a4a, 0xb8a060, 0.22));
     this.stickS = this.makeStick(S.g); this.stickS.userData.home = [W.x + 1.6, 0.04, W.z + 1.4, ...new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0.4)).toArray()];
     this.ringS = [W.x + 1.5, W.z - 0.2];
@@ -687,6 +728,24 @@ export default class Greece {
   buildWell(g, k, W) {
     const RI = 0.77, RO = 1.08, CH = 0.17, NC = 5, NB = 14, SAND = [0xc8a878, 0xb89868, 0xd2b286, 0xae8e60, 0xc0a070];
     const r = rng(29);
+    // Meem's sandstone well: the same width as the shaft's rim (outside 1.1 m, its opening 0.7 m, just
+    // inside the shaft, so you look straight down the stone shaft below to the water and the Sun's glint)
+    const WP = PROPS.fresh();
+    if (WP.add('well_syene', W.x, 0, W.z, 0)) { g.add(WP.build()); this.wellTop = 0.92; }
+    else this.buildWellWall(g, k, W, RI, RO, CH, NC, SAND, r);
+    // a stone water trough and two tall water jars beside the well
+    k.box(1.3, 0.5, 0.6, 0xb09070, [W.x - 1.9, 0.25, W.z + 1.5], [0, 0.5, 0]);
+    k.box(1.12, 0.04, 0.44, 0x2a4a5a, [W.x - 1.9, 0.48, W.z + 1.5], [0, 0.5, 0]);
+    for (const [dx, dz] of [[-1.55, -1.3], [-1.85, -0.95]]) {
+      k.cyl(0.2, 0.14, 0.6, 10, 0xa86a40, [W.x + dx, 0.3, W.z + dz]); k.ball(0.24, 1, 0xa86a40, [W.x + dx, 0.62, W.z + dz], 0, [1, 0.85, 1]);
+      k.cyl(0.09, 0.11, 0.16, 8, 0xa86a40, [W.x + dx, 0.86, W.z + dz]);
+    }
+    // inside: the shaft, lined with stone courses, getting darker the deeper you look
+    this.buildShaft(g, W, RI, SAND);
+  }
+
+  // (the code-built well wall, used only if the model is missing)
+  buildWellWall(g, k, W, RI, RO, CH, NC, SAND, r) {
     // the mortar behind the blocks (a solid ring, so there are never any gaps to see through)
     k.add(new THREE.CylinderGeometry(RO - 0.03, RO - 0.03, NC * CH, 28, 1, true), 0x7a6448, [W.x, NC * CH / 2, W.z]);
     // the blocks: curved slabs, each a little different
@@ -726,14 +785,9 @@ export default class Greece {
     k.cyl(0.15, 0.12, 0.26, 10, 0x7a5432, [bucket.x, PT + 0.13, bucket.z]);
     k.cyl(0.155, 0.155, 0.03, 10, 0x4a3020, [bucket.x, PT + 0.22, bucket.z]); k.cyl(0.13, 0.13, 0.03, 10, 0x4a3020, [bucket.x, PT + 0.05, bucket.z]);
     k.add(new THREE.TorusGeometry(0.13, 0.008, 4, 10, Math.PI), 0x4a3020, [bucket.x, PT + 0.26, bucket.z]);
-    // a stone water trough and two tall water jars beside the well
-    k.box(1.3, 0.5, 0.6, 0xb09070, [W.x - 1.9, 0.25, W.z + 1.5], [0, 0.5, 0]);
-    k.box(1.12, 0.04, 0.44, 0x2a4a5a, [W.x - 1.9, 0.48, W.z + 1.5], [0, 0.5, 0]);
-    for (const [dx, dz] of [[-1.55, -1.3], [-1.85, -0.95]]) {
-      k.cyl(0.2, 0.14, 0.6, 10, 0xa86a40, [W.x + dx, 0.3, W.z + dz]); k.ball(0.24, 1, 0xa86a40, [W.x + dx, 0.62, W.z + dz], 0, [1, 0.85, 1]);
-      k.cyl(0.09, 0.11, 0.16, 8, 0xa86a40, [W.x + dx, 0.86, W.z + dz]);
-    }
-    // inside: the shaft, lined with stone courses, getting darker the deeper you look
+  }
+
+  buildShaft(g, W, RI, SAND) {
     const sh = new THREE.CylinderGeometry(RI + 0.005, RI + 0.005, 8.2, 18, 36, true).toNonIndexed(), sp = sh.attributes.position, sc = new Float32Array(sp.count * 3);
     for (let i = 0; i < sp.count; i += 3) {
       let cy = 0, ca = 0;
@@ -785,14 +839,20 @@ export default class Greece {
     S.blockers.push({ x: -7, z: 7, r: 0.9 }, { x: 7, z: 7, r: 2.2 });
     for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [11, 12]]) { palm(k, x, 0, z, 6 + r() * 2, 500 + x); S.blockers.push({ x, z, r: 0.35 }); }
     // The city around: rows of houses, and the lighthouse (the Pharos) on its island
-    for (let i = 0; i < 70; i++) {
+    k.P = PROPS.fresh();
+    // (each house keeps clear of the ones already standing: a circle round its corners, models and code alike)
+    const homes = [];
+    for (let i = 0, n = 0; i < 260 && n < 62; i++) {
       const a = r() * 360, d = 35 + r() * 110, p = at(a, d); if (a > 330 || a < 30) continue;
-      house(k, p.x, p.z, 6 + r() * 5, 6 + r() * 5, 4 + r() * 5, r() * 0.3, r() > 0.5 ? 0xe8dcc0 : 0xd0b890);
+      const w = 6 + r() * 5, dd = 6 + r() * 5, h = 4 + r() * 5, yaw = r() * 0.3, col = r() > 0.5 ? 0xe8dcc0 : 0xd0b890, rad = Math.hypot(w, dd) / 2;
+      if (homes.some((o) => Math.hypot(o.x - p.x, o.z - p.z) < o.rad + rad + 0.5)) continue;
+      homes.push({ x: p.x, z: p.z, rad }); n++;
+      house(k, p.x, p.z, w, dd, h, yaw, col);
     }
     const ph = at(345, 650);
     k.box(30, 4, 30, 0xc8bca0, [ph.x, 1, ph.z]); k.box(18, 55, 18, 0xe8e0cc, [ph.x, 30, ph.z]); k.cyl(6, 8, 28, 8, 0xe8e0cc, [ph.x, 71, ph.z]);
     k.cyl(3.5, 4, 14, 12, 0xe0d8c4, [ph.x, 92, ph.z]); k.ball(3, 1, 0xd8b050, [ph.x, 101, ph.z]);
-    S.g.add(k.mesh()); addPalms(S.g, k);
+    S.g.add(k.mesh(), k.P.build()); addPalms(S.g, k);
     S.g.add(tufts(300, 31, (r2, p) => { at(r2() * 360, 20 + r2() * 40, 0, p); }, 0x8a8a4a, 0xa8a060, 0.25));
     this.stickA = this.makeStick(S.g); this.stickA.userData.home = [1.1, 0.04, -1.0, ...new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0.9)).toArray()];
     this.ringA = [0, -2.2];
@@ -857,13 +917,25 @@ export default class Greece {
     S.g.add(buildGround(600, 60, H, (x, y, z, c) => { c.setHex(((Math.floor(x) + Math.floor(z)) & 1) ? 0x8a8478 : 0x7a7468); if (Math.hypot(x, z) > 14) c.setHex(0x4a5030); }));
     // courtyard walls with grey tile caps, a hall to the south with red pillars and a sweeping roof
     for (const [x, z, w, d] of [[0, -14, 28, 0.6], [-14, 0, 0.6, 28], [14, 0, 0.6, 28]]) { k.box(w, 3, d, 0xb8a890, [x, 1.5, z]); k.box(w + 0.6, 0.35, d + 0.6, 0x4a4a50, [x, 3.15, z]); }
-    for (let i = 0; i < 8; i++) column(k, -10.5 + i * 3, 0.6, 9, 4.2, 0.28, 0xa02a1a);
-    k.box(26, 0.6, 5, 0xb0a490, [0, 0.3, 10.5]); k.box(25, 4.5, 0.4, 0x8a3020, [0, 2.8, 12.6]);
-    const roof = new THREE.CylinderGeometry(1, 1, 30, 4, 1); roof.rotateZ(Math.PI / 2); roof.rotateX(Math.PI / 4); roof.scale(1, 2.2, 5); k.add(roof, 0x3a3a44, [0, 6.4, 10.8]);
-    k.box(31, 0.3, 1.2, 0x3a3a44, [0, 5.0, 7.6], [0.35, 0, 0]);
-    // the stone table with the silk scroll, inkstone and brush
-    k.box(1.3, 0.7, 0.7, 0x5a3a28, [0, 0.35, -1.3]); S.blockers.push({ x: 0, z: -1.3, r: 0.5 });
-    k.box(0.12, 0.03, 0.08, 0x1a1a1a, [0.5, 0.72, -1.15]); k.cyl(0.01, 0.006, 0.22, 5, 0x6a4a2a, [0.4, 0.72, -1.05], [0, 0.5, Math.PI / 2]);
+    // (Meem's palace hall, its steps toward us, the courtyard's south side; or the code-built one)
+    const CP = PROPS.fresh();
+    const pavilion = CP.add('chinese_pavilion', 0, 0, 8.6 + 8.9, Math.PI, { w: 22 });
+    if (pavilion) S.blockers.push({ x: 0, z: 9.5, r: 1.5 });
+    else {
+      for (let i = 0; i < 8; i++) column(k, -10.5 + i * 3, 0.6, 9, 4.2, 0.28, 0xa02a1a);
+      k.box(26, 0.6, 5, 0xb0a490, [0, 0.3, 10.5]); k.box(25, 4.5, 0.4, 0x8a3020, [0, 2.8, 12.6]);
+      const roof = new THREE.CylinderGeometry(1, 1, 30, 4, 1); roof.rotateZ(Math.PI / 2); roof.rotateX(Math.PI / 4); roof.scale(1, 2.2, 5); k.add(roof, 0x3a3a44, [0, 6.4, 10.8]);
+      k.box(31, 0.3, 1.2, 0x3a3a44, [0, 5.0, 7.6], [0.35, 0, 0]);
+    }
+    // the stone table with the silk scroll, and Meem's inkstone, brush and rolled silk at its right end
+    // (the table is longer to the right to make room; the scroll to paint stays where it was)
+    if (CP.add('inkstone_set', 0.98, 0.7, -1.3, 0, { s: 0.8 })) {
+      k.box(1.95, 0.7, 0.7, 0x5a3a28, [0.32, 0.35, -1.3]); S.blockers.push({ x: 0, z: -1.3, r: 0.5 }, { x: 0.75, z: -1.3, r: 0.5 });
+    } else {
+      k.box(1.3, 0.7, 0.7, 0x5a3a28, [0, 0.35, -1.3]); S.blockers.push({ x: 0, z: -1.3, r: 0.5 });
+      k.box(0.12, 0.03, 0.08, 0x1a1a1a, [0.5, 0.72, -1.15]); k.cyl(0.01, 0.006, 0.22, 5, 0x6a4a2a, [0.4, 0.72, -1.05], [0, 0.5, Math.PI / 2]);
+    }
+    S.g.add(CP.build({ glow: 0x231c16 }));
     // bronze armillary rings on a stand
     const arm = (rad, rot) => k.add(new THREE.TorusGeometry(rad, 0.02, 4, 32), 0xb08a40, [3.5, 1.6, -3], rot);
     arm(0.6, [Math.PI / 2, 0, 0]); arm(0.6, [0, 0, 0]); arm(0.55, [0.6, 0.4, 0]); k.cyl(0.06, 0.1, 1.0, 6, 0x6a5030, [3.5, 0.5, -3]);
@@ -874,9 +946,9 @@ export default class Greece {
     this.scroll = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.45), new THREE.MeshLambertMaterial({ map: this.scrollTex, emissive: 0x2a2418 }));
     this.scroll.rotation.x = -Math.PI / 2; this.scroll.position.set(0, 0.705, -1.3); S.g.add(this.scroll);
     for (const x of [-0.47, 0.47]) { const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 8), FLAT); rod.rotation.x = Math.PI / 2; rod.position.set(x, 0.72, -1.3); S.g.add(rod); }
-    // red lanterns
+    // red lanterns (beside Meem's hall only the middle four: the outer two would hang in the air past its eaves)
     const lm = glowMat('rgba(255,90,50,1)');
-    for (let i = 0; i < 6; i++) { const s = new THREE.Sprite(lm); s.position.set(-10 + i * 4, 4.2, 8.6); s.scale.setScalar(1.3); S.g.add(s); const l = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: 0xd03a20 })); l.position.copy(s.position); l.scale.y = 1.3; S.g.add(l); }
+    for (let i = pavilion ? 1 : 0; i < (pavilion ? 5 : 6); i++) { const s = new THREE.Sprite(lm); s.position.set(-10 + i * 4, 4.2, 8.6); s.scale.setScalar(1.3); S.g.add(s); const l = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: 0xd03a20 })); l.position.copy(s.position); l.scale.y = 1.3; S.g.add(l); }
     this.chinaLight = new THREE.PointLight(0xffb070, 1.5, 7, 1.5); this.chinaLight.position.set(0.8, 1.6, -0.6); S.g.add(this.chinaLight);
     // The comet: a bright head and a long soft tail, crossing the sky to the north-east
     const tailTex = canvasTex(64, 256, (g, w, h) => {
