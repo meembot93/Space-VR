@@ -158,7 +158,7 @@ export class Soundscape {
 
   build(n, ch) {
     this.clear();
-    const A = this.G.audio, ctx = A.ctx, recipe = RECIPES[n]?.(ch) || [];
+    const A = this.G.audio, ctx = A.ctx, recipe = (RECIPES[n]?.(ch) || []).filter(b => CROWD || b.kind !== 'crowd');
     for (const d of recipe) {
       const src = ctx.createBufferSource(); src.buffer = this.buffer(d.kind); src.loop = true;
       const g = ctx.createGain(); g.gain.value = 0;
@@ -206,6 +206,9 @@ export class Soundscape {
 }
 
 // ---------- One recipe per chapter ----------
+// The made-up crowd murmur came out as a strange buzzing babble (Meem heard it in Stonehenge and
+// another chapter, 2026-11-25), so it's off everywhere. Set true to bring it back.
+const CROWD = false;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const at = (az, r, y = 0) => V(Math.sin(az * Math.PI / 180) * r, y, -Math.cos(az * Math.PI / 180) * r);
 const RECIPES = {
