@@ -1110,12 +1110,12 @@ export default class Sputnik {
     for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28 + 0.3; k.ball(0.5, 0, 0x6a6a62, [Math.cos(a) * 6.5, hillH(Math.cos(a) * 6.5, Math.sin(a) * 6.5) + 0.15, Math.sin(a) * 6.5], [r(), r(), r()], [1.3, 0.6, 1]); }
     H.add(k.mesh());
     // everyone from both eras, in a ring round you
-    const who = [['storyteller', 'The storyteller, 30,000 years ago', 0xffd0a0], ['builder', 'The Stonehenge builders', 0xffe0b0], ['priest', 'The priests of the Nile', 0xffe8a0], ['skywatcher', 'The skywatchers of Babylon', 0xffc8a0], ['eratosthenes', 'Eratosthenes', 0xd8e8ff], ['ptolemy', 'Ptolemy', 0xd0d8ff], ['copernicus', 'Copernicus', 0xffd8a0], ['tycho', 'Tycho', 0xffe0c0], ['kepler', 'Kepler', 0xa8c8ff], ['galileo', 'Galileo', 0xc8e0ff], ['newton', 'Newton', 0xe0d0ff], ['tsiolkovsky', 'Tsiolkovsky', 0xbfd8ff], ['goddard', 'Goddard', 0xc0f0e0], ['von_braun', 'Wernher von Braun', 0xd0e4ff]];
+    const who = [['storyteller', 'The storyteller, 30,000 years ago', 0xffd0a0], ['builder', 'The Stonehenge builders', 0xffe0b0], ['priest', 'The priests of the Nile', 0xffe8a0], ['skywatcher', 'The skywatchers of Babylon', 0xffc8a0], ['chinese_astronomer', 'The Chinese astronomers', 0xffd8b8], ['aristotle', 'Aristotle', 0xe0e8ff], ['eratosthenes', 'Eratosthenes', 0xd8e8ff], ['diver', 'The sponge divers', 0xb8e8f0], ['ptolemy', 'Ptolemy', 0xd0d8ff], ['copernicus', 'Copernicus', 0xffd8a0], ['tycho', 'Tycho', 0xffe0c0], ['kepler', 'Kepler', 0xa8c8ff], ['galileo', 'Galileo', 0xc8e0ff], ['newton', 'Newton', 0xe0d0ff], ['tsiolkovsky', 'Tsiolkovsky', 0xbfd8ff], ['goddard', 'Goddard', 0xc0f0e0], ['von_braun', 'Wernher von Braun', 0xd0e4ff]];
     this.ringEchoes = who.map(([model, name, tint], i) => {
       const a = (i / who.length) * Math.PI * 2 + 0.25, x = Math.sin(a) * 4.6, z = -Math.cos(a) * 4.6;
       const E = new Echo(this.G, H, { model, tint, pos: new THREE.Vector3(x, hillH(x, z), z), face: Math.atan2(-x, -z), seed: 81 + i * 3, look: { beard: i % 3 === 1 } });
       E.lab = label(name, 0.13); E.lab.position.set(x, hillH(x, z) + 2.15, z); E.lab.material.opacity = 0; H.add(E.lab);
-      E.i = i; E.vb = model === 'von_braun'; return E;
+      E.i = i; E.vb = model === 'von_braun'; E.who = model; return E;
     });
     // a ring of light on the grass where they stand, and a little pool of light at each one's feet
     this.ringGlow = glowPoints(144 + who.length, { sizeScale: 300 }); H.add(this.ringGlow);
