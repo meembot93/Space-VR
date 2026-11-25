@@ -112,7 +112,7 @@ export class UI {
     if (on) this.placed = false;   // the pause card appears straight in front of you
     if (this.menu) { this.pauseCard.userData.set(''); this.drawMenu(); return; }
     this.menuCard.userData.set('');
-    this.pauseCard.userData.set(on ? 'Paused' : '', on ? (vr ? 'A or X: carry on.  Hold a thumbstick in: reset height' : 'Press P to carry on') : '');
+    this.pauseCard.userData.set(on ? 'Paused' : '', on ? (vr ? 'A or X: carry on.  Tap a thumbstick: look from above.  Hold it in: reset height' : 'Press P to carry on') : '');
     if (this.domHint) { this.domHint.textContent = on ? 'Paused. Press P to carry on.' : ''; this.domHint.style.display = on && !vr ? 'block' : 'none'; }
   }
 
