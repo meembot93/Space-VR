@@ -392,7 +392,9 @@ export default class Nile {
     this.lampSpots = [];
     this.roofSpots = [];
     const P = PROPS;
+    const houses = [];   // footprints, so the granaries can keep clear of the walls
     const house = (x, z, w, d, hgt, yaw = 0) => {
+      houses.push({ x, z, hw: w / 2, hd: d / 2 });
       const y = groundHeight(x, z) - 0.3, col = MUDB[(r() * 4) | 0], top = y + hgt;
       // within 120 m: Meem's mud-brick house model (its door turned to the side the lamps are on; the
       // simplified one past 40 m); further out, plain blocks (hundreds of them, too far to tell)
@@ -436,6 +438,7 @@ export default class Nile {
     // a lattice of houses on the mound, with lanes between them; the houses near you are built by hand
     const near = [[-10.4, 0, 8.5, 9, 4.3], [0, 10.2, 9, 8, 4.6], [0, -10.4, 9, 8.5, 3.8], [-10, 10, 8, 8, 5.2], [-10.2, -10.2, 8, 8, 4.8], [2, 21, 8, 8, 3.6], [1, -22, 9, 8, 3.4]];
     for (const [x, z, w, d, h] of near) house(x, z, w, d, h);
+    const granaries = [];
     for (let gx = -290; gx < 40; gx += 12) for (let gz = -320; gz < 320; gz += 12) {
       if (Math.abs(gx) < 18 && Math.abs(gz) < 18) continue;
       const x = gx + (r() - 0.5) * 3, z = gz + (r() - 0.5) * 3;
@@ -445,7 +448,17 @@ export default class Nile {
       const h = Math.hypot(x, z) < 40 ? 3.2 + r() * 1.2 : 3.2 + r() * 2.8;
       house(x, z, 7 + r() * 3, 7 + r() * 3, h, (r() - 0.5) * 0.12);
       // now and then a round mud granary in the yard
-      if (r() < 0.06) { const gy = groundHeight(x + 6, z); if (!P.add(Math.hypot(x + 6, z) < 60 ? 'granary' : 'granary_lo', x + 6, gy - 0.1, z, -Math.PI / 2, { w: 3.0, h: 3.6 })) k.cyl(0.1, 1.6, 3.4, 10, 0xc0a074, [x + 6, gy + 1.7, z]); }
+      if (r() < 0.06) granaries.push([x, z]);
+    }
+    // (placed once every house is down: the first spot beside its house that is clear of all walls)
+    houses.push({ x: -150, z: -230, hw: 31, hd: 34 });   // the temple's walls (built below)
+    const clearOf = (gx, gz) => vmound(gx, gz) <= 0.92 && !(gx > -14 && Math.abs(gz) < 60) && houses.every((h) => Math.abs(gx - h.x) > h.hw + 2.0 || Math.abs(gz - h.z) > h.hd + 2.0);
+    for (const [x, z] of granaries) {
+      const o = [[6, 0], [-6, 0], [0, 6], [0, -6], [6, 6], [-6, 6], [6, -6], [-6, -6], [8, 0], [-8, 0], [0, 8], [0, -8]].find(([ox, oz]) => clearOf(x + ox, z + oz));
+      if (!o) continue;
+      const gx = x + o[0], gz = z + o[1], gy = groundHeight(gx, gz);
+      houses.push({ x: gx, z: gz, hw: 1.6, hd: 1.6 });
+      if (!P.add(Math.hypot(gx, gz) < 60 ? 'granary' : 'granary_lo', gx, gy - 0.1, gz, -Math.PI / 2, { w: 3.0, h: 3.6 })) k.cyl(0.1, 1.6, 3.4, 10, 0xc0a074, [gx, gy + 1.7, gz]);
     }
     // the temple: whitewashed walls round a courtyard, a gateway, to the north of the village
     const tz = -230, tx = -150, ty = groundHeight(tx, tz);
@@ -596,7 +609,8 @@ export default class Nile {
       const sx = -640 + OX, sz = -160, sy = base0(sx, sz, 30);
       // Meem's Sphinx, 52 m long, its face to the east (turned to face +z, then yawed east)
       const SP = PROPS.fresh();
-      if (SP.add('sphinx', sx - 3, sy + 0.3, sz, Math.PI / 2, { d: 52 })) this.egypt.add(SP.build({ glow: 0x1a1712 }));
+      const model = SP.add('sphinx', sx - 3, sy + 0.3, sz, Math.PI / 2, { d: 52 });
+      if (model) this.egypt.add(SP.build({ glow: 0x1a1712 }));
       else {
       plain.box(46, 6, 15, 0xc8a878, [sx - 8, sy + 3, sz]);                      // the rock cut round it
       plain.box(36, 11, 12, 0xd2b484, [sx - 6, sy + 9, sz]);                     // body
@@ -604,7 +618,9 @@ export default class Nile {
       plain.box(9, 11, 9, 0xd2b484, [sx + 8, sy + 18, sz]);                      // chest and head
       plain.add(new THREE.CylinderGeometry(2, 7.5, 10, 4, 1), 0xc0a070, [sx + 7, sy + 19, sz], [0, Math.PI / 4, 0], [0.7, 1, 1.4]); // the nemes headdress
       }
-      plain.box(40, 12, 34, 0xd8cbaa, [sx + 45, sy + 6, sz]);                    // the Sphinx temple in front
+      // the Sphinx temple in front (kept low beside the model, which it would otherwise hide from the chest down)
+      if (model) plain.box(36, 4, 34, 0xd8cbaa, [sx + 50, sy + 2, sz]);
+      else plain.box(40, 12, 34, 0xd8cbaa, [sx + 45, sy + 6, sz]);
     }
     // the valley temples at the edge of the green, where boats tied up
     plain.box(42, 10, 42, 0xd8cbaa, [-520 + OX, groundHeight(-520 + OX, -330) + 4, -330]);
@@ -728,16 +744,23 @@ export default class Nile {
     for (let i = 0; i < 4; i++) {
       const k = new Kit(), g = new THREE.Group();
       const RB = PROPS.models.reed_boat_lo;
+      let deck = 0;   // where the fisherman sits: the top of the reeds amidships
       if (RB) {   // Meem's reed boat, 6.5 m long along the drift (z)
-        const m = new THREE.Mesh(RB.geometry, RB.material); m.rotation.y = Math.PI / 2; m.scale.setScalar(6.5 / RB.size.x); m.position.y = -0.2; g.add(m);
+        const m = new THREE.Mesh(RB.geometry, RB.material), sc = 6.5 / RB.size.x; m.rotation.y = Math.PI / 2; m.scale.setScalar(sc); m.position.y = -0.2; g.add(m);
+        if (RB.deck == null) {   // (the model rises high at bow and stern: measure its middle)
+          const pa = RB.geometry.attributes.position; let top = 0;
+          for (let j = 0; j < pa.count; j++) if (Math.abs(pa.getX(j)) < RB.size.x * 0.12) top = Math.max(top, pa.getY(j));
+          RB.deck = top;
+        }
+        deck = Math.max(0, RB.deck * sc - 0.2 - 0.3);
       } else {
         k.cyl(0.35, 0.25, 5.2, 8, 0xb8a060, [0, 0.15, 0], [Math.PI / 2, 0, 0], [1, 1, 0.55]);   // a bundle of papyrus reeds
         k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, 2.8], [Math.PI / 2 - 0.6, 0, 0]); k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, -2.8], [-Math.PI / 2 + 0.6, 0, 0]);
       }
-      k.cyl(0.03, 0.03, 3.2, 4, 0x5a4030, [0.3, 1.0, -1.2], [0.5, 0, 0.2]);                // the pole
-      k.cyl(0.2, 0.26, 0.9, 6, 0xe8e0cc, [0, 0.75, -1], 0); k.ball(0.14, 1, 0x7a4e32, [0, 1.35, -1]);   // the fisherman, seated
+      k.cyl(0.03, 0.03, 3.2, 4, 0x5a4030, [0.3, deck + 1.0, -1.2], [0.5, 0, 0.2]);                // the pole
+      k.cyl(0.2, 0.26, 0.9, 6, 0xe8e0cc, [0, deck + 0.75, -1], 0); k.ball(0.14, 1, 0x7a4e32, [0, deck + 1.35, -1]);   // the fisherman, seated
       g.add(k.mesh());
-      const lamp = new THREE.Sprite(glowMat('rgba(255,190,100,1)')); lamp.position.set(0, 1.1, 2.4); lamp.scale.setScalar(5); g.add(lamp);
+      const lamp = new THREE.Sprite(glowMat('rgba(255,190,100,1)')); lamp.position.set(0, deck + 1.1, 2.4); lamp.scale.setScalar(5); g.add(lamp);
       g.userData = { z: -260 + i * 170, x: 205 + (i % 2) * 40 + i * 6, v: (i % 2 ? 1 : -1) * (0.6 + i * 0.1), lamp };
       this.egypt.add(g); this.boats.push(g);
     }

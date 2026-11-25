@@ -165,7 +165,9 @@ export default class Campfire {
       G.world.blockers.push({ x, z, r: 0.35 });
     };
     logAt(0, -3.0, 0); logAt(2.6, 1.4, 1.0); logAt(-2.6, 1.4, -1.0);
-    for (const [x, z, s] of [[-1.4, -2.5, 1], [1.7, 2.8, 0.9], [-2.2, 2.9, 1.1]]) k.cyl(0.9 * s, 0.95 * s, 0.03, 12, 0x8a6a48, [x, 0.02, z]);
+    // (the flat hides and the firewood pile are only for the code fire: the fire_pit model brings its own)
+    const codeFire = !P.has('fire_pit');
+    if (codeFire) for (const [x, z, s] of [[-1.4, -2.5, 1], [1.7, 2.8, 0.9], [-2.2, 2.9, 1.1]]) k.cyl(0.9 * s, 0.95 * s, 0.03, 12, 0x8a6a48, [x, 0.02, z]);
     const tent = (x, z, rad, h, col) => {
       // door toward the fire
       if (!P.add('hide_tent', x, 0, z, Math.atan2(-x, -z), { w: rad * 2, d: rad * 2, h: h + 0.6 })) {
@@ -183,10 +185,16 @@ export default class Campfire {
     }
     G.world.blockers.push({ x: 5.0, z: 2.6, r: 1.0 });
     // mammoth tusks propped by the tents, and a pile of firewood
-    for (const [x, z, a] of [[-4.2, -4.3, 0.5], [4.4, -4.0, -0.5]]) {
-      if (!P.add('mammoth_tusks', x + Math.sin(a) * 0.6, 0, z + 0.6, a, { w: 2.4 })) k.tube([[x, 0, z], [x + Math.sin(a) * 0.6, 1.2, z + 0.4], [x + Math.sin(a) * 1.2, 2.0, z + 1.3]], 0.09, 0xe8dcc0, 8);
+    // (the model lies along its own x: turned to point from the tent toward the fire, and set out
+    // past the tent's edge so neither tip pokes into the hide)
+    for (const [tx, tz, rad] of [[-6.5, -5.2, 2.2], [6.8, -4.8, 2.0]]) {
+      const L = Math.hypot(tx, tz), ux = -tx / L, uz = -tz / L, d = rad + 1.9;
+      if (P.add('mammoth_tusks', tx + ux * d, 0, tz + uz * d, Math.atan2(-uz, ux), { w: 2.4 })) G.world.blockers.push({ x: tx + ux * d, z: tz + uz * d, r: 0.8 });
     }
-    for (let i = 0; i < 9; i++) k.cyl(0.06, 0.07, 1.3, 6, 0x4a3420, [-3.6 + (i % 3) * 0.14, 0.08 + Math.floor(i / 3) * 0.13, -1.0 + r() * 0.1], [0, 0.3, Math.PI / 2]);
+    if (!P.has('mammoth_tusks')) for (const [x, z, a] of [[-4.2, -4.3, 0.5], [4.4, -4.0, -0.5]]) {
+      k.tube([[x, 0, z], [x + Math.sin(a) * 0.6, 1.2, z + 0.4], [x + Math.sin(a) * 1.2, 2.0, z + 1.3]], 0.09, 0xe8dcc0, 8);
+    }
+    if (codeFire) for (let i = 0; i < 9; i++) k.cyl(0.06, 0.07, 1.3, 6, 0x4a3420, [-3.6 + (i % 3) * 0.14, 0.08 + Math.floor(i / 3) * 0.13, -1.0 + r() * 0.1], [0, 0.3, Math.PI / 2]);
     this.root.add(P.build({ glow: 0x231c16 }));
     this.root.add(k.mesh());
 

@@ -125,7 +125,11 @@ export class Atmosphere {
     const ground = G.world.height;
     if (n === 2) {
       // Salisbury Plain before sunrise: mist in the hollows all round the circle
-      const m = makeMist(scatter(55, () => { const a = Math.random() * 6.28, r = 25 + Math.random() * 260; return [Math.cos(a) * r, Math.sin(a) * r]; }, ground, [0.3, 1.6], [30, 60]), 0xd8dce6);
+      // (a flat sheet cuts a hard line across anything standing in it: keep every sheet clear of the
+      // circle and its outlying stones (to 46 m), the Heel Stone and the village's round houses)
+      const heel = [Math.sin(51.6 * Math.PI / 180) * 77, -Math.cos(51.6 * Math.PI / 180) * 77], vil = [82.5, 142.9];
+      const clear = ([x, , z, s]) => { const e = s * 0.72; return Math.hypot(x, z) - e > 46 && Math.hypot(x - heel[0], z - heel[1]) - e > 4 && Math.hypot(x - vil[0], z - vil[1]) - e > 46; };
+      const m = makeMist(scatter(160, () => { const a = Math.random() * 6.28, r = 60 + Math.random() * 230; return [Math.cos(a) * r, Math.sin(a) * r]; }, ground, [0.3, 1.6], [30, 60]).filter(clear).slice(0, 55), 0xd8dce6);
       this.root.add(m); this.mists.push({ m, burn: [2, 14] });
     }
     if (n === 3) {
