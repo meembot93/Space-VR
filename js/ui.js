@@ -31,18 +31,25 @@ export function makeCard(w, h, worldW, style = {}) {
     const key = text + '|' + small + '|' + speaker; if (key === cur) return; cur = key;
     const g = tex.userData.ctx; g.clearRect(0, 0, w, h);
     if (!text) { mesh.visible = false; tex.needsUpdate = true; return; }
-    g.font = `${S.size}px ${S.font}`;
-    const lines = wrap(g, text, w - 80);
-    const lh = S.size * 1.22, smallH = small ? S.size * 0.8 : 0, nameH = speaker ? S.size * 0.85 : 0;
-    const boxH = Math.min(h - 8, lines.length * lh + 44 + smallH + nameH);
+    // long lines shrink the letters until every word fits on the card (never cut off)
+    let size = S.size, lines, lh, smallH, nameH, need;
+    for (;;) {
+      g.font = `${size}px ${S.font}`;
+      lines = wrap(g, text, w - 80);
+      lh = size * 1.22; smallH = small ? size * 0.8 : 0; nameH = speaker ? size * 0.85 : 0;
+      need = lines.length * lh + 44 + smallH + nameH;
+      if (need <= h - 8 || size <= S.size * 0.55) break;
+      size = Math.floor(size * 0.92);
+    }
+    const boxH = Math.min(h - 8, need);
     const y0 = (h - boxH) / 2;
     g.fillStyle = S.bg; g.beginPath(); g.roundRect(4, y0, w - 8, boxH, 26); g.fill();
     g.strokeStyle = S.border; g.lineWidth = 3; g.stroke();
     g.fillStyle = S.color; g.textAlign = 'center'; g.textBaseline = 'middle';
     // who's talking, in gold above the words (the guide star is called Astra)
-    if (speaker) { g.font = `bold ${S.size * 0.62}px ${S.font}`; g.fillStyle = '#ffd77a'; g.fillText(speaker, w / 2, y0 + 16 + nameH * 0.5); g.font = `${S.size}px ${S.font}`; g.fillStyle = S.color; }
+    if (speaker) { g.font = `bold ${size * 0.62}px ${S.font}`; g.fillStyle = '#ffd77a'; g.fillText(speaker, w / 2, y0 + 16 + nameH * 0.5); g.font = `${size}px ${S.font}`; g.fillStyle = S.color; }
     lines.forEach((ln, i) => g.fillText(ln, w / 2, y0 + 22 + nameH + lh * (i + 0.5)));
-    if (small) { g.font = `italic ${S.size * 0.6}px ${S.font}`; g.fillStyle = 'rgba(255,230,170,0.75)'; g.fillText(small, w / 2, y0 + boxH - smallH * 0.75); }
+    if (small) { g.font = `italic ${size * 0.6}px ${S.font}`; g.fillStyle = 'rgba(255,230,170,0.75)'; g.fillText(small, w / 2, y0 + boxH - smallH * 0.75); }
     tex.needsUpdate = true;
   };
   return mesh;
@@ -52,7 +59,7 @@ export class UI {
   constructor(G) {
     this.G = G;
     // Subtitles: a card that floats a little below your gaze and lazily follows your head
-    this.sub = makeCard(1400, 300, 1.25);
+    this.sub = makeCard(1400, 380, 1.25);
     this.hint = makeCard(1100, 150, 0.85, { bg: 'rgba(30,20,6,0.78)', border: 'rgba(120,220,255,0.9)', color: '#dff6ff', size: 44 });
     G.scene.add(this.sub, this.hint);
     this.subYaw = 0; this.placed = false;
@@ -63,6 +70,7 @@ export class UI {
       new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 1, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false }));
     this.fader.renderOrder = 1000; G.camera.add(this.fader);
     this.fade = 1; this.fadeTo = 1; this.fadeSpeed = 1;
+    this.blink = 0;   // the player's bird's-eye peek blinks with this, apart from the story's fades
     // Pause: the world dims and a card says how to carry on
     this.dim = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 8),
       new THREE.MeshBasicMaterial({ color: 0x02040c, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false }));
@@ -136,20 +144,26 @@ export class UI {
       this.fade = this.fade < this.fadeTo ? Math.min(this.fadeTo, this.fade + s) : Math.max(this.fadeTo, this.fade - s);
       if (this.fade === this.fadeTo && this.fadeDone) { const d = this.fadeDone; this.fadeDone = null; d(); }
     }
-    this.fader.material.opacity = this.fade; this.fader.visible = this.fade > 0.001;
+    const dark = Math.max(this.fade, this.blink);
+    this.fader.material.opacity = dark; this.fader.visible = dark > 0.001;
     // Hint timer
     if (this.hintT > 0) { this.hintT -= dt; if (this.hintT <= 0) this.showHint(''); }
     // Place the cards in front of you, following your head's turn slowly (comfier than head-locked)
     cam.getWorldPosition(_a); cam.getWorldDirection(_b);
-    const yaw = Math.atan2(_b.x, _b.z);
-    if (!this.placed) { this.subYaw = yaw; this.placed = true; }
+    const yaw = Math.atan2(_b.x, _b.z), pitch = Math.asin(clamp(_b.y, -1, 1));
+    if (!this.placed) { this.subYaw = yaw; this.subPitch = pitch; this.placed = true; }
+    // the cards also tip down when you look down (at a scroll, a table, the ground), lazily
+    if (Math.abs(pitch - this.subPitch) > 0.25) this.subPitch += (pitch - this.subPitch) * (1 - Math.exp(-dt * 3));
     let dy = yaw - this.subYaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
     if (Math.abs(dy) > 0.35) this.subYaw += dy * (1 - Math.exp(-dt * 3));
     const fx = Math.sin(this.subYaw), fz = Math.cos(this.subYaw);
     const desk = G.mode === 'desktop';
+    const pt = clamp(this.subPitch, -1.1, 0.6), cp = Math.cos(pt), sp = Math.sin(pt);
     for (const [card, dist, drop] of [[this.sub, 1.6, 0.42], [this.hint, 1.5, 0.08], [this.pauseCard, 1.3, -0.05], [this.menuCard, 1.3, -0.02]]) {
-      card.position.set(_a.x + fx * dist, _a.y - drop, _a.z + fz * dist);
-      card.lookAt(_a.x, card.position.y, _a.z);
+      // straight ahead along your (lazy) gaze, then `drop` lower on the card's own up direction
+      card.position.set(_a.x + fx * dist * cp, _a.y + dist * sp - drop * cp, _a.z + fz * dist * cp);
+      card.position.x += fx * drop * sp; card.position.z += fz * drop * sp;
+      card.lookAt(_a);
       if (desk) card.visible = false; // the page shows them instead
       else if (card === this.sub) card.visible = !!(this.subsOn && this.subText);
       else if (card === this.hint) card.visible = this.hintT > 0 && !this.paused;

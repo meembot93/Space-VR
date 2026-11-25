@@ -67,11 +67,16 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   const hint = await page.evaluate(() => G.ui.hint.visible || G.ui.hintT > 0);
   check(hint, 'a "Height reset" note shows');
 
-  // A short tap does nothing (the lift from the last reset, 0.75 m, stays as it was)
+  // A short tap doesn't reset height (the lift from the last reset, 0.75 m, stays as it was):
+  // it's the bird's-eye peek: up 30 m for a few seconds with a beam where you stand, then back
   await page.evaluate(() => __xr.position.set(0, 1.0, 0));
   await page.evaluate(() => __xr.controllers.right.updateButtonValue('thumbstick', 1)); await settle(0.3);
-  await page.evaluate(() => __xr.controllers.right.updateButtonValue('thumbstick', 0)); await settle(0.2);
-  e = await eye(); check(Math.abs(e - 1.75) < 0.05, `a quick click of the stick doesn't reset (${e} m)`);
+  await page.evaluate(() => __xr.controllers.right.updateButtonValue('thumbstick', 0)); await settle(1.0);
+  e = await eye(); check(Math.abs(e - 31.75) < 0.1, `a quick click of the stick gives the bird's-eye peek (${e} m up)`);
+  const beam = await page.evaluate(() => !!G.player.peekBeam?.visible);
+  check(beam, 'a beam of light marks where you stand');
+  await settle(5.5);
+  e = await eye(); check(Math.abs(e - 1.75) < 0.05, `the peek ends back on the ground, height not reset (${e} m)`);
   await holdStick('right');
   e = await eye(); check(Math.abs(e - 1.6) < 0.05, `right thumbstick works too (${e} m)`);
 

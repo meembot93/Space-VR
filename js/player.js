@@ -3,6 +3,7 @@
 //   left stick: walk     right stick: snap turn (45°) or smooth turn
 //   grip (side button): grab      trigger: use / point
 //   hold either thumbstick pressed in for 1 second: reset your height (see calibrate below)
+//   tap either thumbstick in: a quick look from high above, to see where you are (see peek below)
 // Things you can grab or touch register themselves in G.interactables (see below), so a
 // chapter just adds objects there and gets called back.
 //
@@ -21,6 +22,9 @@ const REACH = 0.22;      // how close a hand must be to grab something (metres)
 const WALK = 1.8;        // walking speed (metres a second), a comfortable stroll
 const EYE = 1.6;         // the eye height the story is built for (a grown-up standing)
 const HOLD = 1;          // seconds to hold a thumbstick in to reset your height
+const TAP = 0.45;        // a thumbstick press shorter than this is a tap: the bird's-eye peek
+const PEEK_UP = 30;      // how high the bird's-eye peek lifts you (metres)
+const PEEK_HOLD = 5;     // seconds you stay up there
 
 // A simple soft glove for each hand
 export function buildGlove(color = 0xe8d2b0) {
@@ -165,7 +169,7 @@ export class Player {
       // What's in reach lights up
       if (!h.held) {
         const it = this.nearest(h);
-        if (it !== h.hover) { h.hover = it; if (it) { this.haptic(h, 0.15, 15); if (it.hint && !it.hinted) { it.hinted = true; this.G.ui.showHint(it.hint, 5); } } }
+        if (it !== h.hover) { h.hover = it; if (it) { this.haptic(h, 0.5, 60); if (it.hint && !it.hinted) { it.hinted = true; this.G.ui.showHint(it.hint, 5); } } }
       }
       const menu = this.G.paused && this.G.ui.menu;
       if (menu) {
@@ -238,7 +242,7 @@ export class Player {
     const R = W.bounds, dc = Math.hypot(x, z);
     if (dc > R) { x *= R / dc; z *= R / dc; }
     this.dolly.position.x += x - _a.x; this.dolly.position.z += z - _a.z;
-    this.dolly.position.y = W.height(x, z) + this.lift;
+    this.dolly.position.y = W.height(x, z) + this.lift + (this.peekUp ? PEEK_UP : 0);
   }
 
   // ---------- Height ----------
@@ -271,7 +275,62 @@ export class Player {
     }
     // Hold a thumbstick in: reset
     if (sticks) { this.holdT += dt; if (this.holdT >= HOLD && this.holdT - dt < HOLD) this.calibrate(); }
-    else this.holdT = 0;
+    else { if (this.holdT > 0 && this.holdT < TAP) this.peek(); this.holdT = 0; }
+    this.updatePeek(dt);
+    this.feetCheck(dt);
+  }
+
+  // ---------- Bird's-eye peek ----------
+  // Tap a thumbstick: a quick blink, you're 30 m up over the same spot for a few seconds with a
+  // beam of light where you stand, then a blink back down. Your feet never leave that spot, so
+  // nothing in the story moves; it's just a look round to get your bearings (Meem, 2026-11-25).
+  peek() {
+    if (this.peekT > 0 || this.G.paused) return;
+    this.peekT = 0.0001;
+    if (!this.peekBeam) {
+      const m = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.55, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
+      this.peekBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, PEEK_UP - 3, 12, 1, true), m);
+      this.peekRing = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.4, 32), m.clone());
+      this.peekRing.rotation.x = -Math.PI / 2; this.peekRing.material.side = THREE.DoubleSide;
+      this.peekBeam.visible = this.peekRing.visible = false;
+      this.G.scene.add(this.peekBeam, this.peekRing);
+    }
+  }
+  updatePeek(dt) {
+    if (!(this.peekT > 0)) return;
+    const B = 0.25, T = this.peekT += dt, ui = this.G.ui;
+    // blink: dark at the jump up (B) and the jump down (B + PEEK_HOLD)
+    const k = (t) => clamp(1 - Math.abs(t) / B, 0, 1);
+    ui.blink = Math.max(k(T - B), k(T - B - PEEK_HOLD - B));
+    const up = T > B && T < B * 2 + PEEK_HOLD;
+    if (up && !this.peekUp) { this.peekUp = true; this.haptic(this.hands[0], 0.4, 60); this.haptic(this.hands[1], 0.4, 60); }
+    if (!up && this.peekUp) this.peekUp = false;
+    this.G.camera.getWorldPosition(_a);
+    const g = this.G.world.height(_a.x, _a.z);
+    this.peekBeam.position.set(_a.x, g + (PEEK_UP - 3) / 2, _a.z);
+    this.peekRing.position.set(_a.x, g + 0.08, _a.z);
+    this.peekBeam.visible = this.peekRing.visible = this.peekUp;
+    if (T > B * 3 + PEEK_HOLD) { this.peekT = 0; ui.blink = 0; }
+  }
+
+  // ---------- Things at your feet ----------
+  // A grabbable lying at your feet is easy to miss in the headset: walk up to one and both
+  // controllers buzz, and the first time a card says to look down.
+  feetCheck(dt) {
+    if (this.G.kids || this.G.mode !== 'vr' || this.hands.some((h) => h.held)) return;
+    this.feetT = (this.feetT || 0) - dt; if (this.feetT > 0) return;
+    this.feetT = 1.2;
+    this.G.camera.getWorldPosition(_a);
+    const g = this.G.world.height(_a.x, _a.z);
+    for (const it of this.G.interactables) {
+      if (!it.reach || it.disabled || !it.onGrab) continue;
+      _c.set(_a.x, g + 0.2, _a.z); let d = it.reach(_c, this.hands[0]);
+      _c.y = g + 0.6; d = Math.min(d, it.reach(_c, this.hands[0]));
+      if (d > 0.8) continue;
+      for (const h of this.hands) this.haptic(h, 0.6, 90);
+      if (!it.feetHinted) { it.feetHinted = true; this.G.ui.showHint('Look down: it\'s right by your feet', 5); }
+      break;
+    }
   }
 
   // ---------- Desktop (for testing without a headset) ----------
