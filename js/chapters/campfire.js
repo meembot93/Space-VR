@@ -155,13 +155,13 @@ export default class Campfire {
     const k = new Kit(), r = rng(9), G = this.G;
     const P = PROPS.fresh();
     // Fire pit: a ring of stones, logs, a bed of glowing embers
-    if (!P.add('fire_pit', 0, -0.02, 0, 0.3, { w: 1.85, d: 1.85 })) {
+    if (!P.add('fire_pit', 0, -0.02, 0, 0.3, { w: 1.85, d: 1.85, h: 0.5 })) {
       for (let i = 0; i < 12; i++) { const a = i / 12 * 360; const geo = roughStone(0.32, 0.22, 0.25, 200 + i, [2, 2, 2]); geo.rotateY(-a * D2R); const p = at(a, 0.75); geo.translate(p.x, -0.05, p.z); k.add(geo, 0x6e6860); }
       for (let i = 0; i < 5; i++) k.cyl(0.07, 0.08, 1.1, 7, 0x3a2a1c, [0, 0.12, 0], [Math.PI / 2 - 0.35, i * 1.25, 0]);
     }
     // logs to sit on, hides on the ground, two hide tents on poles, a drying rack with a skin
     const logAt = (x, z, yaw) => {
-      if (!P.add('sitting_log', x, 0, z, yaw, { w: 2.2, h: 0.4 })) k.cyl(0.18, 0.2, 2.2, 10, 0x5a4430, [x, 0.18, z], [0, yaw, Math.PI / 2]);
+      if (!P.add('sitting_log', x, -0.02, z, yaw, { w: 2.2, d: 0.48, h: 0.44 })) k.cyl(0.18, 0.2, 2.2, 10, 0x5a4430, [x, 0.18, z], [0, yaw, Math.PI / 2]);
       G.world.blockers.push({ x, z, r: 0.35 });
     };
     logAt(0, -3.0, 0); logAt(2.6, 1.4, 1.0); logAt(-2.6, 1.4, -1.0);
