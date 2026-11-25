@@ -30,8 +30,10 @@ import { glowPoints, whoosh, awe, shimmer, rumble } from '../wow/fx.js';
 import { Space, lonLat } from '../wow/space.js';
 import { dirFromAzEl } from '../sky.js';
 import { loadProps } from '../props.js';
-// Meem's English cottage (models/props), waited for before the chapter builds
-const PROPS = await loadProps(['house_english', 'house_english_lo', 'barrel', 'lantern']);
+// Meem's English cottage, Woolsthorpe Manor and the farm's things (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_english', 'house_english_lo', 'barrel', 'lantern', 'woolsthorpe_manor', 'stone_barn', 'dovecote',
+  'hay_cart', 'beehive_skeps', 'field_gate', 'cannon', 'apple_ladder']);
+const MS = 1.2;   // Meem's Woolsthorpe Manor, scaled up a little from its 9 m (main block 14.4 m wide, like the old code one)
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 52.81, LON = -0.63, YEAR = 1666, SUNLON = 150;   // Woolsthorpe, late August
@@ -178,6 +180,7 @@ export default class Newton {
   // Woolsthorpe Manor: a grey limestone farmhouse, two storeys and attics under a steep stone-slate
   // roof, tall chimneys at the gable ends, stone-mullioned windows, a rear wing (the T), a porch.
   buildManor() {
+    if (PROPS.has('woolsthorpe_manor')) { this.manorModel(); return; }
     const k = new Kit(), wins = [], r = rng(61), ST = 0xcfc2a0, ST2 = 0xbcae8c, MORTAR = 0x9a8f78, ROOF = 0x6a645a;
     const { x, z } = HOUSE, y = groundHeight(x, z) - 0.2, yaw = Math.atan2(-x, -z);   // its front looks at the orchard
     const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -294,11 +297,45 @@ export default class Newton {
     this.houseYaw = yaw;
   }
 
+  // Meem's model of the manor (the code one above is the fallback). Measured on the model at its own
+  // 9 m: the main block runs x -7..5 (an outshot to x 6.9), its front wall at z 3.64, the porch out
+  // to z 5.18 round the door at x -0.98, the rear wing behind on the right, the chimneys 9 m up at
+  // the gable ends; windows at x -4.5 / -1.3 / 2.5, 1.34 m (ground floor) and 3.17 m up.
+  manorModel() {
+    const { x, z } = HOUSE, y = groundHeight(x, z) - 0.15, yaw = Math.atan2(-x, -z);
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
+    const M = (mx, my, mz) => P(mx * MS + MS, my * MS, mz * MS + 3.2 - 3.64 * MS);   // model coordinates -> world (front wall at 3.2, main block centred)
+    const MP = PROPS.fresh(); MP.add('woolsthorpe_manor', ...P(MS, 0, 3.2 - 3.64 * MS), yaw, { s: MS * 9 / PROPS.size('woolsthorpe_manor').y });
+    // the lantern on a little iron bracket on the porch, by the door
+    const k = new Kit(), LP = M(-0.35, 1.72, 5.18 + 0.3);
+    k.box(0.04, 0.04, 0.34, 0x1e1c1a, M(-0.35, 1.72 + 0.32 / MS, 5.18 + 0.14), [0, yaw, 0]); k.box(0.12, 0.2, 0.03, 0x1e1c1a, M(-0.35, 1.72 + 0.28 / MS, 5.19), [0, yaw, 0]);
+    k.cyl(0.006, 0.006, 0.14, 4, 0x1e1c1a, [LP[0], LP[1] + 0.33, LP[2]]);
+    MP.add('lantern', LP[0], LP[1], LP[2], yaw);
+    this.root.add(MP.build({ glow: 0x231c16 }), k.mesh());
+    LP[1] += 0.14;
+    this.chimneys = [-6.5, 4.5].map((mx) => new THREE.Vector3(...M(mx, 9.1, 0.5)));
+    const wins = [];
+    for (const [mx, my] of [[-4.5, 1.34], [2.5, 1.34], [-4.5, 3.17], [-1.3, 3.17], [2.5, 3.17]]) for (const o of [-0.38, 0, 0.38]) wins.push({ p: new THREE.Vector3(...M(mx + o, my, 3.64 + 0.04)), yaw });
+    this.manorWins = windows(wins, { lit: 0.55, w: 0.4, h: 0.72, seed: 6 }); this.root.add(this.manorWins);
+    this.doorPos = new THREE.Vector3(...M(-0.98, 0, 5.18 + 0.6 / MS));
+    this.lantern = new THREE.PointLight(0xffa860, 0, 14, 1.6); this.lantern.position.set(...LP); this.root.add(this.lantern);
+    this.lanternGlow = glow(0xffb060, 0.5, 0); this.lanternGlow.position.copy(this.lantern.position); this.root.add(this.lanternGlow);
+    this.houseYaw = yaw;
+  }
+
   // The farmyard: a stone barn, a round dovecote, the cart and the haystacks, beehives (straw skeps),
   // the dry-stone walls round the orchard, a field gate, the corn stooks in the harvest field.
   buildFarm() {
-    const k = new Kit(), r = rng(17), wins = [];
+    const k = new Kit(), r = rng(17), wins = [], FP = PROPS.fresh();   // FP: Meem's farm models
     const by = groundHeight(BARN.x, BARN.z);
+    if (FP.has('stone_barn')) {   // Meem's stone barn: 14 m along its front (its big doors in the middle), the front where the old one's was
+      const yw = Math.atan2(-BARN.x, -BARN.z), c = Math.cos(yw), s = Math.sin(yw), sc = 14 / FP.size('stone_barn').x, lz = 3.5 - FP.size('stone_barn').z / 2 * sc;
+      const Q = (lx, ly, lz) => [BARN.x + lx * c + lz * s, by + ly, BARN.z - lx * s + lz * c];
+      FP.add('stone_barn', ...Q(0, -0.2, lz), yw, { s: sc });
+      const p1 = Q(3.6, -0.05, 4.2), p2 = Q(4.45, -0.05, 4.05);
+      FP.add('barrel', ...p1, yw); FP.add('barrel', ...p2, yw + 1); FP.add('lantern', p1[0], p1[1] + PROPS.size('barrel').y, p1[2], yw + 0.4);
+    } else {
     house(k, { x: BARN.x, y: by - 0.2, z: BARN.z, w: 16, d: 7, h: 5, roof: 5, yaw: Math.atan2(-BARN.x, -BARN.z), wall: 0xc4b694, roofCol: 0x7a6a50 }, []);   // (a barn: no house windows)
     { // the barn's threshing doors (a big pair of plank doors under a timber lintel), ventilation
       // slits in the stone, and corner stones
@@ -316,21 +353,26 @@ export default class Newton {
         this.barnProps = B.build(); }
       for (const sx of [-1, 1]) for (let i = 0; i < 9; i++) k.box(i % 2 ? 0.35 : 0.6, 0.5, 0.06, 0xd2c6a6, Q(sx * (8 - (i % 2 ? 0.175 : 0.3) + 0.03), 0.45 + i * 0.52, fz + 0.02), [0, yw, 0]);
     }
+    }
     const out = at(15, 34); house(k, { x: out.x, y: groundHeight(out.x, out.z) - 0.2, z: out.z, w: 7, d: 5, h: 3, roof: 3, yaw: Math.atan2(-out.x, -out.z) + 0.3, wall: 0xc8b898, roofCol: 0x8a5a3a }, wins);
     // the dovecote
     const dv = at(62, 36), dy = groundHeight(dv.x, dv.z);
+    if (!FP.add('dovecote', dv.x, dy - 0.1, dv.z, Math.atan2(-dv.x, -dv.z))) {
     k.cyl(2.2, 2.4, 5, 14, 0xcfc2a0, [dv.x, dy + 2.5, dv.z]); k.cyl(0.001, 2.8, 2.6, 14, 0x6a645a, [dv.x, dy + 6.3, dv.z]); k.cyl(0.4, 0.4, 0.8, 8, 0x8a7a60, [dv.x, dy + 7.8, dv.z]);
     for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28; k.box(0.25, 0.25, 0.1, 0x1a1410, [dv.x + Math.sin(a) * 2.32, dy + 4 + (i % 2) * 0.5, dv.z + Math.cos(a) * 2.32], [0, a, 0]); }
+    }
     // haystacks (clear of the orchard wall) and a cart in the yard
     for (const [az, d] of [[5, 22.5], [358, 21.5], [14, 27]]) { const p = at(az, d), y = groundHeight(p.x, p.z); k.cyl(1.6, 2.1, 3, 10, 0xb89a56, [p.x, y + 1.5, p.z]); k.cyl(0.001, 1.8, 1.8, 10, 0xa88a4a, [p.x, y + 3.9, p.z]); }
     const ca = at(25, 18), cy = groundHeight(ca.x, ca.z), cyaw = 0.6;
+    if (!FP.add('hay_cart', ca.x, cy - 0.03, ca.z, cyaw + Math.PI / 2)) {   // (Meem's cart runs along its x, shafts at -x: turned so the shafts point the old way)
     k.box(1.4, 0.15, 2.6, 0x6a4a2e, [ca.x, cy + 0.85, ca.z], [0, cyaw, 0]);
     for (const sx of [-1, 1]) { k.box(0.06, 0.5, 2.6, 0x5a3e26, [ca.x + Math.cos(cyaw) * sx * 0.68, cy + 1.1, ca.z - Math.sin(cyaw) * sx * 0.68], [0, cyaw, 0]); k.cyl(0.55, 0.55, 0.08, 12, 0x4a3420, [ca.x + Math.cos(cyaw) * sx * 0.8, cy + 0.55, ca.z - Math.sin(cyaw) * sx * 0.8], [0, cyaw, Math.PI / 2]); }
     k.box(1.2, 0.5, 2.2, 0xb89a56, [ca.x, cy + 1.2, ca.z], [0, cyaw, 0]);
     k.box(0.08, 0.08, 2.4, 0x5a3e26, [ca.x + Math.sin(cyaw) * 2.4, cy + 0.6, ca.z + Math.cos(cyaw) * 2.4], [0.25, cyaw, 0]);
+    }
     // beehives: straw skeps on a bench by the orchard wall
     const bh = at(150, 11), bhy = groundHeight(bh.x, bh.z);
-    { // a weathered plank on two little stone piers, a straw skep on a board on each third, each
+    if (!FP.add('beehive_skeps', bh.x, bhy - 0.02, bh.z, 0.4, { s: 1.3 })) { // a weathered plank on two little stone piers, a straw skep on a board on each third, each
       // under its own straw hackle (a rain hat), with a dark entrance at the foot facing the sun
       const BY = 0.4, c4 = Math.cos(0.4), s4 = Math.sin(0.4), Q = (ox, y, oz = 0) => [bh.x + ox * c4 + oz * s4, bhy + y, bh.z - ox * s4 + oz * c4];
       k.box(2.3, 0.07, 0.48, 0x7a6448, Q(0, BY + 0.035), [0, 0.4, 0]); k.box(2.3, 0.05, 0.03, 0x5e4a34, Q(0, BY + 0.01, 0.25), [0, 0.4, 0]);
@@ -354,8 +396,10 @@ export default class Newton {
     dryWall(ws, r, WX, -6, WX, 10.2, { a: 'end', b: 'post' }); dryWall(ws, r, WX, 13.8, WX, WZ1, { a: 'post', b: 'corner' });
     for (const [cx, cz] of [[-26, WZ0], [-26, WZ1], [WX, WZ1]]) wallCorner(ws, r, cx, cz);
     // gateposts and the gates: the east one shut, the south one swung open into the orchard
-    for (const [px, pz] of [[6.0, WZ1], [10.0, WZ1], [WX, 10.0], [WX, 14.0]]) gatePost(ws, r, px, pz);
-    fiveBarGate(ws, WX, 10.25, -Math.PI / 2 - 0.1, 3.45);
+    // (the east one is Meem's gate model, posts and all, when it's there)
+    const eastGate = FP.add('field_gate', WX, groundHeight(WX, 12) - 0.1, 12, Math.PI / 2, { w: 4.5 });
+    for (const [px, pz] of [[6.0, WZ1], [10.0, WZ1], [WX, 10.0], [WX, 14.0]]) if (!eastGate || px !== WX) gatePost(ws, r, px, pz);
+    if (!eastGate) fiveBarGate(ws, WX, 10.25, -Math.PI / 2 - 0.1, 3.45);
     fiveBarGate(ws, 6.25, WZ1, 1.3, 3.45);
     this.root.add(ws.mesh());
     // the harvest field: rows of corn stooks
@@ -363,7 +407,8 @@ export default class Newton {
       const x = -10 + (i % 15) * 7 + r() * 1.5, z = 38 + Math.floor(i / 15) * 9 + r() * 1.5, y = groundHeight(x, z);
       k.cyl(0.001, 0.45, 1.1, 6, 0xc8a85a, [x, y + 0.5, z], [0, r(), (r() - 0.5) * 0.2]); k.cyl(0.25, 0.35, 0.3, 6, 0xb89850, [x, y + 0.15, z]);
     }
-    this.root.add(k.mesh(), this.barnProps);
+    this.root.add(k.mesh(), FP.build({ glow: 0x231c16 }));
+    if (this.barnProps) this.root.add(this.barnProps);
     this.root.add(windows(wins, { lit: 0.2, seed: 11 }));
   }
 
@@ -416,10 +461,15 @@ export default class Newton {
     for (const [list, detail, seed] of [[near, 'mid', 4], [far, 'low', 9]]) if (list.length) { const g = grove(orchardTree, list, { detail, variants: 5, seed, apples: 6, height: 4.6, trunkExtra: 0.7 }); this.root.add(g.group); }   // height + trunkExtra: tall enough to read as trees, not bushes (Meem)
     // a wooden ladder against one tree and a basket of picked apples beside it
     const lt = this.trees[3] || TREE;
+    if (PROPS.has('apple_ladder')) {   // Meem's step ladder and basket of apples, facing out from under the tree
+      const LP = PROPS.fresh(); LP.add('apple_ladder', lt.x + 1.25, groundHeight(lt.x + 1.25, lt.z + 0.2) - 0.03, lt.z + 0.2, Math.PI / 2 + 0.25);
+      this.root.add(LP.build({ glow: 0x231c16 })); this.G.world.blockers.push({ x: lt.x + 1.25, z: lt.z + 0.2, r: 0.9 });
+    } else {
     k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z - 0.25], [0, 0, 0.3]); k.box(0.06, 3.2, 0.06, 0x7a5a3a, [lt.x + 0.9, lt.y + 1.5, lt.z + 0.25], [0, 0, 0.3]);
     for (let i = 0; i < 8; i++) k.box(0.05, 0.05, 0.5, 0x7a5a3a, [lt.x + 1.32 - i * 0.12, lt.y + 0.2 + i * 0.38, lt.z]);
     k.cyl(0.3, 0.22, 0.32, 10, 0x9a7440, [lt.x + 1.8, lt.y + 0.16, lt.z + 0.5]);
     for (let i = 0; i < 9; i++) ak.ball(0.05, 0, 0xc0281c, [lt.x + 1.8 + (r() - 0.5) * 0.35, lt.y + 0.33 + r() * 0.06, lt.z + 0.5 + (r() - 0.5) * 0.35]);
+    }
     // the orchard grass round you: tufts of longer grass, clover, buttercups and daisies, molehills
     // (kept clear of Newton's spot and where the apple lands)
     const GR = [0x4a6a2c, 0x5a7a34, 0x3e5a26, 0x6a8040, 0x7a8a46];
@@ -436,7 +486,7 @@ export default class Newton {
     k.box(0.2, 0.05, 0.28, 0x2a3a2a, [SIT.x + SIDE.x * 0.68, groundHeight(SIT.x, SIT.z) + 0.075, SIT.z + SIDE.z * 0.68], [0, 0.7, 0]);
     k.box(0.36, 0.01, 0.26, 0xece0c0, [SIT.x + SIDE.x * 0.92 + TOWARD.x * 0.5, groundHeight(SIT.x, SIT.z) + 0.01, SIT.z + SIDE.z * 0.92 + TOWARD.z * 0.5], [0, 0.9, 0]);
     this.root.add(k.mesh());
-    this.applesMesh = ak.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })); this.root.add(this.applesMesh);
+    if (ak.parts.length) { this.applesMesh = ak.mesh(new THREE.MeshLambertMaterial({ vertexColors: true })); this.root.add(this.applesMesh); }
   }
 
   // Beyond the walls: hedgerows and oaks along the fields, woods on the far hills, and across the
@@ -657,13 +707,17 @@ export default class Newton {
       ck.box(0.016, 0.014, 0.1, OAKD, [x, 0.018, 0]);
       for (const sz of [-1, 1]) ck.cyl(0.018, 0.018, 0.01, 12, OAKD, [x, 0.018, sz * 0.048], [Math.PI / 2, 0, 0]);
     }
-    this.cannon = ck.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.3, fog: false }));
+    // (Meem's cannon model when it's there: its muzzle is at its -x end, so it's turned round to aim along +x,
+    // 0.3 m long; its barrel's mouth is 1.03 of its own 1.42 m up)
+    const CK = 0.1, cm = PROPS.has('cannon') && PROPS.fresh();
+    if (cm) { cm.add('cannon', 0, 0, 0, Math.PI, { s: CK }); this.cannon = cm.build(); this.cannon.traverse((o) => { if (o.material) { o.material = o.material.clone(); o.material.fog = false; } }); }
+    else this.cannon = ck.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.3, fog: false }));
     this.cannon.position.set(0, top, 0); C.add(this.cannon);
-    this.muzzle = new THREE.Vector3(0.2, top + 0.06, 0);
+    this.muzzle = cm ? new THREE.Vector3(PROPS.size('cannon').x / 2 * CK + 0.01, top + 1.03 * CK, 0) : new THREE.Vector3(0.2, top + 0.06, 0);
     this.flash = glow(0xffc070, 0.6, 0); this.flash.position.copy(this.muzzle); C.add(this.flash);
     // a tiny Newton beside it (the same model, very small)
     this.tiny = makePerson({ model: 'newton', seed: 4, tunic: 0x3a3a44, hair: 0x6a4a2a, height: 1.72 });
-    this.tiny.g.scale.setScalar(0.13); this.tiny.g.position.set(-0.11, top - 0.003, 0.055); this.tiny.g.rotation.y = Math.PI / 2; C.add(this.tiny.g);
+    this.tiny.g.scale.setScalar(0.13); this.tiny.g.position.set(cm ? -0.07 : -0.11, top - 0.003, cm ? 0.13 : 0.055); this.tiny.g.rotation.y = Math.PI / 2; C.add(this.tiny.g);
     // the cannonballs, their glowing trails, the dust where they land, the lines of pull
     this.balls = SPEEDS.map(() => { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d0, fog: false })), glow(0xffd890, 0.6, 1)); g.visible = false; C.add(g); return g; });
     this.trails = glowPoints(2600, { sizeScale: 1000 }); C.add(this.trails);

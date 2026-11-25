@@ -33,8 +33,11 @@ import { bareTree, conifer, grove } from '../trees.js';
 import { glowPoints, rumble, whoosh, awe, shimmer, beeps } from '../wow/fx.js';
 import { Space, lonLat } from '../wow/space.js';
 import { loadProps } from '../props.js';
-// Meem's snowy log house, barrel and crates (models/props), waited for before the chapter builds
-const PROPS = await loadProps(['house_log', 'house_log_lo', 'barrel', 'crate_basket_set']);
+// Meem's snowy log house, barrel and crates, the study's things, Aunt Effie's farm, Esther's camera and an
+// army truck (models/props), waited for before the chapter builds
+const PROPS = await loadProps(['house_log', 'house_log_lo', 'barrel', 'crate_basket_set', 'samovar', 'chalkboard', 'bicycle_1900',
+  'farmhouse_clapboard', 'red_barn_silo', 'model_t', 'film_camera_tripod', 'ww2_truck'],
+{ samovar: { h: 1.15 }, bicycle_1900: { x: 1.6 }, model_t: { z: 3.4 }, film_camera_tripod: { h: 1.95 } });   // (the samovar stands on its own little round table; the Model T's length is along its z)
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(131), N2 = noise2(133), N3 = noise2(137);
@@ -672,12 +675,20 @@ export default class Rockets {
       g.beginPath(); g.moveTo(330, 280); g.lineTo(420, 170); g.lineTo(440, 190); g.lineTo(350, 300); g.closePath(); g.stroke();
       g.beginPath(); g.arc(150, 240, 50, 0, 6.28); g.stroke(); g.beginPath(); g.ellipse(150, 240, 80, 20, -0.3, 0, 6.28); g.stroke();
     });
-    const bm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), new THREE.MeshLambertMaterial({ map: board })); bm.rotation.y = Math.PI; bm.position.set(-0.5, 1.55, RZ - 0.1); A.add(bm);
+    const SP = PROPS.fresh(), EZ = V3(-0.2, 0, RZ - 0.55);   // Meem's study things; the chalkboard's easel, its back leg to the wall
+    if (SP.add('chalkboard', EZ.x, 0, EZ.z, Math.PI)) {
+      // (the writing goes on the easel's board: its face is 0.28 m in front of the easel's middle at the foot, 0.16 at the top, 0.56..1.62 m up)
+      const g = new THREE.Group(); g.position.copy(EZ); g.rotation.y = Math.PI; A.add(g);
+      const bm = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 0.92), new THREE.MeshLambertMaterial({ map: board })); bm.position.set(0, 1.09, 0.226); bm.rotation.x = -0.112; g.add(bm);
+      this.blockK2 = [{ x: EZ.x, z: EZ.z, r: 0.55 }];
+    } else { const bm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), new THREE.MeshLambertMaterial({ map: board })); bm.rotation.y = Math.PI; bm.position.set(-0.5, 1.55, RZ - 0.1); A.add(bm); }
     // a bicycle against the wall (he rode about Kaluga on one)
-    for (const ox of [-0.5, 0.5]) k.add(new THREE.TorusGeometry(0.33, 0.02, 5, 20), 0x1a1a1a, [-1.75 + ox, 0.35, RZ - 0.3]);
-    pipe(k, V3(-2.25, 0.35, RZ - 0.3), V3(-1.75, 0.75, RZ - 0.3), 0.015, 0x2a3a2a); pipe(k, V3(-1.75, 0.75, RZ - 0.3), V3(-1.25, 0.35, RZ - 0.3), 0.015, 0x2a3a2a); pipe(k, V3(-1.75, 0.35, RZ - 0.3), V3(-1.75, 0.75, RZ - 0.3), 0.015, 0x2a3a2a); pipe(k, V3(-1.35, 0.85, RZ - 0.3), V3(-1.25, 0.35, RZ - 0.3), 0.015, 0x2a3a2a);
-    k.box(0.06, 0.02, 0.5, 0x2a2a2a, [-1.35, 0.88, RZ - 0.3]); k.box(0.18, 0.04, 0.08, 0x3a2a1a, [-1.8, 0.8, RZ - 0.3]);
-    // a samovar on a little table by the stove
+    if (SP.add('bicycle_1900', -1.78, 0, RZ - 0.36, 0)) (this.blockK2 ||= []).push({ x: -1.78, z: RZ - 0.36, r: 0.4 });
+    else for (const ox of [-0.5, 0.5]) k.add(new THREE.TorusGeometry(0.33, 0.02, 5, 20), 0x1a1a1a, [-1.75 + ox, 0.35, RZ - 0.3]);
+    if (!SP.has('bicycle_1900')) { pipe(k, V3(-2.25, 0.35, RZ - 0.3), V3(-1.75, 0.75, RZ - 0.3), 0.015, 0x2a3a2a); pipe(k, V3(-1.75, 0.75, RZ - 0.3), V3(-1.25, 0.35, RZ - 0.3), 0.015, 0x2a3a2a); pipe(k, V3(-1.75, 0.35, RZ - 0.3), V3(-1.75, 0.75, RZ - 0.3), 0.015, 0x2a3a2a); pipe(k, V3(-1.35, 0.85, RZ - 0.3), V3(-1.25, 0.35, RZ - 0.3), 0.015, 0x2a3a2a);
+    k.box(0.06, 0.02, 0.5, 0x2a2a2a, [-1.35, 0.88, RZ - 0.3]); k.box(0.18, 0.04, 0.08, 0x3a2a1a, [-1.8, 0.8, RZ - 0.3]); }
+    // a samovar on a little table by the stove (Meem's: on its own round table, the tap toward the room)
+    if (!SP.add('samovar', 1.95, 0, 0.15, Math.PI)) {
     k.box(0.6, 0.04, 0.5, WOOD, [1.95, 0.7, 0.15]); for (const [ox, oz] of [[-0.25, -0.2], [0.25, -0.2], [-0.25, 0.2], [0.25, 0.2]]) k.box(0.04, 0.7, 0.04, 0x3a2416, [1.95 + ox, 0.35, 0.15 + oz]);
     // the samovar: a turned brass urn on a square foot, two looped handles, a tap with its little wheel,
     // the chimney crowned by the teapot keeping warm; a tray, glasses in holders, a sugar bowl
@@ -694,7 +705,8 @@ export default class Rockets {
       k.cyl(0.24, 0.24, 0.012, 20, BR2, [X, 0.728, Z - 0.0]);
       for (const ox of [-0.17, 0.17]) { k.cyl(0.028, 0.026, 0.08, 10, 0xd8e0e0, [X + ox, 0.77, Z - 0.15]); k.cyl(0.03, 0.028, 0.06, 10, 0x8a7a5a, [X + ox, 0.765, Z - 0.15]); k.cyl(0.026, 0.026, 0.06, 10, 0x9a3a10, [X + ox, 0.77, Z - 0.15]); }
       k.cyl(0.04, 0.03, 0.05, 10, 0xf0f0f0, [X + 0.18, 0.76, Z + 0.12]); }
-    A.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+    }
+    A.add(k.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })), SP.build({ glow: 0x231c16 }));
     // his tin model airship, hanging from the beams
     const ak = new Kit(); ak.ball(0.5, 2, 0xb8c0c8, [0, 0, 0], 0, [1, 0.24, 0.24]);
     for (let i = -4; i <= 4; i++) { const rr = 0.12 * Math.sqrt(1 - (i / 4.5) ** 2); ak.add(new THREE.TorusGeometry(rr, 0.004, 4, 16), 0x8a9098, [i * 0.1, 0, 0], [0, Math.PI / 2, 0]); }
@@ -717,7 +729,7 @@ export default class Rockets {
     this.flyBooks = [];
     for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.04), new THREE.MeshLambertMaterial({ color: [0x6a2a1a, 0x2a3a5a, 0x4a3a1a, 0x3a2a4a, 0x5a4a2a, 0x2a4a2a][i], emissive: 0x221a08 })); const home = V3(RX - 0.22, 0.48 + (i % 4) * 0.42, -1.65 + i * 0.16); m.position.copy(home); m.rotation.y = Math.PI / 2; m.userData.home = home; A.add(m); this.flyBooks.push(m); }
     this.bookGlow = glow(0xffe0a0, 1.2, 0); A.add(this.bookGlow); this.bookCenter = V3(TALK_SPOT.x, 1.75, TALK_SPOT.z);
-    this.blockK = [{ x: dx, z: dz, r: 0.85 }, { x: sx, z: sz, r: 0.8 }, { x: 1.95, z: 0.15, r: 0.4 }, { x: bx, z: -1.2, r: 0.3 }, { x: CHAIR.x, z: CHAIR.z, r: 0.28 }];
+    this.blockK = [{ x: dx, z: dz, r: 0.85 }, { x: sx, z: sz, r: 0.8 }, { x: 1.95, z: 0.15, r: 0.4 }, { x: bx, z: -1.2, r: 0.3 }, { x: CHAIR.x, z: CHAIR.z, r: 0.28 }, ...(this.blockK2 || [])];
   }
 
   // ---------- the chalk drawings ----------
@@ -825,18 +837,26 @@ export default class Rockets {
       k.cyl(0.16, 0.26, 0.7, 8, 0x5a4a6a, [X, y + 1.3, Z], [0, 0.3, 0]); k.cyl(0.05, 0.05, 1.1, 6, 0x6a5a7a, [X, y + 1.55, Z], [0, 0.3, Math.PI / 2]); k.ball(0.13, 1, 0xc8b078, [X, y + 1.82, Z]); k.cyl(0.11, 0.2, 0.1, 10, 0x6a5a3a, [X, y + 1.92, Z]); k.cyl(0.24, 0.24, 0.015, 14, 0x6a5a3a, [X, y + 1.88, Z]);
       for (let q = 0; q < 6; q++) k.cyl(0.004, 0.004, 0.18, 3, 0xc8b078, [X + Math.cos(0.3) * (q % 2 ? 0.72 : -0.72), y + 1.5, Z - Math.sin(0.3) * (q % 2 ? 0.72 : -0.72)], [r() - 0.5, 0, r() - 0.5]); }
     // Aunt Effie's farmhouse (white clapboard), the red barn and silo, a shed
-    const fx = 52, fz = -40, fy = auburnHeight(fx, fz);
+    const fx = 52, fz = -40, fy = auburnHeight(fx, fz), FP = PROPS.fresh();   // FP: Meem's farm models, when they're there
+    // (the farmhouse's porch faces west, toward you; the barn's doors too, its silo on its south side; the Model T faces north)
+    const farmM = FP.add('farmhouse_clapboard', fx, fy - 0.1, fz, -Math.PI / 2);
+    if (!farmM) {
     house(k, { x: fx, y: fy, z: fz, w: 10, d: 8, h: 5.6, yaw: -Math.PI / 2, wall: 0xeeeae0, roofCol: 0x3a3a3e }, wins);
     k.box(3, 0.2, 8, 0xeeeae0, [fx - 5.5, fy + 2.6, fz]); for (const z of [-3.5, 0, 3.5]) k.box(0.15, 2.6, 0.15, 0xeeeae0, [fx - 6.8, fy + 1.3, fz + z]);
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) k.box(0.05, 1.2, 0.8, 0x2a3a2a, [fx - 5.03, fy + 1.6 + (i > 1 ? 3 : 0), fz + s * (1.5 + i)]);
+    }
     const gx = 68, gz = -12, gy = auburnHeight(gx, gz);
+    if (!FP.add('red_barn_silo', gx, gy - 0.15, gz, -Math.PI / 2)) {
     k.box(16, 7, 11, 0x9a2a20, [gx, gy + 3.5, gz]); k.add(gableRoof(16, 11, 5, 0.4), 0x4a4a4e, [gx, gy + 7, gz]); for (const s of [-1, 1]) k.add(gableWallGeo(11, 5), 0x9a2a20, [gx + s * 7.95, gy + 7, gz], [0, Math.PI / 2, 0]);
     k.box(0.1, 4, 4, 0xe8e4dc, [gx - 8.05, gy + 2, gz]); k.box(0.05, 3.6, 0.15, 0xe8e4dc, [gx - 8.08, gy + 2, gz], [Math.PI / 4, 0, 0]); k.box(0.05, 3.6, 0.15, 0xe8e4dc, [gx - 8.08, gy + 2, gz], [-Math.PI / 4, 0, 0]);
     k.cyl(2.6, 2.6, 12, 14, 0x8a8a8a, [gx + 4, gy + 6, gz - 8]); k.ball(2.6, 1, 0x6a6a70, [gx + 4, gy + 12, gz - 8], 0, [1, 0.6, 1]);
+    }
     // a Model T by the house
     const tx = 44, tz = -26, ty = auburnHeight(tx, tz);
+    if (!FP.add('model_t', tx, ty - 0.02, tz, Math.PI)) {
     k.box(1.4, 0.6, 2.6, 0x1a1a1e, [tx, ty + 0.9, tz]); k.box(1.3, 0.7, 1.2, 0x1a1a1e, [tx, ty + 1.5, tz + 0.3]); k.box(1.4, 0.06, 1.4, 0x2a2a2e, [tx, ty + 1.88, tz + 0.3]); k.box(0.9, 0.5, 0.9, 0x1a1a1e, [tx, ty + 0.95, tz - 1.6]);
     for (const [ox, oz] of [[-0.75, -1.1], [0.75, -1.1], [-0.75, 1.0], [0.75, 1.0]]) k.add(new THREE.TorusGeometry(0.34, 0.06, 5, 14), 0x2a2a2a, [tx + ox, ty + 0.38, tz + oz], [0, Math.PI / 2, 0]);
+    }
     // telegraph poles along the road
     for (let x = -300; x <= 300; x += 40) { const z = 31 + Math.sin(x / 40) * 4, y = auburnHeight(x, z); k.cyl(0.12, 0.15, 8, 5, 0x4a3a2a, [x, y + 4, z]); k.box(1.4, 0.1, 0.1, 0x4a3a2a, [x, y + 7.6, z]); }
     // bare maples and elms, a stand of pines to the west
@@ -872,6 +892,11 @@ export default class Rockets {
     // its handle, a black body with the film magazine's two drums on top, the lens and its hood (aimed west at
     // the rocket), the eyepiece at the back, and the hand crank on her side
     const cxm = CAMERA_A.x, czm = CAMERA_A.z, TW = 0x7a5a38, CB = 0x1c1c20, BR = 0xb8964a;
+    // Meem's camera: its lens looks along its +x, the eyepiece at -x, the crank on its +z side (1.02 m up at
+    // its own 1.7 m, 0.19 m behind its middle): turned to look west, its eyepiece where the old one's was
+    const CS = 1.95 / 1.7, camM = FP.has('film_camera_tripod') && V3(cxm + 0.25 - 0.49 * CS, 0, czm);
+    if (camM) FP.add('film_camera_tripod', camM.x, auburnHeight(camM.x, camM.z) - 0.03, camM.z, Math.PI);
+    if (!camM) {
     for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) {
       const foot = V3(cxm + Math.cos(a) * 0.4, auburnHeight(cxm + Math.cos(a) * 0.4, czm + Math.sin(a) * 0.4) - 0.04, czm + Math.sin(a) * 0.4), top = V3(cxm + Math.cos(a) * 0.05, 1.2, czm + Math.sin(a) * 0.05);
       for (const o of [-0.018, 0.018]) pipe(k, foot.clone().add(V3(-Math.sin(a) * o, 0.06, Math.cos(a) * o)), top.clone().add(V3(-Math.sin(a) * o, 0, Math.cos(a) * o)), 0.011, TW, 5);
@@ -886,16 +911,18 @@ export default class Rockets {
     k.box(0.12, 0.05, 0.04, CB, [cxm + 0.04, 1.47, czm + 0.095]); k.cyl(0.018, 0.022, 0.06, 10, 0x141416, [cxm + 0.18, 1.47, czm + 0.095], [0, 0, Math.PI / 2]); k.cyl(0.024, 0.024, 0.02, 10, 0x2a2420, [cxm + 0.215, 1.47, czm + 0.095], [0, 0, Math.PI / 2]);
     k.cyl(0.02, 0.02, 0.03, 10, BR, [cxm + 0.02, 1.38, czm - 0.09], [Math.PI / 2, 0, 0]);
     for (let i = 0; i < 4; i++) k.box(0.05, 0.01, 0.002, 0xc8c0a0, [cxm - 0.05 + i * 0.03, 1.36, czm + 0.076]);
-    B.add(k.mesh());
-    B.add(windows(wins, { lit: 0.1, seed: 9, dark: 0x2a3442 }));
+    }
+    B.add(k.mesh(), FP.build());
+    if (wins.length) B.add(windows(wins, { lit: 0.1, seed: 9, dark: 0x2a3442 }));
     const ck = new Kit(); ck.box(0.016, 0.085, 0.01, 0x8a8a8a, [0, 0.035, 0]); ck.cyl(0.009, 0.009, 0.05, 6, 0x3a2a1a, [0, 0.075, -0.03], [Math.PI / 2, 0, 0]);
-    this.crank = ck.mesh(FIG_MAT); this.crank.position.set(cxm + 0.02, 1.38, czm - 0.11); B.add(this.crank);
+    this.crank = ck.mesh(FIG_MAT); B.add(this.crank);
+    if (camM) this.crank.position.set(camM.x + 0.19 * CS, 1.02 * CS, camM.z - 0.2 * CS); else this.crank.position.set(cxm + 0.02, 1.38, czm - 0.11);
     this.crankHandle = new THREE.Object3D(); this.crankHandle.position.set(0, 0.075, -0.06); this.crank.add(this.crankHandle);
-    this.camGrip = V3(cxm + 0.1, 1.36, czm + 0.1);   // her other hand on the side of the body, steadying it
+    this.camGrip = camM ? V3(camM.x + 0.15, 1.6, camM.z + 0.2) : V3(cxm + 0.1, 1.36, czm + 0.1);   // her other hand on the side of the body, steadying it
     this.eyepiece = V3(cxm - 2, 1.2, ESTHER.z);   // (where she looks: through the eyepiece, out past the lens at the rocket)
-    this.chimneyA = makeSmoke(V3(fx, fy + 10, fz + 2.5), { n: 6, rise: 8, size: 1.2, opacity: 0.18, color: 0xd8dce4 }); B.add(this.chimneyA.group);
+    this.chimneyA = makeSmoke(farmM ? V3(fx, fy + 9.4, fz - 5.4) : V3(fx, fy + 10, fz + 2.5), { n: 6, rise: 8, size: 1.2, opacity: 0.18, color: 0xd8dce4 }); B.add(this.chimneyA.group);
     // cows by the barn, the farm dog, crows
-    this.cowsA = this.life.add(makeHerd('cow', { n: 5, area: { x: 78, z: -28, r: 9 }, height: auburnHeight, seed: 3 })); B.add(this.cowsA.group);
+    this.cowsA = this.life.add(makeHerd('cow', { n: 5, area: { x: 82, z: -32, r: 8 }, height: auburnHeight, seed: 3 })); B.add(this.cowsA.group);
     this.horseA = this.life.add(makeHerd('horse', { n: 1, area: { x: 60, z: 2, r: 5 }, height: auburnHeight, seed: 8 })); B.add(this.horseA.group);
     this.dogA = this.life.add(makeHerd('dog', { n: 1, area: { x: 5.5, z: 1.0, r: 1.5 }, height: auburnHeight, seed: 5, mode: 'follow' })); this.dogA.lead.set(5.5, 0, 1.0); B.add(this.dogA.group);
     this.crowsUp = this.life.add(makeFlock({ n: 9, center: V3(-14, 9, -20), r: 14, height: 5, color: 0x1a1a1e, size: 0.55, seed: 4, speed: 7 })); B.add(this.crowsUp.group); this.crowsUp.group.visible = false;
@@ -1085,8 +1112,11 @@ export default class Rockets {
     }
     // trucks: an Opel Blitz fuel bowser and a cable truck (cab with its long bonnet, mudguards, a tank or a
     // canvas tilt behind), parked where they backed off; floodlights on timber poles
+    // (the cable truck is Meem's army truck when it's there: cab at its -x end, so turned a quarter more)
+    const TP = PROPS.fresh();
     for (const [x, z, yaw, kind] of [[-12, PAD.z + 9, 0.4, 'tank'], [14, PAD.z + 14, -0.3, 'tilt']]) {
       const c = Math.cos(yaw), s = Math.sin(yaw), y0 = balticHeight(x, z), P = (lx, ly, lz) => [x + lx * c + lz * s, y0 + ly, z - lx * s + lz * c], R = [0, yaw, 0];
+      if (kind === 'tilt' && TP.add('ww2_truck', ...P(0, -0.02, -0.15), yaw + Math.PI / 2, { w: 6.4, h: 3.4, d: 2.5 })) continue;
       const BODY = 0x3e4434, DK = 0x22241e;
       k.box(1.9, 0.18, 6.8, DK, P(0, 0.72, 0), R);
       k.box(1.1, 0.8, 1.4, BODY, P(0, 1.2, 3.0), R); k.box(1.0, 0.05, 1.3, BODY, P(0, 1.625, 3.0), R);
@@ -1129,7 +1159,7 @@ export default class Rockets {
       k.box(0.5, 0.4, 0.4, 0x5a4a2e, [-2.6, 0.2, -0.8]); k.box(0.24, 0.14, 0.18, 0x2a2e26, [-2.6, 0.47, -0.8]); k.cyl(0.02, 0.02, 0.2, 6, 0x1a1a1a, [-2.6, 0.56, -0.8], [0, 0, Math.PI / 2]);
       k.box(0.2, 0.02, 0.26, 0x2a2a3a, [-2.37, 0.41, -0.8]);
     }
-    C.add(k.mesh());
+    C.add(k.mesh(), TP.build({ glow: 0x231c16 }));
     // the erector beside the rocket: a lattice tower that lowers away before launch
     const ek = new Kit(), EC = 0x4a5048;
     for (const sx of [-0.6, 0.6]) for (const sz of [-0.6, 0.6]) ek.box(0.14, 15, 0.14, EC, [sx, 7.5, sz]);
