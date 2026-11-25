@@ -26,7 +26,8 @@ import { grove, grassTuft, palm as palmTree, olive as oliveTree, cypress as cypr
 import { buildAthens } from './athens.js';
 import { loadProps } from '../props.js';
 // Meem's houses and the Greek ship (models/props), waited for before the chapter builds
-const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'house_greek_lo', 'ship_ancient', 'amphora', 'oil_lamp', 'table_stool']);
+const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'house_greek_lo', 'ship_ancient', 'amphora', 'oil_lamp', 'table_stool',
+  'lampstand', 'greek_statue', 'fire_tripod', 'well_syene', 'chinese_pavilion', 'inkstone_set']);
 import { moonFaceTexture } from '../moontex.js';
 
 const D2R = Math.PI / 180;
@@ -540,9 +541,12 @@ export default class Greece {
     // a clay oil lamp on a tall bronze lampstand beside the table
     const LX = 0.62, LZ = -3.05, LY = 1.22;
     this.lampPos = new THREE.Vector3(LX, LY + 0.06, LZ);
-    k.cyl(0.015, 0.02, LY - 0.03, 6, 0x6a5030, [LX, (LY - 0.03) / 2, LZ]); k.cyl(0.14, 0.16, 0.03, 8, 0x6a5030, [LX, 0.015, LZ]); k.cyl(0.07, 0.04, 0.03, 8, 0x6a5030, [LX, LY - 0.02, LZ]);
-    const FP = PROPS.fresh();   // Meem's clay oil lamp on the stand; jars, a table and stool along the wall
-    if (!FP.add('oil_lamp', LX, LY - 0.005, LZ, 0)) { k.ball(0.06, 1, 0xa0603a, [LX, LY + 0.02, LZ], 0, [1.2, 0.5, 0.9]); k.cyl(0.018, 0.022, 0.05, 6, 0x8a5030, [LX - 0.06, LY + 0.04, LZ], [0, 0, -1.1]); }
+    const FP = PROPS.fresh();   // Meem's bronze lampstand with its clay lamp on top; jars, a table and stool along the wall
+    // (the stand's own lamp sits just under the flame, lampPos, so the shadows still come from the same point)
+    if (!FP.add('lampstand', LX, 0, LZ + 0.06, 0, { h: LY + 0.05 })) {   // (the model's centre is 6 cm off its lamp)
+      k.cyl(0.015, 0.02, LY - 0.03, 6, 0x6a5030, [LX, (LY - 0.03) / 2, LZ]); k.cyl(0.14, 0.16, 0.03, 8, 0x6a5030, [LX, 0.015, LZ]); k.cyl(0.07, 0.04, 0.03, 8, 0x6a5030, [LX, LY - 0.02, LZ]);
+      if (!FP.add('oil_lamp', LX, LY - 0.005, LZ, 0)) { k.ball(0.06, 1, 0xa0603a, [LX, LY + 0.02, LZ], 0, [1.2, 0.5, 0.9]); k.cyl(0.018, 0.022, 0.05, 6, 0x8a5030, [LX - 0.06, LY + 0.04, LZ], [0, 0, -1.1]); }
+    }
     // (jars to the right of the lamp, out of the shadows' way; the table round the east side of the house)
     FP.add('amphora', 1.05, 0, this.wallZ + 0.35, 2); FP.add('amphora', 1.5, 0, this.wallZ + 0.4, 1); FP.add('amphora', 3.75, 0, this.wallZ - 0.3, 0.4);
     if (FP.add('table_stool', 4.1, 0, this.wallZ - 1.7, -Math.PI / 2)) S.blockers.push({ x: 4.1, z: this.wallZ - 1.7, r: 0.9 });
@@ -564,10 +568,12 @@ export default class Greece {
     k.box(3.2, 1.2, 1.6, 0xd8ceb6, [front.x + 9, TERR + 0.6, TC.z]); k.box(3.5, 0.15, 1.9, 0xe8e0cc, [front.x + 9, TERR + 1.25, TC.z]);
     S.blockers.push({ x: front.x + 9, z: TC.z - 0.8, r: 1.1 }, { x: front.x + 9, z: TC.z + 0.8, r: 1.1 });
     this.fires = [];
+    const GP = PROPS.fresh();   // Meem's bronze fire tripods and marble statues (built with a little glow of their own, for the night)
     const bowl = (x, z, y) => {
+      this.fires.push(new THREE.Vector3(x, y + 0.55, z));
+      if (GP.add('fire_tripod', x, H(x, z), z, 0.4, { h: y + 0.38 - H(x, z) })) return;   // its rim where the code bowl's was
       for (let i = 0; i < 3; i++) { const a = i * 2.09; k.cyl(0.03, 0.03, y, 5, 0x5a4020, [x + Math.cos(a) * 0.25, y / 2, z + Math.sin(a) * 0.25], [Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12]); }
       k.add(new THREE.SphereGeometry(0.42, 10, 4, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 0x8a6a2a, [x, y + 0.38, z]);
-      this.fires.push(new THREE.Vector3(x, y + 0.55, z));
     };
     bowl(front.x + 2.2, TC.z - 5.2, TERR + 1.1); bowl(front.x + 2.2, TC.z + 5.2, TERR + 1.1);
     this.fires.push(new THREE.Vector3(front.x + 9, TERR + 1.55, TC.z));
@@ -582,13 +588,15 @@ export default class Greece {
     for (let i = 0; i < 3; i++) {
       const t = 0.3 + i * 0.22, x = lerp(front.x + 12, -3, t), z = lerp(TC.z, 0, t) + 3.2;
       const y = H(x, z);
+      S.blockers.push({ x, z, r: 0.7 });
+      // Meem's marble statue on its plinth, turned to look out over the path toward the farm
+      if (GP.add('greek_statue', x, y - 0.03, z, 1.75 + i * 0.15, { h: 2.75 })) continue;
       k.box(0.9, 1.1, 0.9, 0xd8ceb6, [x, y + 0.55, z]);
       // a marble figure (a herm-like statue): body, head, arm
       k.cyl(0.2, 0.26, 1.3, 8, 0xeee6d2, [x, y + 1.75, z]); k.ball(0.15, 1, 0xeee6d2, [x, y + 2.55, z]);
       k.cyl(0.06, 0.06, 0.6, 5, 0xeee6d2, [x + 0.25, y + 2.0, z], [0, 0, 0.6]);
-      S.blockers.push({ x, z, r: 0.7 });
     }
-    g.add(k.mesh(), this.farmProps, grove(cypressTree, cyp, { detail: 'high', height: 11, seed: 5, variants: 5 }).group);
+    g.add(k.mesh(), this.farmProps, GP.build({ glow: 0x231c16 }), grove(cypressTree, cyp, { detail: 'high', height: 11, seed: 5, variants: 5 }).group);
     const nearOl = trunks.filter((p) => Math.hypot(p.x, p.z) < 18), farOl = trunks.filter((p) => Math.hypot(p.x, p.z) >= 18);
     if (nearOl.length) g.add(grove(oliveTree, nearOl, { detail: 'high', height: 4.6, seed: 7, variants: 5 }).group);
     if (farOl.length) g.add(grove(oliveTree, farOl, { detail: 'mid', height: 4.6, seed: 9, variants: 5 }).group);
@@ -711,6 +719,24 @@ export default class Greece {
   buildWell(g, k, W) {
     const RI = 0.77, RO = 1.08, CH = 0.17, NC = 5, NB = 14, SAND = [0xc8a878, 0xb89868, 0xd2b286, 0xae8e60, 0xc0a070];
     const r = rng(29);
+    // Meem's sandstone well: the same width as the shaft's rim (outside 1.1 m, its opening 0.7 m, just
+    // inside the shaft, so you look straight down the stone shaft below to the water and the Sun's glint)
+    const WP = PROPS.fresh();
+    if (WP.add('well_syene', W.x, 0, W.z, 0)) { g.add(WP.build()); this.wellTop = 0.92; }
+    else this.buildWellWall(g, k, W, RI, RO, CH, NC, SAND, r);
+    // a stone water trough and two tall water jars beside the well
+    k.box(1.3, 0.5, 0.6, 0xb09070, [W.x - 1.9, 0.25, W.z + 1.5], [0, 0.5, 0]);
+    k.box(1.12, 0.04, 0.44, 0x2a4a5a, [W.x - 1.9, 0.48, W.z + 1.5], [0, 0.5, 0]);
+    for (const [dx, dz] of [[-1.55, -1.3], [-1.85, -0.95]]) {
+      k.cyl(0.2, 0.14, 0.6, 10, 0xa86a40, [W.x + dx, 0.3, W.z + dz]); k.ball(0.24, 1, 0xa86a40, [W.x + dx, 0.62, W.z + dz], 0, [1, 0.85, 1]);
+      k.cyl(0.09, 0.11, 0.16, 8, 0xa86a40, [W.x + dx, 0.86, W.z + dz]);
+    }
+    // inside: the shaft, lined with stone courses, getting darker the deeper you look
+    this.buildShaft(g, W, RI, SAND);
+  }
+
+  // (the code-built well wall, used only if the model is missing)
+  buildWellWall(g, k, W, RI, RO, CH, NC, SAND, r) {
     // the mortar behind the blocks (a solid ring, so there are never any gaps to see through)
     k.add(new THREE.CylinderGeometry(RO - 0.03, RO - 0.03, NC * CH, 28, 1, true), 0x7a6448, [W.x, NC * CH / 2, W.z]);
     // the blocks: curved slabs, each a little different
@@ -750,14 +776,9 @@ export default class Greece {
     k.cyl(0.15, 0.12, 0.26, 10, 0x7a5432, [bucket.x, PT + 0.13, bucket.z]);
     k.cyl(0.155, 0.155, 0.03, 10, 0x4a3020, [bucket.x, PT + 0.22, bucket.z]); k.cyl(0.13, 0.13, 0.03, 10, 0x4a3020, [bucket.x, PT + 0.05, bucket.z]);
     k.add(new THREE.TorusGeometry(0.13, 0.008, 4, 10, Math.PI), 0x4a3020, [bucket.x, PT + 0.26, bucket.z]);
-    // a stone water trough and two tall water jars beside the well
-    k.box(1.3, 0.5, 0.6, 0xb09070, [W.x - 1.9, 0.25, W.z + 1.5], [0, 0.5, 0]);
-    k.box(1.12, 0.04, 0.44, 0x2a4a5a, [W.x - 1.9, 0.48, W.z + 1.5], [0, 0.5, 0]);
-    for (const [dx, dz] of [[-1.55, -1.3], [-1.85, -0.95]]) {
-      k.cyl(0.2, 0.14, 0.6, 10, 0xa86a40, [W.x + dx, 0.3, W.z + dz]); k.ball(0.24, 1, 0xa86a40, [W.x + dx, 0.62, W.z + dz], 0, [1, 0.85, 1]);
-      k.cyl(0.09, 0.11, 0.16, 8, 0xa86a40, [W.x + dx, 0.86, W.z + dz]);
-    }
-    // inside: the shaft, lined with stone courses, getting darker the deeper you look
+  }
+
+  buildShaft(g, W, RI, SAND) {
     const sh = new THREE.CylinderGeometry(RI + 0.005, RI + 0.005, 8.2, 18, 36, true).toNonIndexed(), sp = sh.attributes.position, sc = new Float32Array(sp.count * 3);
     for (let i = 0; i < sp.count; i += 3) {
       let cy = 0, ca = 0;
@@ -882,13 +903,24 @@ export default class Greece {
     S.g.add(buildGround(600, 60, H, (x, y, z, c) => { c.setHex(((Math.floor(x) + Math.floor(z)) & 1) ? 0x8a8478 : 0x7a7468); if (Math.hypot(x, z) > 14) c.setHex(0x4a5030); }));
     // courtyard walls with grey tile caps, a hall to the south with red pillars and a sweeping roof
     for (const [x, z, w, d] of [[0, -14, 28, 0.6], [-14, 0, 0.6, 28], [14, 0, 0.6, 28]]) { k.box(w, 3, d, 0xb8a890, [x, 1.5, z]); k.box(w + 0.6, 0.35, d + 0.6, 0x4a4a50, [x, 3.15, z]); }
-    for (let i = 0; i < 8; i++) column(k, -10.5 + i * 3, 0.6, 9, 4.2, 0.28, 0xa02a1a);
-    k.box(26, 0.6, 5, 0xb0a490, [0, 0.3, 10.5]); k.box(25, 4.5, 0.4, 0x8a3020, [0, 2.8, 12.6]);
-    const roof = new THREE.CylinderGeometry(1, 1, 30, 4, 1); roof.rotateZ(Math.PI / 2); roof.rotateX(Math.PI / 4); roof.scale(1, 2.2, 5); k.add(roof, 0x3a3a44, [0, 6.4, 10.8]);
-    k.box(31, 0.3, 1.2, 0x3a3a44, [0, 5.0, 7.6], [0.35, 0, 0]);
-    // the stone table with the silk scroll, inkstone and brush
-    k.box(1.3, 0.7, 0.7, 0x5a3a28, [0, 0.35, -1.3]); S.blockers.push({ x: 0, z: -1.3, r: 0.5 });
-    k.box(0.12, 0.03, 0.08, 0x1a1a1a, [0.5, 0.72, -1.15]); k.cyl(0.01, 0.006, 0.22, 5, 0x6a4a2a, [0.4, 0.72, -1.05], [0, 0.5, Math.PI / 2]);
+    // (Meem's palace hall, its steps toward us, the courtyard's south side; or the code-built one)
+    const CP = PROPS.fresh();
+    if (CP.add('chinese_pavilion', 0, 0, 8.6 + 8.9, Math.PI, { w: 22 })) S.blockers.push({ x: 0, z: 9.5, r: 1.5 });
+    else {
+      for (let i = 0; i < 8; i++) column(k, -10.5 + i * 3, 0.6, 9, 4.2, 0.28, 0xa02a1a);
+      k.box(26, 0.6, 5, 0xb0a490, [0, 0.3, 10.5]); k.box(25, 4.5, 0.4, 0x8a3020, [0, 2.8, 12.6]);
+      const roof = new THREE.CylinderGeometry(1, 1, 30, 4, 1); roof.rotateZ(Math.PI / 2); roof.rotateX(Math.PI / 4); roof.scale(1, 2.2, 5); k.add(roof, 0x3a3a44, [0, 6.4, 10.8]);
+      k.box(31, 0.3, 1.2, 0x3a3a44, [0, 5.0, 7.6], [0.35, 0, 0]);
+    }
+    // the stone table with the silk scroll, and Meem's inkstone, brush and rolled silk at its right end
+    // (the table is longer to the right to make room; the scroll to paint stays where it was)
+    if (CP.add('inkstone_set', 0.98, 0.7, -1.3, 0, { s: 0.8 })) {
+      k.box(1.95, 0.7, 0.7, 0x5a3a28, [0.32, 0.35, -1.3]); S.blockers.push({ x: 0, z: -1.3, r: 0.5 }, { x: 0.75, z: -1.3, r: 0.5 });
+    } else {
+      k.box(1.3, 0.7, 0.7, 0x5a3a28, [0, 0.35, -1.3]); S.blockers.push({ x: 0, z: -1.3, r: 0.5 });
+      k.box(0.12, 0.03, 0.08, 0x1a1a1a, [0.5, 0.72, -1.15]); k.cyl(0.01, 0.006, 0.22, 5, 0x6a4a2a, [0.4, 0.72, -1.05], [0, 0.5, Math.PI / 2]);
+    }
+    S.g.add(CP.build({ glow: 0x231c16 }));
     // bronze armillary rings on a stand
     const arm = (rad, rot) => k.add(new THREE.TorusGeometry(rad, 0.02, 4, 32), 0xb08a40, [3.5, 1.6, -3], rot);
     arm(0.6, [Math.PI / 2, 0, 0]); arm(0.6, [0, 0, 0]); arm(0.55, [0.6, 0.4, 0]); k.cyl(0.06, 0.1, 1.0, 6, 0x6a5030, [3.5, 0.5, -3]);
