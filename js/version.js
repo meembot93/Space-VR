@@ -4,4 +4,4 @@
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
 export const VERSION = 41;
-export const CHANGES = ['Test guards von Braun', 'Von Braun at Sputnik, circle'];
+export const CHANGES = ['Everyone in the final circle', 'Von Braun cheers, both arms up', 'Test guards the circle'];
