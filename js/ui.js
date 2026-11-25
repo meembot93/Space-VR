@@ -59,7 +59,7 @@ export class UI {
   constructor(G) {
     this.G = G;
     // Subtitles: a card that floats a little below your gaze and lazily follows your head
-    this.sub = makeCard(1400, 380, 1.25);
+    this.sub = makeCard(1600, 340, 1.45, { bg: 'rgba(8,12,28,0.55)' });   // wide and low, so it sits under the scene, not over it
     this.hint = makeCard(1100, 150, 0.85, { bg: 'rgba(30,20,6,0.78)', border: 'rgba(120,220,255,0.9)', color: '#dff6ff', size: 44 });
     G.scene.add(this.sub, this.hint);
     this.subYaw = 0; this.placed = false;
@@ -159,7 +159,7 @@ export class UI {
     const fx = Math.sin(this.subYaw), fz = Math.cos(this.subYaw);
     const desk = G.mode === 'desktop';
     const pt = clamp(this.subPitch, -1.1, 0.6), cp = Math.cos(pt), sp = Math.sin(pt);
-    for (const [card, dist, drop] of [[this.sub, 1.6, 0.42], [this.hint, 1.5, 0.08], [this.pauseCard, 1.3, -0.05], [this.menuCard, 1.3, -0.02]]) {
+    for (const [card, dist, drop] of [[this.sub, 1.6, 0.56], [this.hint, 1.5, 0.08], [this.pauseCard, 1.3, -0.05], [this.menuCard, 1.3, -0.02]]) {
       // straight ahead along your (lazy) gaze, then `drop` lower on the card's own up direction
       card.position.set(_a.x + fx * dist * cp, _a.y + dist * sp - drop * cp, _a.z + fz * dist * cp);
       card.position.x += fx * drop * sp; card.position.z += fz * drop * sp;
