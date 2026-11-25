@@ -34,8 +34,9 @@ import { dirFromAzEl } from '../sky.js';
 import { eqVec } from '../stars.js';
 import { glowPoints, shatter, whoosh, awe, shimmer } from '../wow/fx.js';
 import { loadProps } from '../props.js';
-// Meem's Italian town house, lantern and books (models/props), waited for before the chapter builds
-const PROPS = await loadProps(['house_italian', 'house_italian_lo']);
+// Meem's models (models/props): the Italian town house, St Mark's Basilica, the carrack, gondola and
+// bell, and the lens-grinding workbench and a spare telescope in Padua; waited for before the chapter builds
+const PROPS = await loadProps(['house_italian', 'house_italian_lo', 'st_marks', 'ship_carrack', 'gondola', 'church_bell', 'lens_workbench', 'galileo_telescope']);
 import { D2R, ease, clamp01, at, sunAt, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 45.42;
@@ -46,6 +47,8 @@ const JUP = [78.6, 23.0];        // Jupiter among the stars that night (J2000 RA
 const MILKY = [92, 24];          // a patch of the Milky Way near it (by the Twins' feet)
 const MOON = { az: 140, el: 30 };
 const SHIP = at(105, 4800, 0);   // the ship coming in from the Adriatic, beyond the Lido
+// Meem's bell for the belfry's bells, Meem's gondola for the nine boats (and the gondolier's deck height in it)
+const BELL_MODEL = true, GONDOLA_MODEL = true, GDECK = 0.65;
 const VEN = new THREE.Vector3(...at(118, 8.5, TOPB + 3.6).toArray());   // the Venus model
 const N1 = noise2(111), N2 = noise2(113);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
@@ -206,13 +209,16 @@ export default class Galileo {
     const cm = new THREE.Mesh(new THREE.CircleGeometry(3.6, 32), new THREE.MeshLambertMaterial({ map: clock, emissive: 0x111122 })); cm.position.set(16, 22, -42.9); A.add(cm);
     // the Basilica of San Marco: five great domes with lanterns, golden mosaics on the front
     const bx0 = 30, bx1 = 105, bz0 = -50, bz1 = 6, bcx = (bx0 + bx1) / 2, bcz = (bz0 + bz1) / 2;
-    k.box(bx1 - bx0, 24, bz1 - bz0, 0xc8a888, [bcx, 13.2, bcz]);
-    facade(basTex, 56, 26, [bx0 - 0.05, 14.2, bcz], -Math.PI / 2, 1);
-    for (let i = 0; i < 5; i++) { const zz = bz0 + 5.6 + i * 11.2; k.cyl(0.001, 1.2, 4, 6, 0xe8dcc4, [bx0 - 0.4, 29.5, zz]); k.ball(0.4, 0, 0xe0b040, [bx0 - 0.4, 31.7, zz]); }
-    for (const [dx, dz, R, H] of [[bcx, bcz, 11, 32], [bcx - 22, bcz, 9, 29], [bcx + 22, bcz, 9, 29], [bcx, bcz - 20, 8.5, 28], [bcx, bcz + 20, 8.5, 28]]) {
-      k.cyl(R * 0.82, R * 0.82, 4, 16, 0xb8a080, [dx, H - 3, dz]);
-      k.add(new THREE.SphereGeometry(R * 0.86, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), 0x8a9098, [dx, H - 1, dz], 0, [1, 1.35, 1]);
-      k.cyl(1.1, 1.1, 2.4, 8, 0x8a9098, [dx, H + R * 1.16, dz]); k.ball(1.3, 1, 0xa0a6ae, [dx, H + R * 1.16 + 2, dz], 0, [1, 1.4, 1]); k.box(0.2, 2.4, 0.2, 0xe0b040, [dx, H + R * 1.16 + 4.2, dz]); k.box(1.1, 0.2, 0.2, 0xe0b040, [dx, H + R * 1.16 + 4.6, dz]);
+    const BP = PROPS.fresh();   // Meem's Basilica, its front to the Piazza (the code-built one if it's missing)
+    if (!BP.add('st_marks', bx0 + 30.4, 1.1, -19, -Math.PI / 2, { s: 0.84 })) {
+      k.box(bx1 - bx0, 24, bz1 - bz0, 0xc8a888, [bcx, 13.2, bcz]);
+      facade(basTex, 56, 26, [bx0 - 0.05, 14.2, bcz], -Math.PI / 2, 1);
+      for (let i = 0; i < 5; i++) { const zz = bz0 + 5.6 + i * 11.2; k.cyl(0.001, 1.2, 4, 6, 0xe8dcc4, [bx0 - 0.4, 29.5, zz]); k.ball(0.4, 0, 0xe0b040, [bx0 - 0.4, 31.7, zz]); }
+      for (const [dx, dz, R, H] of [[bcx, bcz, 11, 32], [bcx - 22, bcz, 9, 29], [bcx + 22, bcz, 9, 29], [bcx, bcz - 20, 8.5, 28], [bcx, bcz + 20, 8.5, 28]]) {
+        k.cyl(R * 0.82, R * 0.82, 4, 16, 0xb8a080, [dx, H - 3, dz]);
+        k.add(new THREE.SphereGeometry(R * 0.86, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), 0x8a9098, [dx, H - 1, dz], 0, [1, 1.35, 1]);
+        k.cyl(1.1, 1.1, 2.4, 8, 0x8a9098, [dx, H + R * 1.16, dz]); k.ball(1.3, 1, 0xa0a6ae, [dx, H + R * 1.16 + 2, dz], 0, [1, 1.4, 1]); k.box(0.2, 2.4, 0.2, 0xe0b040, [dx, H + R * 1.16 + 4.2, dz]); k.box(1.1, 0.2, 0.2, 0xe0b040, [dx, H + R * 1.16 + 4.6, dz]);
+      }
     }
     // the Doge's Palace: white arcades below, pink diamond-patterned walls above
     k.box(70, 24, 70, 0xe8c4b4, [70, 13.2, 50]);
@@ -250,18 +256,21 @@ export default class Galileo {
     }
     // bell towers rising out of the roofs here and there
     for (const [x, z, h] of [[-330, -260, 50], [160, -220, 46], [-620, 200, 40], [480, -60, 44], [-120, -520, 48], [700, -400, 42]]) { k.box(6, h, 6, 0xb86a50, [x, 1.2 + h / 2, z]); k.box(6.6, 4, 6.6, 0xe8e0d0, [x, h - 1, z]); k.cyl(0.001, 3.6, 9, 4, 0x6a8a7a, [x, h + 5.5, z], [0, Math.PI / 4, 0]); }
-    A.add(k.mesh(), VP.build()); if (far.parts.length) A.add(far.mesh());
+    A.add(k.mesh(), VP.build(), BP.build()); if (far.parts.length) A.add(far.mesh());
     A.add(panes(wins, { lit: 0.12, seed: 4, glint: true }));
     // ---- boats: anchored ships in the basin, the ship far out at sea, gondolas ----
     this.boats = [];
-    for (const [x, z, yaw, s] of [[160, 220, 0.4, 1], [60, 300, -0.2, 0.9], [-80, 240, 1.3, 1.1], [420, 180, 0.9, 0.8], [600, 300, -0.5, 1], [-300, 250, 0.2, 0.7]]) { const b = ship(s); b.position.set(x, 0, z); b.rotation.y = yaw; b.userData.ph = r() * 6; A.add(b); this.boats.push(b); }
+    for (const [x, z, yaw, s, m] of [[160, 220, 0.4, 1, 1], [60, 300, -0.2, 0.9, 0], [-80, 240, 1.3, 1.1, 1], [420, 180, 0.9, 0.8, 0], [600, 300, -0.5, 1, 0], [-300, 250, 0.2, 0.7, 0]]) { const b = ship(s, !!m); b.position.set(x, 0, z); b.rotation.y = yaw; b.userData.ph = r() * 6; A.add(b); this.boats.push(b); }
     this.farShip = ship(1.1); this.farShip.position.copy(SHIP); this.farShip.rotation.y = 0.9; this.farShip.userData.ph = 1; A.add(this.farShip); this.boats.push(this.farShip);
     this.gondolas = [];
     for (let i = 0; i < 9; i++) {
-      const gk = new Kit(); gk.box(1.3, 0.45, 10, 0x0a0a0c, [0, 0.35, 0]); gk.box(1.0, 0.5, 2, 0x0a0a0c, [0, 0.75, 4.8], [-0.5, 0, 0]); gk.box(1.0, 0.5, 2, 0x0a0a0c, [0, 0.7, -4.8], [0.4, 0, 0]); gk.box(0.08, 0.7, 0.5, 0xd8d8d8, [0, 1.2, 5.6]);
-      gk.box(0.9, 0.5, 1.4, 0x6a1a1a, [0, 0.75, 0.5]);   // a little cabin seat
-      gk.box(1.0, 0.03, 1.3, 0x1a1410, [0, 0.585, -3.6]);   // the gondolier's little stern deck
-      const gm = gk.mesh(); const P = makePerson({ seed: 40 + i, tunic: [0x1a1a1a, 0xe8e0d0, 0x2a3a5a][i % 3], hair: 0x2a1a10 }); P.g.position.set(0, 0.6, -3.6); P.pose = 'pull'; gm.add(P.g); gm.userData.P = P;
+      const gp = PROPS.fresh(), gmod = GONDOLA_MODEL && gp.add('gondola', 0, -0.35, -0.2, Math.PI / 2, { s: 0.9 });   // Meem's gondola, its prow to +z
+      const gk = new Kit(); if (!gmod) gk.box(1.3, 0.45, 10, 0x0a0a0c, [0, 0.35, 0]);       if (!gmod) {
+        gk.box(1.0, 0.5, 2, 0x0a0a0c, [0, 0.75, 4.8], [-0.5, 0, 0]); gk.box(1.0, 0.5, 2, 0x0a0a0c, [0, 0.7, -4.8], [0.4, 0, 0]); gk.box(0.08, 0.7, 0.5, 0xd8d8d8, [0, 1.2, 5.6]);
+        gk.box(0.9, 0.5, 1.4, 0x6a1a1a, [0, 0.75, 0.5]);   // a little cabin seat
+        gk.box(1.0, 0.03, 1.3, 0x1a1410, [0, 0.585, -3.6]);   // the gondolier's little stern deck
+      }
+      const gm = gmod ? gp.build() : gk.mesh(); const P = makePerson({ seed: 40 + i, tunic: [0x1a1a1a, 0xe8e0d0, 0x2a3a5a][i % 3], hair: 0x2a1a10 }); P.g.position.set(0, gmod ? GDECK : 0.6, gmod ? -3.1 : -3.6); P.pose = 'pull'; gm.add(P.g); gm.userData.P = P;
       const path = i < 5 ? { cx: 120 + i * 90, cz: 180, rx: 160 + i * 30, rz: 60 + i * 15 } : { cx: -110 + (i - 5) * 40, cz: 150 + (i - 5) * 25, rx: 35, rz: 18 };
       gm.userData.path = path; gm.userData.a = r() * 6.28; gm.userData.v = (0.02 + r() * 0.02) * (i % 2 ? 1 : -1);
       A.add(gm); this.gondolas.push(gm);
@@ -386,7 +395,9 @@ export default class Galileo {
     const bellGeo = new THREE.LatheGeometry(prof, 20), bellMat = new THREE.MeshStandardMaterial({ color: 0x9a7a40, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide });
     this.bells = [];
     for (const [x, z, s] of [[-2.6, -1.2, 1.15], [0.2, -1.2, 1.0], [2.8, -1.2, 0.85], [-1.6, 1.2, 0.75], [1.4, 1.2, 0.65]]) {
-      const b = new THREE.Group(); b.position.set(x, Y + 4.55, z); const m = new THREE.Mesh(bellGeo, bellMat); m.scale.setScalar(s); b.add(m);
+      const b = new THREE.Group(); b.position.set(x, Y + 4.55, z);
+      const bp = PROPS.fresh();   // Meem's bronze bell, its crown up in the headstock (it swings with the code group)
+      if (BELL_MODEL && bp.add('church_bell', 0, -1.4 * s, 0, 0, { h: 1.5 * s })) b.add(bp.build()); else { const m = new THREE.Mesh(bellGeo, bellMat); m.scale.setScalar(s); b.add(m); }
       const cl = new THREE.Mesh(new THREE.SphereGeometry(0.1 * s, 8, 6), bellMat); cl.position.y = -1.15 * s; b.add(cl);
       // its wooden headstock (yoke) with iron straps, up to the frame
       const yk = new Kit(); yk.box(0.6 * s + 0.3, 0.26, 0.36, 0x3e2c1c, [0, 0.12, 0]); for (const sx of [-1, 1]) yk.box(0.06, 0.32, 0.4, 0x2a2a2e, [sx * 0.2 * s, 0.06, 0]);
@@ -557,11 +568,15 @@ export default class Galileo {
     // ...a lean-to over the workbench: posts, a tiled slope, the lens-grinding wheel, tube staves, a lamp
     for (const x of [-12.6, -5.4]) k.box(0.14, 2.6, 0.14, 0x3a2818, [x, 1.3, -31.2]);
     k.box(7.6, 0.08, 2.2, 0x8a3a28, [-9, 2.75, -32.0], [0.35, 0, 0]); k.box(7.6, 0.14, 0.14, 0x3a2818, [-9, 2.55, -31.2]);
-    k.box(2.4, 0.08, 0.7, 0x6a4a30, [-7.2, 0.9, -31.9]); for (const x of [-8.3, -6.1]) for (const z of [-31.6, -32.2]) k.box(0.08, 0.9, 0.08, 0x3a2818, [x, 0.45, z]);
-    k.cyl(0.35, 0.35, 0.08, 14, 0x8a8478, [-6.6, 1.3, -31.9], [0, 0, Math.PI / 2]); k.box(0.06, 0.5, 0.06, 0x3a2818, [-6.6, 1.05, -31.9]);
-    for (let i = 0; i < 5; i++) k.cyl(0.03, 0.04, 1.0, 6, 0x7a2a1a, [-7.9 + i * 0.12, 0.98, -32.0], [0, 0, Math.PI / 2]);
+    const WP = PROPS.fresh();   // Meem's lens-grinding bench (wheel and all) and a spare telescope on its tripod beside it
+    if (!WP.add('lens_workbench', -7.2, paduaHeight(-7.2, -31.9), -31.95, 0, { d: 1.2 })) {
+      k.box(2.4, 0.08, 0.7, 0x6a4a30, [-7.2, 0.9, -31.9]); for (const x of [-8.3, -6.1]) for (const z of [-31.6, -32.2]) k.box(0.08, 0.9, 0.08, 0x3a2818, [x, 0.45, z]);
+      k.cyl(0.35, 0.35, 0.08, 14, 0x8a8478, [-6.6, 1.3, -31.9], [0, 0, Math.PI / 2]); k.box(0.06, 0.5, 0.06, 0x3a2818, [-6.6, 1.05, -31.9]);
+      for (let i = 0; i < 5; i++) k.cyl(0.03, 0.04, 1.0, 6, 0x7a2a1a, [-7.9 + i * 0.12, 0.98, -32.0], [0, 0, Math.PI / 2]);
+    }
+    WP.add('galileo_telescope', -9.4, paduaHeight(-9.4, -31.5), -31.5, 0.25, { s: 0.75 });
     k.cyl(0.25, 0.3, 0.6, 8, 0x6a4a30, [-11.8, 0.3, -31.7]); k.box(0.9, 0.5, 0.5, 0x5a3a22, [-12.0, 0.25, -32.6]);
-    Bg.add(k.mesh());
+    Bg.add(k.mesh(), WP.build({ glow: 0x231c16 }));
     Bg.add(panes(wins, { lit: 0.6, seed: 2 }));
     this.workLight = new THREE.PointLight(0xffa050, 2.5, 14, 1.6); this.workLight.position.set(-9, 2, -31.5); Bg.add(this.workLight);
     // the hatch lid
@@ -1294,7 +1309,9 @@ function panes(list, { lit = 0.4, seed = 3, glint = false } = {}) {
 }
 
 // A Venetian merchant ship (a carrack): a round hull, castles fore and aft, three masts, square sails
-function ship(s = 1) {
+function ship(s = 1, model = true) {
+  const P = PROPS.fresh();   // Meem's carrack, bow to +z like the code ship below, its keel 2.2 m under the water
+  if (model && P.add('ship_carrack', 0, -2.2, 0, Math.PI / 2, { s: 0.9 })) { const g = P.build(); g.scale.setScalar(s); return g; }
   const k = new Kit(), H = 0x4a3020, SAIL = 0xe8dcc0;
   k.box(7, 3, 24, H, [0, 1.2, 0]); k.box(5, 1.5, 22, H, [0, -0.6, 0]); k.box(6.6, 0.4, 24.2, 0x8a2a1a, [0, 2.4, 0]);
   k.box(6.4, 2.6, 6, 0x5a3a24, [0, 3.8, -9]); k.box(6, 2.2, 4, 0x5a3a24, [0, 3.6, 10]); k.box(3, 1.4, 4, H, [0, 2.4, 13.5], [0.3, 0, 0]);

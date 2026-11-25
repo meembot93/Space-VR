@@ -23,8 +23,9 @@ import { rng, noise2 } from '../shapes.js';
 import { glowPoints, textSprite, shatter, rumble, whoosh, awe, shimmer } from '../wow/fx.js';
 import { grove, bareTree, orchardTree, bush } from '../trees.js';
 import { loadProps } from '../props.js';
-// Meem's English cottage (models/props), waited for before the chapter builds
-const PROPS = await loadProps(['house_english', 'house_english_lo', 'lantern', 'book_set']);
+// Meem's models (models/props): the English cottage, lantern and books, Herrevad Abbey, Uraniborg and
+// a rail fence; waited for before the chapter builds
+const PROPS = await loadProps(['house_english', 'house_english_lo', 'lantern', 'book_set', 'herrevad_abbey', 'uraniborg', 'wood_fence']);
 import { D2R, ease, clamp01, at, sunAt, house, windows, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const N1 = noise2(91), N2 = noise2(93);
@@ -131,18 +132,27 @@ export default class Tycho {
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals(); A.add(new THREE.Mesh(g, FLAT));
     // Herrevad Abbey: a long brick church with a squat tower, the cloister range, the farm buildings
     const B = 0x8a4030, B2 = 0x7a3626, ROOF = 0x6a2a20, wins = [];
-    const ax = 60, az = 10;
-    k.box(40, 11, 12, B, [ax, 5.5, az]); k.add(gableRoof(40, 12, 9, 0.3), ROOF, [ax, 11, az]);
-    k.box(10, 24, 10, B2, [ax - 24, 12, az]); k.add(gableRoof(10, 10, 6, 0.3), ROOF, [ax - 24, 24, az]);
-    for (let i = 0; i < 7; i++) { k.box(1.4, 10, 1.6, B2, [ax - 17 + i * 5.6, 5, az - 6.6]); wins.push({ p: new THREE.Vector3(ax - 14.2 + i * 5.6, 6, az - 6.05), yaw: Math.PI }); }
-    k.box(30, 7, 9, B, [ax + 4, 3.5, az + 16]); k.add(gableRoof(30, 9, 6, 0.3), ROOF, [ax + 4, 7, az + 16]);
+    const ax = 60, az = 10, AP = PROPS.fresh();
+    if (AP.add('herrevad_abbey', ax, fieldsHeight(ax, az) - 0.2, az, Math.PI)) {   // Meem's abbey church, its porch toward you
+      k.box(30, 7, 9, B, [ax + 4, 3.5, az + 26]); k.add(gableRoof(30, 9, 6, 0.3), ROOF, [ax + 4, 7, az + 26]);   // the cloister range behind it
+    } else {
+      k.box(40, 11, 12, B, [ax, 5.5, az]); k.add(gableRoof(40, 12, 9, 0.3), ROOF, [ax, 11, az]);
+      k.box(10, 24, 10, B2, [ax - 24, 12, az]); k.add(gableRoof(10, 10, 6, 0.3), ROOF, [ax - 24, 24, az]);
+      for (let i = 0; i < 7; i++) { k.box(1.4, 10, 1.6, B2, [ax - 17 + i * 5.6, 5, az - 6.6]); wins.push({ p: new THREE.Vector3(ax - 14.2 + i * 5.6, 6, az - 6.05), yaw: Math.PI }); }
+      k.box(30, 7, 9, B, [ax + 4, 3.5, az + 16]); k.add(gableRoof(30, 9, 6, 0.3), ROOF, [ax + 4, 7, az + 16]);
+    }
     // Tycho's laboratory (the old brewery), with its chimney smoking
     house(k, { x: 28, y: 0, z: -8, w: 12, d: 8, h: 5, yaw: -Math.PI / 2, wall: 0xb07050, roofCol: 0x5a3a2a }, wins);
     house(k, { x: 38, y: 0, z: 30, w: 16, d: 8, h: 4, yaw: Math.PI, wall: 0xd0c0a0, roofCol: 0x6a5a3a, timber: 0x3a2a1c }, wins);
     house(k, { x: 16, y: 0, z: 26, w: 10, d: 7, h: 3.6, yaw: Math.PI, wall: 0xc8b898, roofCol: 0x7a6a3a, timber: 0x3a2a1c }, wins);
     this.labSmoke = makeSmoke(new THREE.Vector3(31, 10, -8), { n: 7, rise: 8, size: 1.2, opacity: 0.18, color: 0x9a9aa8 }); A.add(this.labSmoke.group);
     // a fence along the lane, bare trees, haystacks
-    for (let x = -12; x < 50; x += 2.4) { const z = 4 + Math.sin(x / 30) * 3 - 2.4; k.box(0.1, 1.1, 0.1, 0x4a3a2a, [x, fieldsHeight(x, z) + 0.55, z]); k.box(2.4, 0.08, 0.05, 0x5a4a3a, [x + 1.2, fieldsHeight(x, z) + 0.85, z]); }
+    const fz = (x) => 4 + Math.sin(x / 30) * 3 - 2.4;
+    if (AP.has('wood_fence')) for (let x = -12; x < 48; x += 2.9) {   // Meem's rail fence, a 3 m section at a time
+      const x1 = x + 2.9, mx = (x + x1) / 2, mz = (fz(x) + fz(x1)) / 2;
+      AP.add('wood_fence', mx, fieldsHeight(mx, mz) - 0.05, mz, -Math.atan2(fz(x1) - fz(x), 2.9), { h: 1.2 });
+    }
+    else for (let x = -12; x < 50; x += 2.4) { const z = fz(x); k.box(0.1, 1.1, 0.1, 0x4a3a2a, [x, fieldsHeight(x, z) + 0.55, z]); k.box(2.4, 0.08, 0.05, 0x5a4a3a, [x + 1.2, fieldsHeight(x, z) + 0.85, z]); }
     // bare November trees: a few detailed ones near the lane, the rest a cheap grove
     const near = [], far = [];
     for (let i = 0; i < 90; i++) {
@@ -153,7 +163,7 @@ export default class Tycho {
     A.add(grove(bareTree, near, { detail: 'mid', variants: 4, seed: 3, height: 9 }).group);
     A.add(grove(bareTree, far, { detail: 'low', variants: 4, seed: 5, height: 9 }).group);
     for (let i = 0; i < 8; i++) { const x = -30 - r() * 60, z = -20 - r() * 60; k.cyl(0.4, 2.2, 3, 8, 0x8a7a4a, [x, fieldsHeight(x, z) + 1.5, z]); }
-    A.add(k.mesh());
+    A.add(k.mesh(), AP.build({ glow: 0x231c16 }));
     A.add(windows(wins, { lit: 0.55, seed: 2 }));
     this.life = new Life(this.root);
     this.cowsA = this.life.add(makeHerd('cow', { n: 5, area: { x: -40, z: 40, r: 18 }, height: fieldsHeight, seed: 4 }));
@@ -186,20 +196,23 @@ export default class Tycho {
     // Uraniborg: red brick with pale sandstone corners, a square main house, round towers north and
     // south with observing platforms and conical roofs, a tall middle tower with an onion-ish spire
     const RB = 0xa0482e, SS = 0xd8c8a0, CU = 0x4a8070, wins = [], X = CASTLE.x, Z = CASTLE.z;
-    k.box(16, 10, 16, RB, [X, 5, Z]);
-    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(0.9, 10.2, 0.9, SS, [X + sx * 8, 5.1, Z + sz * 8]);
-    k.box(16.4, 0.5, 16.4, SS, [X, 10.2, Z]);
-    k.add(gableRoof(16, 16, 6, 0.4), 0x6a3426, [X, 10.4, Z]); k.add(gableRoof(16, 16, 6, 0.4).rotateY(Math.PI / 2), 0x6a3426, [X, 10.4, Z]);
-    for (const s of [-1, 1]) { // east and west wings with gables and a lantern, and the north/south towers
-      k.box(6, 8, 10, RB, [X + s * 11, 4, Z]); k.add(gableRoof(6, 10, 4, 0.3).rotateY(Math.PI / 2), 0x6a3426, [X + s * 11, 8, Z]);
-      k.cyl(4, 4, 11, 16, RB, [X, 5.5, Z + s * 11]); k.cyl(4.3, 4.3, 0.4, 16, SS, [X, 11.2, Z + s * 11]);
-      for (let i = 0; i < 16; i++) { const a = i / 16 * 6.28; k.box(0.15, 1, 0.15, SS, [X + Math.cos(a) * 4.1, 11.9, Z + s * 11 + Math.sin(a) * 4.1]); }
-      k.cyl(0.001, 4.2, 5, 16, CU, [X, 14.5, Z + s * 11]);
-      for (let i = 0; i < 3; i++) for (let j = 0; j < 8; j++) { const a = j / 8 * 6.28; wins.push({ p: new THREE.Vector3(X + Math.cos(a) * 4.02, 2.5 + i * 3, Z + s * 11 + Math.sin(a) * 4.02), yaw: Math.PI / 2 - a }); }
+    const UP = PROPS.fresh();   // Meem's Uraniborg, its front toward you (the code-built one if it's missing)
+    if (!UP.add('uraniborg', X, -0.1, Z, 0)) {
+      k.box(16, 10, 16, RB, [X, 5, Z]);
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(0.9, 10.2, 0.9, SS, [X + sx * 8, 5.1, Z + sz * 8]);
+      k.box(16.4, 0.5, 16.4, SS, [X, 10.2, Z]);
+      k.add(gableRoof(16, 16, 6, 0.4), 0x6a3426, [X, 10.4, Z]); k.add(gableRoof(16, 16, 6, 0.4).rotateY(Math.PI / 2), 0x6a3426, [X, 10.4, Z]);
+      for (const s of [-1, 1]) { // east and west wings with gables and a lantern, and the north/south towers
+        k.box(6, 8, 10, RB, [X + s * 11, 4, Z]); k.add(gableRoof(6, 10, 4, 0.3).rotateY(Math.PI / 2), 0x6a3426, [X + s * 11, 8, Z]);
+        k.cyl(4, 4, 11, 16, RB, [X, 5.5, Z + s * 11]); k.cyl(4.3, 4.3, 0.4, 16, SS, [X, 11.2, Z + s * 11]);
+        for (let i = 0; i < 16; i++) { const a = i / 16 * 6.28; k.box(0.15, 1, 0.15, SS, [X + Math.cos(a) * 4.1, 11.9, Z + s * 11 + Math.sin(a) * 4.1]); }
+        k.cyl(0.001, 4.2, 5, 16, CU, [X, 14.5, Z + s * 11]);
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 8; j++) { const a = j / 8 * 6.28; wins.push({ p: new THREE.Vector3(X + Math.cos(a) * 4.02, 2.5 + i * 3, Z + s * 11 + Math.sin(a) * 4.02), yaw: Math.PI / 2 - a }); }
+      }
+      k.cyl(2.4, 2.6, 8, 12, RB, [X, 18, Z]); k.cyl(2.8, 2.8, 0.4, 12, SS, [X, 22.2, Z]);
+      k.ball(2.4, 1, CU, [X, 23.6, Z], 0, [1, 1.1, 1]); k.cyl(0.001, 0.7, 6, 8, CU, [X, 27.5, Z]); k.ball(0.35, 0, 0xe0b040, [X, 30.6, Z]);
+      for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { wins.push({ p: new THREE.Vector3(X - 6 + i * 4, 3, Z + s * 8.03), yaw: s > 0 ? 0 : Math.PI }); wins.push({ p: new THREE.Vector3(X - 6 + i * 4, 7, Z + s * 8.03), yaw: s > 0 ? 0 : Math.PI }); }
     }
-    k.cyl(2.4, 2.6, 8, 12, RB, [X, 18, Z]); k.cyl(2.8, 2.8, 0.4, 12, SS, [X, 22.2, Z]);
-    k.ball(2.4, 1, CU, [X, 23.6, Z], 0, [1, 1.1, 1]); k.cyl(0.001, 0.7, 6, 8, CU, [X, 27.5, Z]); k.ball(0.35, 0, 0xe0b040, [X, 30.6, Z]);
-    for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { wins.push({ p: new THREE.Vector3(X - 6 + i * 4, 3, Z + s * 8.03), yaw: s > 0 ? 0 : Math.PI }); wins.push({ p: new THREE.Vector3(X - 6 + i * 4, 7, Z + s * 8.03), yaw: s > 0 ? 0 : Math.PI }); }
     // The garden wall, as Tycho built it: a square about 75 m a side, turned so its corners point
     // north, south, east and west. Red brick on a sandstone plinth, with sandstone bands, pilasters
     // and coping; a half-round bay bulging out of the middle of every side (each with a little
@@ -298,7 +311,7 @@ export default class Tycho {
     // The terrace where you stand, and the great mural quadrant on its wall
     k.box(12, 0.25, 9, 0x8a8478, [0, -0.11, 0]);   // top at the people's feet
     k.box(0.6, 3.4, 4.2, RB, [QUAD.x - 0.35, 1.7, QUAD.z - 0.4]); k.box(0.7, 0.3, 4.4, SS, [QUAD.x - 0.35, 3.5, QUAD.z - 0.4]);
-    Bg.add(k.mesh(), VP.build({ glow: 0x231c16 }));
+    Bg.add(k.mesh(), VP.build({ glow: 0x231c16 }), UP.build({ glow: 0x231c16 }));
     Bg.add(windows(wins, { lit: 0.6, seed: 6 }));
     for (const L of this.gateLamps || []) Bg.add(L);
     // the quadrant: a brass quarter circle (radius 1.9 m) on the wall, centred at its top corner
