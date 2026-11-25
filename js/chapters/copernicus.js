@@ -27,7 +27,7 @@ import { glowPoints } from '../wow/fx.js';
 import { grove, deciduousTree, bareTree, conifer } from '../trees.js';
 import { loadProps } from '../props.js';
 // Meem's models (models/props): the brick town house with its stepped gable, a barrel and a small boat, the
-// cathedral, Copernicus's desk under its lean-to, the triquetrum, a handcart and the carracks; waited for before the chapter builds
+// cathedral, Copernicus's desk under its lean-to, the triquetrum, a handcart and a carrack; waited for before the chapter builds
 const PROPS = await loadProps(['house_north', 'house_north_lo', 'boat_small', 'barrel', 'crate_basket_set', 'frombork_cathedral', 'copernicus_desk', 'triquetrum', 'handcart', 'ship_carrack']);
 import { D2R, ease, clamp01, at, sunAt, house, windows, steppedGable, gableRoof, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
@@ -427,8 +427,8 @@ export default class Copernicus {
       const b = bk.mesh(); b.position.set(-48 + (i % 2) * 16 + r() * 2, WATER + 0.25, -170 - i * 9); b.rotation.y = (r() - 0.5) * 0.3; b.userData.ph = r() * 6;
       this.root.add(b); this.boats.push(b);
     }
-    // two of Meem's carracks riding at anchor out past the pier (they bob with the boats)
-    for (const [x, z, yaw, ph] of [[-92, -232, 0.35, 1.3], [-4, -246, -0.5, 4.1]]) {
+    // Meem's carrack riding at anchor out past the pier (it bobs with the boats)
+    for (const [x, z, yaw, ph] of [[-30, -240, -0.5, 4.1]]) {   // (one: each is 14k triangles)
       const sp = PROPS.fresh(); if (!sp.add('ship_carrack', 0, -2.6, 0, 0)) break;
       const b = sp.build({ glow: 0x231c16 }); b.position.set(x, WATER + 0.25, z); b.rotation.y = yaw; b.userData.ph = ph;
       this.root.add(b); this.boats.push(b);

@@ -163,7 +163,7 @@ export default class Tycho {
     A.add(grove(bareTree, near, { detail: 'mid', variants: 4, seed: 3, height: 9 }).group);
     A.add(grove(bareTree, far, { detail: 'low', variants: 4, seed: 5, height: 9 }).group);
     for (let i = 0; i < 8; i++) { const x = -30 - r() * 60, z = -20 - r() * 60; k.cyl(0.4, 2.2, 3, 8, 0x8a7a4a, [x, fieldsHeight(x, z) + 1.5, z]); }
-    A.add(k.mesh(), AP.build());
+    A.add(k.mesh(), AP.build({ glow: 0x231c16 }));
     A.add(windows(wins, { lit: 0.55, seed: 2 }));
     this.life = new Life(this.root);
     this.cowsA = this.life.add(makeHerd('cow', { n: 5, area: { x: -40, z: 40, r: 18 }, height: fieldsHeight, seed: 4 }));
