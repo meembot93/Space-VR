@@ -40,7 +40,8 @@ function roof(k, w, d, rise, color, p, yaw) {
 function house(k, x, y, z, w, d, h, yaw, r) {
   const c = Math.cos(yaw), s = Math.sin(yaw), wall = WHITE[Math.floor(r() * WHITE.length)];
   // within 100 m: Meem's model (it has its own roof, door and windows); past that, these simple shapes
-  if (k.P && Math.hypot(x, z) < 100 && k.P.add('house_greek_lo', x, y, z, yaw, { w, d, h: h + 2 })) { r(); r(); return; }
+  // (no wider than 8.8 m, so neighbours on the 11 m grid, jittered up to 1.5 m, never run into each other)
+  if (k.P && Math.hypot(x, z) < 100 && k.P.add('house_greek_lo', x, y, z, yaw, { w: Math.min(w, 8.8), d: Math.min(d, 8.8), h: h + 2 })) { r(); r(); return; }
   k.box(w, h + 1.5, d, wall, [x, y + (h - 1.5) / 2, z], [0, yaw, 0]);
   roof(k, w + 0.5, d + 0.7, d * 0.28, r() < 0.5 ? TILE : TILE2, [x, y + h, z], yaw);
   // door and a small dark window on the street side
@@ -257,7 +258,8 @@ export function buildAthens({ H, temple, colonnade, avoid }) {
     if (near) continue;
     grid.set(key, 1); placed++;
     const w = 6 + r() * 4.5, d = 6 + r() * 3, h = 3 + (r() < 0.35 ? 2.8 : 0) + r() * 0.6, y = H(x, z) - 0.3;
-    house(city, x, y, z, w, d, h, -GY + (r() < 0.5 ? 0 : Math.PI) + (r() - 0.5) * 0.06, r);
+    // (turned square to the street grid: a yaw of +GY lines a house's sides up with the grid's u and v)
+    house(city, x, y, z, w, d, h, GY + (r() < 0.5 ? 0 : Math.PI) + (r() - 0.5) * 0.06, r);
     if (r() < 0.22) windows.push(new THREE.Vector3(x + (r() - 0.5) * 4, y + 1.6 + r() * 2, z + (r() - 0.5) * 4));
   }
 

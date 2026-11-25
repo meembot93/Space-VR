@@ -315,9 +315,13 @@ export default class Stonehenge {
   buildVillage() {
     const k = new Kit(), r = rng(13), center = at(150, 165), G = this.G, P = PROPS.fresh();
     // Round houses: wattle-and-daub walls, tall thatched cone roofs, a dark doorway (toward the stones)
-    for (let i = 0; i < 9; i++) {
-      const a = r() * 6.28, d = 8 + r() * 26, x = center.x + Math.cos(a) * d, z = center.z + Math.sin(a) * d, y = groundHeight(x, z);
+    // (each house reaches rad + 0.6 out at the eaves: a new one keeps clear of those already placed)
+    const placed = [];
+    for (let i = 0, tries = 0; i < 9 && tries < 200; tries++) {
+      const a = r() * 6.28, d = 8 + r() * 30, x = center.x + Math.cos(a) * d, z = center.z + Math.sin(a) * d, y = groundHeight(x, z);
       const rad = 3.2 + r() * 1.6, wall = 1.5 + r() * 0.3;
+      if (placed.some((h) => Math.hypot(h.x - x, h.z - z) < h.rad + rad + 2.4)) continue;
+      placed.push({ x, z, rad }); i++;
       const toC = Math.atan2(-x, -z);
       if (!P.add('roundhouse', x, y - 0.1, z, toC, { w: (rad + 0.6) * 2, d: (rad + 0.6) * 2, h: wall + rad * 1.15 + 0.1 })) {
         k.cyl(rad, rad, wall, 22, 0xb8a07a, [x, y + wall / 2, z]);

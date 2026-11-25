@@ -672,8 +672,9 @@ export default class Antikythera {
     const prof = [[0, 0], [0.025, 0.02], [0.055, 0.1], [0.12, 0.33], [0.14, 0.47], [0.115, 0.6], [0.05, 0.68], [0.04, 0.82], [0.055, 0.85], [0.03, 0.86]].map(([x, y]) => new THREE.Vector2(x, y));
     const ak = new Kit(); ak.add(new THREE.LatheGeometry(prof, 9), 0xffffff);
     for (const s of [-1, 1]) ak.add(new THREE.TorusGeometry(0.06, 0.012, 4, 8, Math.PI), 0xffffff, [s * 0.07, 0.72, 0], [0, 0, s > 0 ? -Math.PI / 2 : Math.PI / 2]);
-    // (the first 14, piled in the middle of the wreck, are Meem's jars; the rest are code-built ones)
-    const NA = 46, NM = SP.has('amphora') ? 14 : 0, amph = new THREE.InstancedMesh(ak.geometry(), addCaustics(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), this.uTime), NA - NM);
+    // (all 40 are Meem's jars if it loaded, about 2.5k triangles each; else 46 code-built ones. Mixed,
+    // the faceted code jars looked wrong beside the model's)
+    const NA = SP.has('amphora') ? 40 : 46, NM = SP.has('amphora') ? NA : 0, amph = new THREE.InstancedMesh(ak.geometry(), addCaustics(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), this.uTime), NA - NM);
     const mm = new THREE.Matrix4(), cc = new THREE.Color();
     for (let i = 0; i < NA; i++) {
       const pile = i < 20, [x, z] = pile ? at(2 + (r() - 0.5) * 4, (r() - 0.5) * 2.2) : at((r() - 0.5) * 18, (r() - 0.5) * 9);
@@ -685,7 +686,7 @@ export default class Antikythera {
       mm.compose(_b.set(x, y, z), _q, _c.setScalar(sc)); amph.setMatrixAt(i - NM, mm);
       amph.setColorAt(i - NM, cc.setHex(0xb0643a).lerp(new THREE.Color(r() < 0.4 ? 0x6a6a48 : 0x8a5a3a), r() * 0.6));
     }
-    S.add(amph);
+    if (NA > NM) S.add(amph);
     // Glass bowls (some of the cargo) and bronze coins scattered among the timbers
     const bowl = new THREE.LatheGeometry([[0, 0], [0.06, 0.005], [0.09, 0.04], [0.095, 0.05], [0.088, 0.05], [0.05, 0.012], [0, 0.01]].map(([x, y]) => new THREE.Vector2(x, y)), 12);
     const glass = new THREE.InstancedMesh(bowl, new THREE.MeshLambertMaterial({ color: 0x7fd0c0, emissive: 0x0a3a3a, transparent: true, opacity: 0.6, side: THREE.DoubleSide }), 7);

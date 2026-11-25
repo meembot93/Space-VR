@@ -259,12 +259,15 @@ export default class Babylon {
     const RIVER = -150, riverW = 34;
     const MUD = [0x9a8262, 0xa38a68, 0x8f7758, 0xb09774, 0x86705a];
     // Houses: flat mudbrick roofs on a rough grid of streets, all the way out to the city walls
+    // the Ishtar Gate model's footprint (built below at x 112 on the north wall, 25 m tall): no house in it
+    const GS = PROPS.size('babylon_gate'), gHW = GS ? GS.x * 25 / GS.y / 2 + 1 : 0, gHD = GS ? GS.z * 25 / GS.y / 2 + 1 : 0;
     for (let gx = -436; gx <= 436; gx += 15) for (let gz = -436; gz <= 436; gz += 15) {
       const x = gx + (r() - 0.5) * 4, z = gz + (r() - 0.5) * 4;
       if (inTemenos(x, z) || Math.abs(x - RIVER) < riverW + 14 || Math.abs(x - 112) < 9 || r() < 0.22) continue;
       if (Math.hypot(x - 0, z - 170) < 55 || Math.hypot(x + 85, z + 300) < 70) continue; // the big temple and the palace
       const w = 8 + r() * 5, d = 8 + r() * 5, h = 3.2 + r() * (r() < 0.25 ? 5 : 2.5), col = MUD[r() * 5 | 0];
       const yaw = (r() - 0.5) * 0.12;
+      if (GS && Math.abs(x - 112) < gHW + w / 2 && Math.abs(z + 440) < gHD + d / 2) continue;
       if (PROPS.has('house_mudbrick_lo') && Math.hypot(x, z - ZIG_Z) < 175) {
         // nearer houses: Meem's mud-brick house (it has its own roof room and door, facing +z)
         PROPS.add('house_mudbrick_lo', x, BASE, z, yaw, { w, d, h: h + 1.2 });
@@ -564,13 +567,16 @@ export default class Babylon {
       m.compose(_a.set(x, y, SHELF_Z + 0.02), _q, _b.set(1, 0.9 + r() * 0.25, 1)); shelfTabs.setMatrixAt(n, m);
       shelfTabs.setColorAt(n++, cc.setHex(0xb89a72).multiplyScalar(0.75 + r() * 0.35));
     }
-    // a row drying on the east parapet's ledge (Meem's clay tablet, lying face up, if it loaded)
+    // a row drying on top of the east parapet (Meem's clay tablet, lying face up, if it loaded): two
+    // side by side in each gap between the battlements (wall top 0.8 m, battlements every 0.9 m from 0.4 m)
     const DP = PROPS.fresh();
     for (let i = 0; i < 24; i++) {
-      const rz = (r() - 0.5) * 0.3, dx = (r() - 0.5) * 0.08;
-      if (DP.add('clay_tablet_lo', 9.25 + dx, 0.93, ZIG_Z - 4 + i * 0.32, 0, { w: 0.13, tilt: [-Math.PI / 2, rz] })) continue;
+      const rz = (r() - 0.5) * 0.3, dx = (r() - 0.5) * 0.03, x = 9.8 + (i & 1 ? 0.11 : -0.11) + dx;
+      const z = ZIG_Z - 11 + 0.85 + 0.9 * (6 + (i >> 1));   // the middle of a gap
+      // (the model lies down from its foot toward -z: set its foot half a tablet past the gap's middle)
+      if (DP.add('clay_tablet_lo', x, 0.805, z + 0.06, 0, { w: 0.13, tilt: [-Math.PI / 2, rz] })) continue;
       _q.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, rz));
-      m.compose(_a.set(9.25 + dx, 0.96, ZIG_Z - 4 + i * 0.32), _q, _b.set(1, 1, 1)); shelfTabs.setMatrixAt(n, m);
+      m.compose(_a.set(x, 0.82, z + 0.085), _q, _b.set(1, 1, 1)); shelfTabs.setMatrixAt(n, m);
       shelfTabs.setColorAt(n++, cc.setHex(0x9e7c56).multiplyScalar(0.8 + r() * 0.2));
     }
     shelfTabs.count = n; void keep;
