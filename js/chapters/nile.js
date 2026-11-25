@@ -24,8 +24,10 @@ import { dirFromAzEl } from '../sky.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { makeJournalPage } from '../journal.js';
 import { loadProps } from '../props.js';
-// Meem's mud-brick house, reed boat stand-in and jars (models/props), waited for before the chapter builds
-const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'amphora', 'crate_basket_set']);
+// Meem's mud-brick house, jars, reed boats, granaries, temple gateway and Sphinx (models/props),
+// waited for before the chapter builds (each falls back to the old code shapes if it is missing)
+const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'amphora', 'crate_basket_set', 'reed_boat_lo', 'granary', 'granary_lo', 'temple_pylon', 'sphinx'],
+  { sphinx: { z: 52, turn: 90 } });
 import { grove, palm as palmTree } from '../trees.js';
 
 const D2R = Math.PI / 180;
@@ -442,19 +444,23 @@ export default class Nile {
       // east of you, houses stay low so the view to the horizon is clear
       const h = Math.hypot(x, z) < 40 ? 3.2 + r() * 1.2 : 3.2 + r() * 2.8;
       house(x, z, 7 + r() * 3, 7 + r() * 3, h, (r() - 0.5) * 0.12);
-      if (r() < 0.06) { const gy = groundHeight(x + 6, z); k.cyl(0.1, 1.6, 3.4, 10, 0xc0a074, [x + 6, gy + 1.7, z]); }
+      // now and then a round mud granary in the yard
+      if (r() < 0.06) { const gy = groundHeight(x + 6, z); if (!P.add(Math.hypot(x + 6, z) < 60 ? 'granary' : 'granary_lo', x + 6, gy - 0.1, z, -Math.PI / 2, { w: 3.0, h: 3.6 })) k.cyl(0.1, 1.6, 3.4, 10, 0xc0a074, [x + 6, gy + 1.7, z]); }
     }
     // the temple: whitewashed walls round a courtyard, a gateway, to the north of the village
     const tz = -230, tx = -150, ty = groundHeight(tx, tz);
     for (const [ox, oz, w, d] of [[0, -32, 60, 2], [0, 32, 60, 2], [-30, 0, 2, 64], [30, 0, 2, 64]]) k.box(w, 6, d, WHITE, [tx + ox, ty + 3, tz + oz]);
-    k.box(20, 10, 4, WHITE, [tx, ty + 5, tz + 32]); k.box(4, 7, 4.4, DARK, [tx, ty + 3.5, tz + 32]);
+    // its gateway (pylon) facing the village
+    if (!P.add('temple_pylon', tx, ty - 0.2, tz + 32.5, 0, { w: 24 })) { k.box(20, 10, 4, WHITE, [tx, ty + 5, tz + 32]); k.box(4, 7, 4.4, DARK, [tx, ty + 3.5, tz + 32]); }
     k.box(18, 9, 14, WHITE, [tx, ty + 4.5, tz - 12]);
     this.lampSpots.push(new THREE.Vector3(tx - 4, ty + 3, tz + 35), new THREE.Vector3(tx + 4, ty + 3, tz + 35));
     // reed boats pulled up on the river bank
     for (let i = 0; i < 9; i++) {
       const z = -200 + i * 47 + r() * 20, x = riverX(z) - RIVER_W - 4 + r() * 3, y = groundHeight(x, z);
+      const yaw = Math.PI / 2 + (r() - 0.5) * 0.4;
+      if (P.add('reed_boat_lo', x, y - 0.05, z, yaw, { w: 6.5 })) continue;
       const b = new THREE.CylinderGeometry(0.5, 0.5, 6, 8, 1, false, 0, Math.PI); b.rotateZ(Math.PI / 2); b.rotateX(Math.PI); b.scale(1, 0.55, 1);
-      k.add(b, 0xb79a5a, [x, y + 0.35, z], [0, Math.PI / 2 + (r() - 0.5) * 0.4, 0]);
+      k.add(b, 0xb79a5a, [x, y + 0.35, z], [0, yaw, 0]);
     }
     this.village = k.mesh(); this.egypt.add(this.village);
     this.egypt.add(P.build());
@@ -588,11 +594,16 @@ export default class Nile {
     // the Sphinx: a lion lying down with a king's head, carved from the bedrock, looking east
     {
       const sx = -640 + OX, sz = -160, sy = base0(sx, sz, 30);
+      // Meem's Sphinx, 52 m long, its face to the east (turned to face +z, then yawed east)
+      const SP = PROPS.fresh();
+      if (SP.add('sphinx', sx - 3, sy + 0.3, sz, Math.PI / 2, { d: 52 })) this.egypt.add(SP.build({ glow: 0x1a1712 }));
+      else {
       plain.box(46, 6, 15, 0xc8a878, [sx - 8, sy + 3, sz]);                      // the rock cut round it
       plain.box(36, 11, 12, 0xd2b484, [sx - 6, sy + 9, sz]);                     // body
       plain.box(18, 4, 4, 0xd2b484, [sx + 18, sy + 5, sz - 3.5]); plain.box(18, 4, 4, 0xd2b484, [sx + 18, sy + 5, sz + 3.5]); // paws
       plain.box(9, 11, 9, 0xd2b484, [sx + 8, sy + 18, sz]);                      // chest and head
       plain.add(new THREE.CylinderGeometry(2, 7.5, 10, 4, 1), 0xc0a070, [sx + 7, sy + 19, sz], [0, Math.PI / 4, 0], [0.7, 1, 1.4]); // the nemes headdress
+      }
       plain.box(40, 12, 34, 0xd8cbaa, [sx + 45, sy + 6, sz]);                    // the Sphinx temple in front
     }
     // the valley temples at the edge of the green, where boats tied up
@@ -716,8 +727,13 @@ export default class Nile {
     this.boats = [];
     for (let i = 0; i < 4; i++) {
       const k = new Kit(), g = new THREE.Group();
-      k.cyl(0.35, 0.25, 5.2, 8, 0xb8a060, [0, 0.15, 0], [Math.PI / 2, 0, 0], [1, 1, 0.55]);   // a bundle of papyrus reeds
-      k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, 2.8], [Math.PI / 2 - 0.6, 0, 0]); k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, -2.8], [-Math.PI / 2 + 0.6, 0, 0]);
+      const RB = PROPS.models.reed_boat_lo;
+      if (RB) {   // Meem's reed boat, 6.5 m long along the drift (z)
+        const m = new THREE.Mesh(RB.geometry, RB.material); m.rotation.y = Math.PI / 2; m.scale.setScalar(6.5 / RB.size.x); m.position.y = -0.2; g.add(m);
+      } else {
+        k.cyl(0.35, 0.25, 5.2, 8, 0xb8a060, [0, 0.15, 0], [Math.PI / 2, 0, 0], [1, 1, 0.55]);   // a bundle of papyrus reeds
+        k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, 2.8], [Math.PI / 2 - 0.6, 0, 0]); k.cyl(0.18, 0.05, 1.2, 6, 0xb8a060, [0, 0.5, -2.8], [-Math.PI / 2 + 0.6, 0, 0]);
+      }
       k.cyl(0.03, 0.03, 3.2, 4, 0x5a4030, [0.3, 1.0, -1.2], [0.5, 0, 0.2]);                // the pole
       k.cyl(0.2, 0.26, 0.9, 6, 0xe8e0cc, [0, 0.75, -1], 0); k.ball(0.14, 1, 0x7a4e32, [0, 1.35, -1]);   // the fisherman, seated
       g.add(k.mesh());
