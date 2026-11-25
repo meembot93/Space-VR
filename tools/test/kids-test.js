@@ -34,6 +34,14 @@ const ASKS = /\b(walk|touch|click|point|turn|pull|grab|ring|hold|press|look|foll
       G.music.moment = (name, v) => { if (name.startsWith('ch')) __music.push(`${name} during ${G.narration.cur?.id || G.director.chapter?.s?.phase}`); return mo(name, v); };
     });
     const kids = await page.evaluate(() => G.kids);
+    // Meem's rule: Wernher von Braun is at the Sputnik launch and in the final circle, in his own model
+    if (n === 14) {
+      const vb = await page.evaluate(() => { const c = G.director.chapter; return { crowd: !!c.crowd?.some((P) => P.name === 'von_braun'), ring: !!c.ringEchoes?.some((E) => E.vb) }; });
+      check(vb.crowd && vb.ring, `Chapter 14: von Braun in the launch crowd (${vb.crowd}) and the final circle (${vb.ring})`);
+      // and everyone is treated the same: each launch-crowd person also stands in the final circle
+      const miss = await page.evaluate(() => { const c = G.director.chapter, ring = new Set(c.ringEchoes.map((E) => E.who)); return c.crowd.map((P) => P.name).filter((n) => !ring.has(n)); });
+      check(miss.length === 0, `Chapter 14: everyone at the launch is in the final circle${miss.length ? ' (missing: ' + miss.join(', ') + ')' : ''}`);
+    }
     const ok = await page.waitForFunction(() => window.__ended, null, { timeout: 1200000, polling: 250 }).then(() => true, () => false);
     const r = await page.evaluate(() => ({ hints: __hints, phase: G.director.chapter?.s?.phase, music: __music }));
     const asks = r.hints.filter((h) => ASKS.test(h));
