@@ -1614,9 +1614,9 @@ export default class Sputnik {
       let ry = yaw - P.g.rotation.y; ry = Math.atan2(Math.sin(ry), Math.cos(ry)); P.g.rotation.y += ry * Math.min(1, dt * 3);
       // what they do
       const named = P.namedT != null ? G.t - P.namedT : 99;
-      // von Braun turns to you while he's named, so you see his face (Meem wants him seen here)
+      // von Braun turns to you and nods while he's named, so you see his face (Meem wants him seen here)
       if (!pair && P.name === 'von_braun' && named < 4) { yaw = toMe; let r2 = yaw - P.g.rotation.y; r2 = Math.atan2(Math.sin(r2), Math.cos(r2)); P.g.rotation.y += r2 * Math.min(1, dt * 3); }
-      if (!pair && P.name === 'von_braun' && named < 4) { P.pose = 'wave'; P.look = me.clone(); }
+      if (!pair && P.name === 'von_braun' && named < 4) { P.pose = 'idle'; P.look = me.clone(); }   // arms down: just looks at you and nods (a raised arm could read as a salute)
       else if (pair) { P.pose = 'hold'; P.look = other.g.position.clone().add(this.site.position).setY(1.6); }
       else if (lr < 0) { P.pose = this.meetV > 0.5 && P.i % 5 === 0 ? 'wave' : 'idle'; P.look = this.meetV > 0.3 ? me.clone() : rocketTop.clone(); }
       else { P.pose = lr < 2.5 ? 'idle' : lr < 6 ? (P.i % 3 ? 'gasp' : 'point') : P.i % 3 === 0 ? 'point' : P.i % 3 === 1 ? 'cheer' : 'wave'; P.look = rocketTop.clone(); }
