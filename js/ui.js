@@ -91,6 +91,8 @@ export class UI {
   fadeOut(secs = 1) { return this.fadeTarget(1, secs); }
   fadeIn(secs = 1.5) { return this.fadeTarget(0, secs); }
   fadeTarget(v, secs) {
+    // a story fade ends any bird's-eye peek at once, so the next scene is laid out round you on the ground
+    if (v > 0) this.G.player?.endPeek?.();
     this.fadeTo = v; this.fadeSpeed = 1 / Math.max(0.01, secs);
     return new Promise((ok) => { this.fadeDone = ok; if (this.fade === v) { this.fadeDone = null; ok(); } });
   }

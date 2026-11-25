@@ -77,6 +77,12 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
   check(beam, 'a beam of light marks where you stand');
   await settle(5.5);
   e = await eye(); check(Math.abs(e - 1.75) < 0.05, `the peek ends back on the ground, height not reset (${e} m)`);
+  // a story fade (a scene change) ends a peek straight away
+  await page.evaluate(() => __xr.controllers.right.updateButtonValue('thumbstick', 1)); await settle(0.3);
+  await page.evaluate(() => __xr.controllers.right.updateButtonValue('thumbstick', 0)); await settle(1.0);
+  await page.evaluate(() => { G.ui.fadeOut(0.3); }); await settle(0.1);
+  e = await eye(); check(Math.abs(e - 1.75) < 0.05, `a scene fade brings you straight back down from a peek (${e} m)`);
+  await page.evaluate(() => G.ui.fadeIn(0.3)); await settle(0.5);
   await holdStick('right');
   e = await eye(); check(Math.abs(e - 1.6) < 0.05, `right thumbstick works too (${e} m)`);
 
