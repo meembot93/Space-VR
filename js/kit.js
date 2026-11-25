@@ -50,6 +50,8 @@ export class Kit {
   }
 
   geometry() {
+    // (nothing added, e.g. every shape was replaced by one of Meem's models: an empty geometry)
+    if (!this.parts.length) { const e = new THREE.BufferGeometry(); e.setAttribute('position', new THREE.Float32BufferAttribute([], 3)); e.computeBoundingSphere(); return e; }
     const g = mergeGeometries(this.parts, false);
     for (const p of this.parts) p.dispose();
     this.parts = [];
