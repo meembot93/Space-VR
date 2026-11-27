@@ -11,3 +11,6 @@ cloud session, so nothing needs installing on Meem's Mac. Output is plain GLB, s
 - `view.html?file=out/x.glb&az=30&el=10`: look at a GLB in the game's renderer (run a local server at the repo root).
 
 Outputs go to `out/` (not committed).
+- `export_scene.js` + `venice_set.py`: the Venice set for ch11 (models/sets/venice.glb). Pulls the code-built
+  city out of the game, rebuilds the islands with straight stone quays, bakes soft shadows, and drops every
+  face you can't see from the belfry or the bird's-eye peek. `?noset` in the URL shows the old one.
