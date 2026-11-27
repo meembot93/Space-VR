@@ -66,8 +66,9 @@ if target and cur > target:
 bpy.context.view_layer.objects.active = body
 body.select_set(True)
 bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
-bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
-bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
+if body.vertex_groups:   # (animals come unrigged: nothing to limit)
+    bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
+    bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
 bpy.ops.object.mode_set(mode='OBJECT')
 
 for im in bpy.data.images:
