@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 46;
-export const CHANGES = ['Real Kennedy Moon speech clips'];
+export const VERSION = 47;
+export const CHANGES = ['Era 3 chapter 3 voice lines in'];
