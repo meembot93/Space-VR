@@ -8,14 +8,14 @@ How to record:
 - Real people's lines: record them clean, in a voice that fits (American astronauts, a Russian accent for the cosmonauts and Korolev). I add the crackly radio sound in the game, so don't add it in ElevenLabs.
 - Lines marked **Russian** are spoken in Russian, exactly as written; Astra says what they mean right after.
 - **(Adults only)** lines play only in Adults mode; **(Kids only)** only in Kids mode. Everything else plays in both.
-- Kennedy's Rice Stadium lines (1962) should sound like an outdoor speech to a big crowd.
+- Kennedy's Rice Stadium lines (1962) are cut from the real speech recording, so skip them. Only ch17_08 (his 1961 speech to Congress) still needs a voice.
 
 Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `narration/ch16`, ... `narration/ch35`.
 
 ## Voices to pick in ElevenLabs
 
 - **Astra**: your same Astra voice from Eras 1 and 2.
-- **Kennedy**: President John F. Kennedy, Boston accent, big outdoor speech.
+- **Kennedy**: only ch17_08 is needed (Boston accent, formal speech to Congress). His Rice Stadium lines come from the real 1962 recording.
 - **Russian accent**: Korolev (gruff, older chief designer), Gagarin (warm, cheerful), Tereshkova (bright, young), Leonov (friendly, artist), Gazenko (gentle animal trainer).
 - **German accent**: von Braun (confident, enthusiastic).
 - **American astronauts**: Shepard (cocky), Glenn (earnest), Carpenter, Ed White, Stafford, Scott, Borman, Lovell, Anders, Collins (dry humour), Armstrong (calm, quiet), Aldrin, Swigert, Haise, Mattingly, Slayton (gravelly), Cernan.
@@ -115,9 +115,9 @@ Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `n
 | ch17_21 | Glenn | That was a real fireball, boy. |
 | ch17_22 | Astra | Pieces of the rocket pack burned and flew past his window. But the heat shield held. Splashdown. And in New York, a parade, with paper raining down from every window. |
 | ch17_23 | Astra | The twelfth of September, 1962. Rice Stadium, in Houston, Texas. It's hot, and forty thousand people are fanning themselves with their programmes. Look, there's John Glenn. And von Braun. |
-| ch17_24 | Kennedy | The exploration of space will go ahead, whether we join in it or not, and it is one of the great adventures of all time. |
+| ch17_24 | Kennedy (DONE: real 1962 recording) | The exploration of space will go ahead, whether we join in it or not, and it is one of the great adventures of all time. |
 | ch17_25 | Astra | See it? The Moon, pale in the afternoon sky, right above the stadium. |
-| ch17_26 | Kennedy | But why, some say, the Moon? Why choose this as our goal? And they may well ask, why climb the highest mountain? Why, thirty-five years ago, fly the Atlantic? Why does Rice play Texas? |
+| ch17_26 | Kennedy (DONE: real 1962 recording) | But why, some say, the Moon? Why choose this as our goal? And they may well ask, why climb the highest mountain? Why, thirty-five years ago, fly the Atlantic? Why does Rice play Texas? |
 
 ## Era 3, Chapter 4: Seagull and the Spacewalk (files ch18_..)
 
@@ -148,7 +148,7 @@ Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `n
 
 | # | Speaker | Line |
 |---|---|---|
-| ch19_01 | Kennedy | We set sail on this new sea because there is new knowledge to be gained, and new rights to be won, and they must be won and used for the progress of all people. |
+| ch19_01 | Kennedy (DONE: real 1962 recording) | We set sail on this new sea because there is new knowledge to be gained, and new rights to be won, and they must be won and used for the progress of all people. |
 | ch19_02 | Astra (Kids only) | President Kennedy wouldn't get to see where that sea led. He died in November 1963. But his country kept sailing. |
 | ch19_03 | Astra (Adults only) | President Kennedy wouldn't get to see where that sea led. In November 1963, he was shot and killed in Dallas, Texas. But his country kept sailing. |
 | ch19_04 | Astra | Houston, Texas. The brand new Mission Control. Rows of glowing screens, a giant map of the world, and a flight director named Gene Kranz in his white vest. |
@@ -181,7 +181,7 @@ Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `n
 | ch20_07 | Astra (Adults only) | This is the new hatch. It opens outward, in a few seconds. |
 | ch20_08 | Astra | Three months later, the Soviet Union lost a cosmonaut too. Vladimir Komarov died when his Soyuz parachute failed. Both sides had learned how dangerous this road was. |
 | ch20_09 | Astra | Dawn, at the Vehicle Assembly Building. Behind these doors stands the rocket that will carry people to the Moon. Five years ago, President Kennedy described it. |
-| ch20_10 | Kennedy | ...a giant rocket more than three hundred feet tall, the length of this football field, made of new metal alloys, some of which have not yet been invented. |
+| ch20_10 | Kennedy (DONE: real 1962 recording) | ...a giant rocket more than three hundred feet tall, the length of this football field, made of new metal alloys, some of which have not yet been invented. |
 | ch20_11 | Astra | And here it is. The Saturn V. |
 | ch20_12 | Astra | One hundred and ten meters tall. As tall as a thirty-six storey building. It rolls out on a crawler as big as a baseball infield, slower than you can walk. |
 | ch20_13 | Astra | November 1967. Apollo 4, the first Saturn V launch, with no one on board. You're at the press site, five and a half kilometers away. Watch... and wait for the sound. |
@@ -212,7 +212,7 @@ Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `n
 | ch21_17 | Borman | And from the crew of Apollo 8, we close with good night, good luck, a Merry Christmas, and God bless all of you, all of you on the good Earth. |
 | ch21_18 | Astra | Christmas Day. Behind the Moon again, the engine fires to send them home. When they come back around, Lovell has news. |
 | ch21_19 | Lovell | Please be informed, there is a Santa Claus. |
-| ch21_20 | Kennedy | ...re-entering the atmosphere at speeds of over twenty-five thousand miles per hour, causing heat about half that of the temperature of the Sun. |
+| ch21_20 | Kennedy (DONE: real 1962 recording) | ...re-entering the atmosphere at speeds of over twenty-five thousand miles per hour, causing heat about half that of the temperature of the Sun. |
 | ch21_21 | Astra | Splashdown, in the dark Pacific. And later, Borman got a telegram from a stranger. It said: Thank you, Apollo 8. You saved 1968. |
 
 ## Era 3, Apollo 11, Part 1: Launch Morning (files ch22_..)
@@ -229,7 +229,7 @@ Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `n
 | ch22_08 | Astra (Adults only) | Press the button for the elevator. |
 | ch22_09 | Astra | Up, out of the clouds... and there's the sunrise, over the ocean. |
 | ch22_10 | Astra | Buzz Aldrin waits on the walkway for a few minutes, alone, while the others climb in. Down on the beaches and roads, about a million people have come to watch. |
-| ch22_11 | Kennedy | The eyes of the world now look into space, to the Moon and to the planets beyond. |
+| ch22_11 | Kennedy (DONE: real 1962 recording) | The eyes of the world now look into space, to the Moon and to the planets beyond. |
 | ch22_12 | Astra | In the little white room at the top, pad leader Guenter Wendt has a present for Neil. |
 | ch22_13 | Wendt | For you, Neil. A key to the Moon. |
 | ch22_14 | Armstrong | Thanks, Guenter. And here's one for you. A ticket for a space taxi. Good between any two planets. |
@@ -242,7 +242,7 @@ Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `n
 | ch23_01 | Astra | The Launch Control room in Florida. Four hundred and fifty people at their consoles. And at the big windows, with his binoculars, Wernher von Braun. |
 | ch23_02 | von Braun | Twenty-five years, from the V-2 to this. Come on, my beauty. Fly. |
 | ch23_03 | Astra | Thirty seconds to go. The room goes quiet. |
-| ch23_04 | Kennedy | ...we ask God's blessing on the most hazardous and dangerous and greatest adventure on which man has ever embarked. |
+| ch23_04 | Kennedy (DONE: real 1962 recording) | ...we ask God's blessing on the most hazardous and dangerous and greatest adventure on which man has ever embarked. |
 | ch23_05 | Jack King | Twelve, eleven, ten, nine, ignition sequence start. |
 | ch23_06 | Jack King | Six, five, four, three, two, one, zero. All engines running. |
 | ch23_07 | Jack King | Liftoff! We have a liftoff! Liftoff on Apollo 11! |
@@ -304,7 +304,7 @@ Put the clips in your project folder under `narration/fl3`, `narration/ch15`, `n
 | ch26_15 | Armstrong | Shutdown. |
 | ch26_16 | Armstrong | Houston, Tranquility Base here. The Eagle has landed. |
 | ch26_17 | Duke | Roger, Tranquility, we copy you on the ground. You got a bunch of guys about to turn blue. We're breathing again. Thanks a lot. |
-| ch26_18 | Kennedy | We choose to go to the Moon. We choose to go to the Moon in this decade and do the other things, not because they are easy, but because they are hard. |
+| ch26_18 | Kennedy (DONE: real 1962 recording) | We choose to go to the Moon. We choose to go to the Moon. We choose to go to the Moon in this decade and do the other things, not because they are easy, but because they are hard. |
 | ch26_19 | Astra (Adults only) | He didn't live to see this day. But his promise was kept, with five months to spare. |
 | ch26_20 | Astra (Kids only) | He didn't live to see this day. But his promise was kept. |
 
@@ -476,7 +476,7 @@ The problem board: whenever Astra says "Problem one", "Problem two" and so on, a
 |---|---|---|
 | Astra | 235 | fl3_01, fl3_02, fl3_03, fl3_04, fl3_05, fl3_06, fl3_07, fl3_08, ch15_01, ch15_02, ch15_04, ch15_06, ch15_07, ch15_08, ch15_09, ch15_10, ch15_12, ch15_13, ch15_14, ch15_15, ch15_16, ch15_17, ch15_18, ch15_19, ch16_01, ch16_02, ch16_04, ch16_05, ch16_06, ch16_08, ch16_11, ch16_12, ch16_13, ch16_15, ch16_16, ch16_17, ch16_18, ch16_19, ch16_20, ch16_22, ch16_23, ch17_01, ch17_02, ch17_03, ch17_05, ch17_06, ch17_07, ch17_09, ch17_10, ch17_12, ch17_13, ch17_14, ch17_15, ch17_17, ch17_19, ch17_20, ch17_22, ch17_23, ch17_25, ch18_01, ch18_02, ch18_03, ch18_05, ch18_07, ch18_08, ch18_10, ch18_11, ch18_13, ch18_14, ch18_16, ch18_17, ch18_18, ch18_19, ch18_20, ch19_02, ch19_03, ch19_04, ch19_05, ch19_06, ch19_08, ch19_09, ch19_10, ch19_11, ch19_12, ch19_14, ch19_15, ch19_16, ch19_18, ch19_19, ch20_01, ch20_02, ch20_03, ch20_04, ch20_05, ch20_06, ch20_07, ch20_08, ch20_09, ch20_11, ch20_12, ch20_13, ch20_15, ch20_16, ch21_01, ch21_02, ch21_03, ch21_04, ch21_06, ch21_07, ch21_08, ch21_10, ch21_13, ch21_14, ch21_15, ch21_18, ch21_21, ch22_01, ch22_03, ch22_04, ch22_05, ch22_06, ch22_07, ch22_08, ch22_09, ch22_10, ch22_12, ch22_15, ch23_01, ch23_03, ch23_08, ch23_09, ch23_11, ch23_12, ch23_13, ch23_14, ch24_01, ch24_03, ch24_04, ch24_06, ch24_07, ch24_08, ch24_09, ch24_10, ch25_01, ch25_02, ch25_04, ch25_05, ch25_06, ch25_08, ch26_01, ch26_02, ch26_05, ch26_08, ch26_09, ch26_10, ch26_19, ch26_20, ch27_01, ch27_02, ch27_06, ch27_10, ch27_11, ch27_12, ch27_14, ch27_16, ch27_17, ch27_18, ch27_19, ch27_20, ch28_01, ch28_02, ch28_04, ch28_05, ch28_07, ch28_08, ch29_01, ch29_03, ch29_04, ch29_05, ch29_06, ch29_08, ch30_01, ch30_02, ch30_04, ch30_05, ch30_06, ch31_01, ch31_02, ch31_05, ch31_07, ch31_10, ch31_11, ch31_12, ch31_13, ch31_14, ch32_01, ch32_02, ch32_03, ch32_05, ch32_06, ch32_07, ch32_09, ch32_10, ch32_11, ch32_13, ch33_01, ch33_02, ch33_03, ch33_05, ch33_06, ch33_08, ch34_01, ch34_02, ch34_03, ch34_04, ch34_05, ch34_06, ch34_09, ch34_10, ch34_12, ch34_14, ch34_16, ch35_01, ch35_03, ch35_04, ch35_05, ch35_06, ch35_08, ch35_11, ch35_12, ch35_13, ch35_14, ch35_17, ch35_18, ch35_19 |
 | Armstrong | 11 | ch22_14, ch23_10, ch25_07, ch26_03, ch26_04, ch26_15, ch26_16, ch27_03, ch27_04, ch27_08, ch27_13 |
-| Kennedy | 9 | ch17_08, ch17_24, ch17_26, ch19_01, ch20_10, ch21_20, ch22_11, ch23_04, ch26_18 |
+| Kennedy (DONE: real 1962 recording) | 8 | ch17_24, ch17_26, ch19_01, ch20_10, ch21_20, ch22_11, ch23_04, ch26_18 |
 | Lovell | 7 | ch21_09, ch21_19, ch30_07, ch31_04, ch31_08, ch32_08, ch34_11 |
 | Aldrin | 6 | ch25_03, ch26_11, ch26_14, ch27_07, ch27_09, ch28_03 |
 | Collins | 5 | ch21_05, ch24_05, ch25_09, ch28_06, ch29_02 |
@@ -504,6 +504,7 @@ The problem board: whenever Astra says "Problem one", "Problem two" and so on, a
 | Ed White | 1 | ch19_07 |
 | Gazenko | 1 | ch15_03 |
 | Haise | 1 | ch32_12 |
+| Kennedy | 1 | ch17_08 |
 | Kerwin (Mission Control) | 1 | ch34_13 |
 | Liebergot | 1 | ch31_09 |
 | Scott | 1 | ch19_17 |
