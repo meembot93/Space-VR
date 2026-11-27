@@ -1,0 +1,53 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Blender model viewer</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}#info{position:fixed;left:10px;top:8px;color:#ccd;font:13px sans-serif}</style>
+<script type="importmap">{ "imports": { "three": "../../lib/three.module.js", "three/addons/": "../../lib/addons/" } }</script>
+</head><body><div id="info"></div>
+<script type="module">
+// Look at a GLB in the game's renderer and lighting.
+//   view.html?file=out/apollo_csm.glb&az=30&el=10&dist=14&env=space|day&h=1.75 (scale to h metres tall)
+//   &file2=... places a second model beside it (for side-by-side comparisons)
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const q = new URLSearchParams(location.search), num = (k, d) => Number(q.get(k) ?? d);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.setPixelRatio(devicePixelRatio);
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene();
+const env = q.get('env') || 'space';
+function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+const envTex = canvasTex(512, 256, (g, w, h) => {
+  if (env === 'space') {
+    g.fillStyle = '#000006'; g.fillRect(0, 0, w, h);
+    const gr = g.createLinearGradient(0, h * 0.5, 0, h); gr.addColorStop(0, '#5a8ad0'); gr.addColorStop(0.15, '#1a3a70'); gr.addColorStop(1, '#0a1428'); g.fillStyle = gr; g.fillRect(0, h * 0.52, w, h * 0.48);
+    const rg = g.createRadialGradient(128, 110, 0, 128, 110, 40); rg.addColorStop(0, 'rgba(255,255,250,1)'); rg.addColorStop(1, 'rgba(255,250,230,0)'); g.fillStyle = rg; g.fillRect(80, 60, 100, 100);
+  } else {
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#6a9ad8'); gr.addColorStop(0.5, '#d8e4ee'); gr.addColorStop(0.52, '#8a8070'); gr.addColorStop(1, '#4a4438'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  }
+});
+envTex.mapping = THREE.EquirectangularReflectionMapping;
+scene.environment = envTex;
+scene.background = env === 'space' ? new THREE.Color(0x02030a) : new THREE.Color(0x8fb4d8);
+scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x202030, env === 'space' ? 0.35 : 1.0));
+const sun = new THREE.DirectionalLight(0xfff4e0, 3.0); sun.position.set(-6, 5, 8); scene.add(sun);
+if (env !== 'space') { const g = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.MeshStandardMaterial({ color: 0x6b6a60, roughness: 1 })); g.rotation.x = -Math.PI / 2; scene.add(g); }
+
+const loader = new GLTFLoader();
+let tris = 0, calls = 0;
+async function add(file, x, h) {
+  const g = await loader.loadAsync(file), s = g.scene;
+  if (h) { const b = new THREE.Box3().setFromObject(s); s.scale.multiplyScalar(h / b.getSize(new THREE.Vector3()).y); }
+  const b = new THREE.Box3().setFromObject(s), c = b.getCenter(new THREE.Vector3());
+  s.position.set(x - c.x, env === 'space' ? -c.y : -b.min.y, -c.z);
+  s.traverse((o) => { if (o.isMesh) { tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; calls++; } });
+  scene.add(s); return b.getSize(new THREE.Vector3());
+}
+const sz = await add(q.get('file'), q.get('file2') ? -num('gap', 2) : 0, q.get('h') ? num('h') : 0);
+if (q.get('file2')) await add(q.get('file2'), num('gap', 2), q.get('h2') ? num('h2') : 0);
+const cam = new THREE.PerspectiveCamera(num('fov', 35), innerWidth / innerHeight, 0.05, 500);
+const az = num('az', 30) * Math.PI / 180, el = num('el', 10) * Math.PI / 180, d = num('dist', Math.max(sz.x, sz.y, sz.z) * 2.2);
+const ty = num('ty', env === 'space' ? 0 : sz.y / 2);
+cam.position.set(Math.sin(az) * Math.cos(el) * d, ty + Math.sin(el) * d, Math.cos(az) * Math.cos(el) * d); cam.lookAt(0, ty, 0);
+r.render(scene, cam);
+document.getElementById('info').textContent = q.get('label') ?? `${Math.round(tris).toLocaleString()} triangles · ${calls} draw call${calls > 1 ? 's' : ''}`;
+window.done = true;
+</script></body></html>
