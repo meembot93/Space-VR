@@ -20,7 +20,7 @@ def main(src):
     index = json.loads(index_path.read_text()) if index_path.exists() else {}
     added = []
     for f in sorted(pathlib.Path(src).iterdir()):
-        m = re.match(r'^((?:ch\d+|br\d+|open)_\d+)', f.stem.lower())
+        m = re.match(r'^((?:ch\d+|br\d+|fl\d+|open)_\d+)', f.stem.lower())
         if not m or f.suffix.lower() not in EXTS:
             continue
         line = m.group(1)
