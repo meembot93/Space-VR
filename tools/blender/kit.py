@@ -76,6 +76,19 @@ class Kit:
             self._faces(out['faces'], color)
         return res
 
+    def prism(self, pts, depth, color, m=Matrix()):
+        """A flat outline [(x, z), ...] (any convex or simple shape) given thickness along y: fins, plates."""
+        bm = self.bm
+        front = [bm.verts.new(m @ Vector((x, -depth / 2, z))) for x, z in pts]
+        back = [bm.verts.new(m @ Vector((x, depth / 2, z))) for x, z in pts]
+        faces = [bm.faces.new(front), bm.faces.new(list(reversed(back)))]
+        n = len(pts)
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append(bm.faces.new((front[j], front[i], back[i], back[j])))
+        bmesh.ops.recalc_face_normals(bm, faces=faces)
+        self._faces(faces, color)
+
     def tube(self, m, r, h, color, segs=12, cap=True, r2=None):
         """A cylinder (or cone with r2) standing on the origin of matrix m, along its z."""
         r2 = r if r2 is None else r2
