@@ -170,10 +170,10 @@ p.poly([(-e, hy0, fz), (hx0, hy0, fz), (hx0, hy1, fz), (-e, hy1, fz)], 'floor')
 p.poly([(hx1, hy0, fz), (e, hy0, fz), (e, hy1, fz), (hx1, hy1, fz)], 'floor')
 # the stairwell: walls going down into the dark, and mud-brick steps down to the north
 for (x0, y0, x1, y1) in [(hx0, hy0, hx1, hy0), (hx1, hy0, hx1, hy1), (hx1, hy1, hx0, hy1), (hx0, hy1, hx0, hy0)]:
-    p.poly([(x0, y0, fz), (x0, y0, fz - 2.6), (x1, y1, fz - 2.6), (x1, y1, fz)], 'brick')
+    p.poly([(x0, y0, fz), (x1, y1, fz), (x1, y1, fz - 2.6), (x0, y0, fz - 2.6)], 'brick')   # (facing in)
 for i in range(7):
     z = fz - 0.22 * (i + 1); y = hy0 + 0.05 + i * 0.27
-    p.box(((hx0 + hx1) / 2, y + 0.14, z - 0.3), (hx1 - hx0 - 0.02, 0.28, 0.3), 'brick', top='floor')
+    p.box(((hx0 + hx1) / 2, y + 0.14, z - 0.3), (hx1 - hx0 - 0.02, 0.28, 0.3), 'brick', top='brick')
 p.box(((hx0 + hx1) / 2, (hy0 + hy1) / 2, fz - 2.7), (hx1 - hx0, hy1 - hy0, 0.05), 'dark')
 # a low kerb round the hole on its open sides, so it reads as a drop
 p.box((hx1 + 0.08, (hy0 + hy1) / 2, fz), (0.16, hy1 - hy0 + 0.32, 0.18), 'plaster_b')
@@ -204,10 +204,10 @@ jar(p, *B(-3.5, -1.5), fz, 0.8, 'clay2')
 p.cyl((*B(-3.85, -0.55), fz), 0.18, 0.12, 'clay2', segs=10, r2=0.2)
 basket(p, *B(3.6, 3.7), fz, 0.26, 0.22, 'grain')
 basket(p, *B(3.0, 3.85), fz, 0.2, 0.18, 'dates')
-p.dome((*B(-3.7, -3.6), fz), 0.5, 0.7, 'clay', segs=10)              # the bread oven
-p.box((*B(-3.7, -3.1), fz), (0.25, 0.04, 0.22), 'dark')
-p.box((*B(-2.6, -3.85), fz), (0.55, 0.35, 0.12), 'limestone', batter=0.04)   # quern
-p.box((*B(-2.6, -3.85), fz + 0.12), (0.3, 0.12, 0.06), 'limestone')
+p.dome((*B(-1.3, -3.7), fz), 0.5, 0.7, 'clay', segs=10)              # the bread oven
+p.box((*B(-1.3, -3.2), fz), (0.25, 0.04, 0.22), 'dark')
+p.box((*B(-1.0, 0.7), fz), (0.55, 0.35, 0.12), 'limestone', batter=0.04)   # quern
+p.box((*B(-1.0, 0.7), fz + 0.12), (0.3, 0.12, 0.06), 'limestone')
 # the offering table: a limestone slab on a pedestal (lamp sits at three (3.4, Y+0.78, -3.4))
 tx, ty = B(3.4, -3.4)
 p.box((tx, ty, fz), (0.3, 0.3, 0.06), 'limestone')
@@ -226,8 +226,8 @@ bx, by = B(3.2, 3.3)
 for s in (-1, 1): p.box((bx + s * 0.55, by, fz), (0.13, 0.13, 2.27), 'wood')
 p.box((bx, by, fz + 2.13), (1.4, 0.16, 0.15), 'wood')
 for s in (-1, 1): p.box((bx + s * 0.55, by, fz), (0.3, 0.3, 0.12), 'plaster_b', batter=0.05)
-# a bundle of firewood and a broom by the north wall
-for i in range(6): p.cyl((1.6 + (i % 3) * 0.07, 4.05 + (i // 3) * 0.07, fz + 0.05), 0.035, 0.9 + rnd.random() * 0.2, 'wood', segs=5, axis=(1, 0.05 * i, 0.06))
+# a bundle of firewood by the south wall
+for i in range(6): p.cyl((0.2 + (i % 3) * 0.07, -4.05 - (i // 3) * 0.07, fz + 0.05), 0.035, 0.9 + rnd.random() * 0.2, 'wood', segs=5, axis=(1, 0.05 * i, 0.06))
 pieces = [p]
 
 

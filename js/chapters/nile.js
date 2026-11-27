@@ -33,9 +33,10 @@ import { loadGLB } from '../models.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // The Giza set built in Blender (tools/blender/giza.py): each pyramid, temple and tomb a piece with
 // one shared baked texture, placed here on the uneven desert and merged into one mesh
-const GIZA = await loadGLB('sets/giza.glb');
+const NOSET = new URLSearchParams(location.search).has('noset');   // ?noset: the old code-built ones, to compare
+const GIZA = NOSET ? null : await loadGLB('sets/giza.glb');
 // ... and the priest's house you stand on, with the seven houses round it (tools/blender/egypt_village.py)
-const VILLAGE = await loadGLB('sets/egypt_village.glb');
+const VILLAGE = NOSET ? null : await loadGLB('sets/egypt_village.glb');
 function setPieces(gltf) {
   const out = new Map(); if (!gltf) return out;
   gltf.scene.updateMatrixWorld(true);
