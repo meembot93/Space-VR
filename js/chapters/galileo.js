@@ -34,6 +34,10 @@ import { dirFromAzEl } from '../sky.js';
 import { eqVec } from '../stars.js';
 import { glowPoints, shatter, whoosh, awe, shimmer } from '../wow/fx.js';
 import { loadProps } from '../props.js';
+import { loadGLB } from '../models.js';
+// The Venice set from Blender (tools/blender/venice_set.py): the islands with stone quays, the city with
+// soft shadows baked in, and only the faces you can see from the belfry. ?noset uses the code-built one.
+const SET = new URLSearchParams(location.search).has('noset') ? null : await loadGLB('sets/venice.glb');
 // Meem's models (models/props): the Italian town house, St Mark's Basilica, the carrack, gondola and
 // bell, and the lens-grinding workbench and a spare telescope in Padua; waited for before the chapter builds
 const PROPS = await loadProps(['house_italian', 'house_italian_lo', 'st_marks', 'ship_carrack', 'gondola', 'church_bell', 'lens_workbench', 'galileo_telescope']);
@@ -180,7 +184,7 @@ export default class Galileo {
       if (x > -185 && x < 110 && z > -60 && z < 95) c.copy(paving);
       cols.set([c.r, c.g, c.b], i * 3);
     }
-    g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals(); A.add(new THREE.Mesh(g, FLAT));
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals(); const ground = new THREE.Mesh(g, FLAT); ground.name = 'venice_ground';
     // the canals (rii) through the city
     for (const [[ax, az], [bx, bz]] of RII) { const L = Math.hypot(bx - ax, bz - az); k.box(9, 0.05, L, canal.getHex(), [(ax + bx) / 2, 1.23, (az + bz) / 2], [0, Math.atan2(bx - ax, bz - az), 0]); }
     // the Piazza's white stone stripes
@@ -256,7 +260,10 @@ export default class Galileo {
     }
     // bell towers rising out of the roofs here and there
     for (const [x, z, h] of [[-330, -260, 50], [160, -220, 46], [-620, 200, 40], [480, -60, 44], [-120, -520, 48], [700, -400, 42]]) { k.box(6, h, 6, 0xb86a50, [x, 1.2 + h / 2, z]); k.box(6.6, 4, 6.6, 0xe8e0d0, [x, h - 1, z]); k.cyl(0.001, 3.6, 9, 4, 0x6a8a7a, [x, h + 5.5, z], [0, Math.PI / 4, 0]); }
-    A.add(k.mesh(), VP.build(), BP.build()); if (far.parts.length) A.add(far.mesh());
+    const city = k.mesh(), farCity = far.parts.length ? far.mesh() : null;
+    city.name = 'venice_city'; if (farCity) farCity.name = 'venice_far';
+    if (SET) A.add(setMeshes(SET)); else { A.add(ground, city); if (farCity) A.add(farCity); }
+    A.add(VP.build(), BP.build());
     A.add(panes(wins, { lit: 0.12, seed: 4, glint: true }));
     // ---- boats: anchored ships in the basin, the ship far out at sea, gondolas ----
     this.boats = [];
@@ -1264,6 +1271,21 @@ function beam(k, a, b, t, col) {
 }
 // An Italian town house: stucco walls, a low tiled roof, a funnel chimney, green shutters;
 // pushes its windows into `wins`. Far houses are just a block and a roof.
+// The Blender set's meshes, in the same flat-shaded vertex-colour look as the code-built city
+// (the ground keeps its own baked texture)
+function setMeshes(gltf) {
+  const g = new THREE.Group();
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const m = o.clone(); m.geometry.computeBoundingSphere();
+    const map = o.material.map;
+    m.material = map ? new THREE.MeshLambertMaterial({ map, vertexColors: !!o.geometry.attributes.color }) : FLAT;
+    o.updateWorldMatrix(true, false); m.matrix.copy(o.matrixWorld); m.matrix.decompose(m.position, m.quaternion, m.scale);
+    g.add(m);
+  });
+  return g;
+}
+
 function house(k, o, wins, r, near = true) {
   const { x, y, z, w, d, h, yaw = 0, wall, roofCol } = o, c = Math.cos(yaw), s = Math.sin(yaw);
   const P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
