@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 58;
-export const CHANGES = ['Apollo 11 leaving the Moon lines in'];
+export const VERSION = 59;
+export const CHANGES = ['Apollo 11 homecoming lines in'];
