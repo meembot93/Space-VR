@@ -29,6 +29,38 @@ import { loadProps } from '../props.js';
 const PROPS = await loadProps(['house_mudbrick', 'house_mudbrick_lo', 'amphora', 'crate_basket_set', 'reed_boat_lo', 'granary', 'granary_lo', 'temple_pylon', 'sphinx'],
   { sphinx: { z: 52, turn: 90 } });
 import { grove, palm as palmTree } from '../trees.js';
+import { loadGLB } from '../models.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+// The Giza set built in Blender (tools/blender/giza.py): each pyramid, temple and tomb a piece with
+// one shared baked texture, placed here on the uneven desert and merged into one mesh
+const NOSET = new URLSearchParams(location.search).has('noset');   // ?noset: the old code-built ones, to compare
+const GIZA = NOSET ? null : await loadGLB('sets/giza.glb');
+// ... and the priest's house you stand on, with the seven houses round it (tools/blender/egypt_village.py)
+const VILLAGE = NOSET ? null : await loadGLB('sets/egypt_village.glb');
+function setPieces(gltf) {
+  const out = new Map(); if (!gltf) return out;
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse((o) => { if (o.isMesh) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); out.set(o.name, { g, map: o.material.map }); } });
+  return out;
+}
+// Copies of set pieces, each moved into place, merged into one mesh per texture
+class SetBuilder {
+  constructor(set) { this.set = set; this.parts = new Map(); }
+  has(name) { return this.set.has(name); }
+  put(name, x, y, z, yaw = 0, sx = 1) {
+    const p = this.set.get(name); if (!p) return false;
+    const g = p.g.clone();
+    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(sx, 1, 1)));
+    if (!this.parts.has(p.map)) this.parts.set(p.map, []);
+    this.parts.get(p.map).push(g); return true;
+  }
+  // one mesh per texture; makeMat(texture) gives its material
+  build(makeMat = (map) => new THREE.MeshStandardMaterial({ map, roughness: 0.95, metalness: 0 })) {   // (lit like Meem's props round them)
+    const grp = new THREE.Group();
+    for (const [map, list] of this.parts) { map.anisotropy = 8; grp.add(new THREE.Mesh(mergeGeometries(list, false), makeMat(map))); for (const g of list) g.dispose(); }
+    this.parts.clear(); return grp;
+  }
+}
 
 const D2R = Math.PI / 180;
 const SILT = new THREE.Color(0x5c452c);
@@ -393,7 +425,10 @@ export default class Nile {
     this.roofSpots = [];
     const P = PROPS;
     const houses = [];   // footprints, so the granaries can keep clear of the walls
-    const house = (x, z, w, d, hgt, yaw = 0) => {
+    const VS = this.villageSet = new SetBuilder(setPieces(VILLAGE));
+    let nearIdx = -1;    // (the near houses are built by hand in Blender: house_0 .. house_6, doors already on the right side)
+    const house = (x, z, w, d, hgt, yaw = 0, near = false) => {
+      if (near) nearIdx++;
       houses.push({ x, z, hw: w / 2, hd: d / 2 });
       const y = groundHeight(x, z) - 0.3, col = MUDB[(r() * 4) | 0], top = y + hgt;
       // within 120 m: Meem's mud-brick house model (its door turned to the side the lamps are on; the
@@ -401,7 +436,7 @@ export default class Nile {
       const dist = Math.hypot(x, z), hm = dist < 40 ? 'house_mudbrick' : 'house_mudbrick_lo';
       if (P.has(hm) && dist < 120) {
         const side = (r() * 4) | 0, a = yaw + side * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), half = side % 2 ? w / 2 : d / 2;
-        P.add(hm, x, y, z, a, side % 2 ? { w: d, d: w, h: hgt + 0.3 } : { w, d, h: hgt + 0.3 });
+        if (!(near && VS.put('house_' + nearIdx, x, y, z))) P.add(hm, x, y, z, a, side % 2 ? { w: d, d: w, h: hgt + 0.3 } : { w, d, h: hgt + 0.3 });
         this.lampSpots.push(new THREE.Vector3(x + sa * (half + 0.4), y + 1.6, z + ca * (half + 0.4)));
         // water jars by the door, and now and then baskets and a sack
         if (dist < 60 && r() < 0.6) P.add('amphora', x + sa * (half + 0.45) + ca * 1.3, y + 0.3, z + ca * (half + 0.45) - sa * 1.3, r() * 6, { s: 0.7 + r() * 0.3 });
@@ -437,7 +472,7 @@ export default class Nile {
     };
     // a lattice of houses on the mound, with lanes between them; the houses near you are built by hand
     const near = [[-10.4, 0, 8.5, 9, 4.3], [0, 10.2, 9, 8, 4.6], [0, -10.4, 9, 8.5, 3.8], [-10, 10, 8, 8, 5.2], [-10.2, -10.2, 8, 8, 4.8], [2, 21, 8, 8, 3.6], [1, -22, 9, 8, 3.4]];
-    for (const [x, z, w, d, h] of near) house(x, z, w, d, h);
+    for (const [x, z, w, d, h] of near) house(x, z, w, d, h, 0, true);
     const granaries = [];
     for (let gx = -290; gx < 40; gx += 12) for (let gz = -320; gz < 320; gz += 12) {
       if (Math.abs(gx) < 18 && Math.abs(gz) < 18) continue;
@@ -476,6 +511,7 @@ export default class Nile {
       k.add(b, 0xb79a5a, [x, y + 0.35, z], [0, yaw, 0]);
     }
     this.village = k.mesh(); this.egypt.add(this.village);
+    this.egypt.add(VS.build());
     this.egypt.add(P.build());
   }
 
@@ -561,6 +597,9 @@ export default class Nile {
       // the paved court round the pyramid
       plain.box(half * 2 - 4, 0.6, half * 2 - 4, 0xdccfae, [x, y + 0.3, z]);
     };
+    const SET = setPieces(GIZA);
+    if (SET.size) { this.buildGizaSet(SET, OX, base0); }
+    else {
     const giza = [
       // name, x, z, base, height, tint
       ['Khufu', -760 + OX, -380, 230, 146, 0xf2ead6],
@@ -630,14 +669,66 @@ export default class Nile {
     const merge = (list, m) => { const kk = new Kit(); kk.parts.push(...list); return new THREE.Mesh(kk.geometry(), m); };
     this.pyrMat = mat;
     this.egypt.add(merge(cased, mat), merge(core, cm), plain.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0x1a1712 })));
+    }
     // a small glint on each capstone when the Sun first reaches it
     this.capGlints = this.pyramidTops.map((p) => { const sp = new THREE.Sprite(glowMat('rgba(255,236,190,1)')); sp.position.copy(p); sp.scale.setScalar(26); sp.material.opacity = 0; this.egypt.add(sp); return sp; });
+  }
+
+  // The Blender-built Giza set: same places and sizes as the code shapes it replaces
+  buildGizaSet(SET, OX, base0) {
+    const parts = [], m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0);
+    const put = (name, x, y, z, yaw = 0, sx = 1) => {
+      const p = SET.get(name); if (!p) return;
+      const g = p.g.clone(); m4.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(UP, yaw), new THREE.Vector3(sx, 1, 1));
+      g.applyMatrix4(m4); parts.push(g);
+    };
+    this.pyramidTops = [];
+    for (const [name, x, z, b, h] of [['khufu', -760 + OX, -380, 230, 146], ['khafre', -930 + OX, -205, 215, 143]]) {
+      const y = base0(x, z, b / 2);
+      put(name, x, y, z);
+      this.pyramidTops.push(new THREE.Vector3(x, y + h + 0.3, z));
+      // the mortuary temple on the east side, and its covered causeway down toward the river
+      const tx = x + b / 2 + 40; put('mortuary_temple', tx, base0(tx, z, 20), z);
+      const x0 = x + b / 2 + 63, x1 = -560 + OX, L = x1 - x0, n = Math.ceil(L / 10), seg = L / n;
+      for (let k = 0; k < n; k++) { const sx = x0 + seg * (k + 0.5); put('causeway', sx, groundHeight(sx, z) + 0.6, z, 0, seg / 10); }
+    }
+    { const x = -1060 + OX, z = -40; put('menkaure', x, base0(x, z, 105 / 2), z); }
+    for (let i = 0; i < 3; i++) { const qx = -600 + OX, qz = -450 + i * 58; put('queen', qx, base0(qx, qz, 25), qz); }
+    for (const [ox, oz, cols2, rows] of [[-920 + OX, -560, 6, 5], [-605 + OX, -330, 3, 6]]) {
+      for (let a = 0; a < cols2; a++) for (let c = 0; c < rows; c++) { const mx = ox + a * 26, mz = oz + c * 34; put('mastaba', mx, base0(mx, mz, 10), mz); }
+    }
+    // the Sphinx (Meem's model) and its temple in front
+    const sx = -640 + OX, sz = -160, sy = base0(sx, sz, 30);
+    const SP = PROPS.fresh();
+    if (SP.add('sphinx', sx - 3, sy + 0.3, sz, Math.PI / 2, { d: 52 })) this.egypt.add(SP.build({ glow: 0x1a1712 }));
+    put('sphinx_temple', sx + 50, sy, sz);
+    put('valley_temple', -520 + OX, base0(-520 + OX, -330, 21), -330);
+    const kk = new Kit(); kk.parts.push(...parts);
+    const geo = kk.geometry();
+    // each side its own shade (east brightest), so the four faces read apart even in flat night light
+    const nrm = geo.attributes.normal, col = new Float32Array(nrm.count * 3);
+    for (let i = 0; i < nrm.count; i++) {
+      const nx = nrm.getX(i), nz = nrm.getZ(i), k = 0.78 + 0.22 * Math.max(0, nx) - 0.12 * Math.max(0, -nx) + 0.04 * nz;
+      col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = k;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const tex = SET.values().next().value.map; tex.anisotropy = 8;
+    // (glowing faintly by itself, so pale limestone stays visible under the stars; tinted at dawn in update)
+    const mat = this.pyrMat = new THREE.MeshPhongMaterial({ map: tex, vertexColors: true, shininess: 30, specular: 0x3a352c, emissive: 0x4a4436, emissiveMap: tex });
+    const mesh = new THREE.Mesh(geo, mat); mesh.name = 'giza';
+    this.egypt.add(mesh);
   }
 
   // Your roof: a low wall all round, mats, jars, the bell on its frame and the priest's sighting post
   buildRoof() {
     const k = new Kit(), Y = ROOF, col = 0xa88c66, W = 9;
     const y0 = groundHeight(0, 0) - 0.3;
+    // where things are (the Blender house below has them built in the same places)
+    const SP = this.sightPos = new THREE.Vector3(W / 2 - 0.15, Y + 0.75, -0.3);
+    const B = this.bellPos = new THREE.Vector3(3.2, Y + 1.75, 3.3);
+    const RS = new SetBuilder(setPieces(VILLAGE));
+    if (RS.put('priest_house', 0, y0, 0)) this.egypt.add(this.roofSet = RS.build());
+    else {
     k.box(W, Y - y0, W, col, [0, (Y + y0) / 2 - 0.02, 0]);
     k.box(W - 0.4, 0.04, W - 0.4, 0x8e7450, [0, Y - 0.01, 0]);         // packed-earth floor
     for (const [x, z, w, d] of [[0, W / 2 - 0.15, W, 0.3], [0, -W / 2 + 0.15, W, 0.3], [W / 2 - 0.15, 0, 0.3, W], [-W / 2 + 0.15, 0, 0.3, W]]) k.box(w, 0.55, d, col, [x, Y + 0.275, z]);
@@ -658,15 +749,14 @@ export default class Nile {
     k.box(0.7, 0.05, 0.5, 0xc8b89a, [3.4, Y + 0.75, -3.4]); k.box(0.1, 0.75, 0.1, 0x8a6a44, [3.4, Y + 0.37, -3.4]);
     lathe([[0, 0], [0.07, 0.01], [0.08, 0.04], [0, 0.04]], 0xc07a48, [3.4, Y + 0.78, -3.4]);
     // the sighting post: a palm rib with a V-notch on a stand, looking east over the wall
-    const SP = this.sightPos = new THREE.Vector3(W / 2 - 0.15, Y + 0.75, -0.3);
     k.box(0.08, 0.55, 0.06, 0x7a5a36, [SP.x - 0.05, SP.y + 0.27, SP.z]);
     for (const s of [-1, 1]) k.box(0.025, 0.12, 0.05, 0x7a5a36, [SP.x - 0.05, SP.y + 0.6, SP.z + s * 0.035], [s * 0.35, 0, 0]);
     k.cyl(0.004, 0.004, 0.45, 3, 0xe0d8c0, [SP.x + 0.1, SP.y + 0.35, SP.z]);   // the plumb line
     k.ball(0.025, 0, 0x3a3a3a, [SP.x + 0.1, SP.y + 0.12, SP.z]);
     // the bell frame, by the south-east corner
-    const B = this.bellPos = new THREE.Vector3(3.2, Y + 1.75, 3.3);
     for (const s of [-1, 1]) k.box(0.12, 2.2, 0.12, 0x5a4228, [B.x + s * 0.55, Y + 1.1, B.z]);
     k.box(1.35, 0.14, 0.16, 0x5a4228, [B.x, Y + 2.2, B.z]);
+    }
     this.roof = k.mesh(); this.egypt.add(this.roof);
     // The bell itself swings, so it's its own little mesh
     const bk = new Kit();
