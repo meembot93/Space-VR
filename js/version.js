@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 65;
-export const CHANGES = ['Handshake voice lines in'];
+export const VERSION = 66;
+export const CHANGES = ['Three voice lines redone'];
