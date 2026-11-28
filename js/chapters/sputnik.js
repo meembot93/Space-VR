@@ -37,6 +37,7 @@ import { Space, lonLat } from '../wow/space.js';
 import { D2R, ease, clamp01, at, sunAt, windows, label, Journal, INK, guideUpdate } from '../era2/common.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { loadProps } from '../props.js';
+import { texSolid } from '../surfaces.js';
 
 // Meem's R-7 and Sputnik (Tripo models), cut into the pieces that move on their own by
 // tools/models/split_r7.mjs: r7_parts.glb has the core stage above the boosters, four boosters and
@@ -505,25 +506,25 @@ export default class Sputnik {
   }
 
   buildPad() {
-    const k = new Kit(), r = rng(5), CON = 0x8e8c86, CON2 = 0x6e6c68, STEEL = 0x7a7e86, RED = 0x9a3a2a;
+    const k = new Kit(), kc = new Kit(), r = rng(5), CON = 0x8e8c86, CON2 = 0x6e6c68, STEEL = 0x7a7e86, RED = 0x9a3a2a;   // kc: the concrete (real cast-concrete texture)
     // the concrete apron, round the slot over the flame pit
     // cast in 4 m slabs with tar-filled joints between them; each slab a slightly different shade,
     // darker and sooty toward the flame pit, a few patched or cracked
     for (let x = -26; x < 28; x += 4) for (let z = -26; z < 28; z += 4) {
       if (inSlot(x, z) || inSlot(x + 2, z) || Math.abs(x) < 8 && z < 8 && z > -28) continue;
       const soot = clamp01(1 - (Math.hypot(x, z) - 6) / 14) * 0.35, v = 0.9 + r() * 0.16 - soot, c = _col.setHex(CON).multiplyScalar(v).getHex();
-      k.box(3.94, APRON, 3.94, c, [x, APRON / 2, z]);
+      kc.box(3.94, APRON, 3.94, c, [x, APRON / 2, z]);
       if (r() < 0.12) k.box(1 + r() * 1.5, 0.012, 0.8 + r(), _col.setHex(CON2).multiplyScalar(0.9 + r() * 0.2).getHex(), [x + (r() - 0.5) * 1.5, APRON + 0.008, z + (r() - 0.5) * 1.5], [0, r() * 3, 0]);   // a patch
     }
     // the narrow strips either side of the slot, out to its walls
-    for (const sx of [-1, 1]) k.box(1.7, APRON, 34, _col.setHex(CON).multiplyScalar(0.75).getHex(), [sx * 7.15, APRON / 2, -11]);
-    k.box(16, APRON, 1.7, _col.setHex(CON).multiplyScalar(0.8).getHex(), [0, APRON / 2, 7.15]);
+    for (const sx of [-1, 1]) kc.box(1.7, APRON, 34, _col.setHex(CON).multiplyScalar(0.75).getHex(), [sx * 7.15, APRON / 2, -11]);
+    kc.box(16, APRON, 1.7, _col.setHex(CON).multiplyScalar(0.8).getHex(), [0, APRON / 2, 7.15]);
     // painted lines: walkways round the pad, raised a little so they never flicker
     for (const [x, z, w, d] of [[0, 12.5, 30, 0.14], [-12.5, -4, 0.14, 33], [12.5, -4, 0.14, 33]]) k.box(w, 0.012, d, 0xb89a30, [x, APRON + 0.008, z]);
     // the slot: dark concrete walls dropping into the pit; the pit floor glows faintly red-brown with soot
     k.box(12, 0.05, 34, 0x0c0a09, [0, -0.4, -11]);
-    for (const sx of [-1, 1]) k.box(0.6, 3, 34, 0x302c28, [sx * 6, -1.3, -11]);
-    k.box(12, 3, 0.6, 0x302c28, [0, -1.3, 6]);
+    for (const sx of [-1, 1]) kc.box(0.6, 3, 34, 0x302c28, [sx * 6, -1.3, -11]);
+    kc.box(12, 3, 0.6, 0x302c28, [0, -1.3, 6]);
     // a yellow-and-black safety edge round the slot
     for (let i = 0; i < 17; i++) { const zz = 5.6 - i * 2; for (const sx of [-1, 1]) k.box(0.25, 0.04, 1, i % 2 ? 0xd8b030 : 0x1a1a1a, [sx * 6.2, APRON + 0.02, zz]); }
     // floodlight poles at the apron's corners (their lamps glow in this.lamps)
@@ -533,7 +534,7 @@ export default class Sputnik {
     // the bunker: an earth mound with a concrete portal and a steel door, periscopes and cables
     const bx = DOOR.x - 9, bz = DOOR.z, mx = bx - 1;   // the mound sits a metre back so its facets stay under the door step
     k.ball(12, 2, 0x6a6350, [mx, -3.5, bz], 0, [1, 0.62, 0.8]);
-    k.box(1.6, 3.6, 7, CON, [DOOR.x - 0.9, 1.8, DOOR.z]); k.box(4.2, 0.5, 7.4, CON, [DOOR.x - 1.4, 3.8, DOOR.z]);
+    kc.box(1.6, 3.6, 7, CON, [DOOR.x - 0.9, 1.8, DOOR.z]); kc.box(4.2, 0.5, 7.4, CON, [DOOR.x - 1.4, 3.8, DOOR.z]);
     k.box(0.15, 2.3, 1.6, 0x3a4a3a, [DOOR.x - 0.08, 1.15 + APRON, DOOR.z]); k.box(0.1, 0.12, 0.6, 0x9a9a9a, [DOOR.x, 1.1 + APRON, DOOR.z + 0.4]);
     // the blast door's frame, its rivet straps and locking wheel, a step, a caged lamp and a sign
     const DX = DOOR.x, DZ = DOOR.z, A = APRON;
@@ -544,7 +545,7 @@ export default class Sputnik {
     for (let i = 0; i < 4; i++) k.box(0.02, 0.38, 0.02, 0x8a8a84, [DX + 0.04, A + 1.2, DZ - 0.25], [i * Math.PI / 4, 0, 0]);
     k.box(0.9, 0.16, 2.2, 0x8a8882, [DX + 0.45, A + 0.08, DZ]);
     k.box(0.44, 0.1, 2.2, 0x8a8882, [DX + 1.1, A + 0.034, DZ], [0, 0, -0.38]);   // a little ramp down off the step
-    for (const s of [-1, 1]) k.box(2.6, 2.4, 0.4, CON, [DX + 1.0, A + 1.2, DZ + s * 3.3], [0, s * 0.25, 0]);   // wing walls
+    for (const s of [-1, 1]) kc.box(2.6, 2.4, 0.4, CON, [DX + 1.0, A + 1.2, DZ + s * 3.3], [0, s * 0.25, 0]);   // wing walls
     k.box(0.25, 0.2, 0.3, 0x2a2a2a, [DX + 0.15, A + 3.1, DZ]); k.cyl(0.09, 0.09, 0.18, 8, 0xfff0c8, [DX + 0.25, A + 2.95, DZ], [0, 0, Math.PI / 2]);
     for (const y of [2.88, 3.02]) k.box(0.04, 0.02, 0.24, 0x2a2a2a, [DX + 0.36, A + y, DZ]);
     k.box(0.03, 0.45, 0.7, 0xc8c0a0, [DX + 0.04, A + 2.35, DZ + 1.55]); k.box(0.035, 0.08, 0.5, 0xa03020, [DX + 0.045, A + 2.45, DZ + 1.55]);
@@ -565,7 +566,7 @@ export default class Sputnik {
     // crates, gas bottles, a work table
     for (let i = 0; i < 8; i++) { const x = -22 + r() * 6, z = -20 + r() * 10; k.box(1 + r(), 0.8 + r() * 0.6, 1 + r() * 0.5, 0x6a5a3a, [x, APRON + 0.5, z], [0, r() * 3, 0]); }
     for (let i = 0; i < 6; i++) k.cyl(0.13, 0.13, 1.4, 8, i % 2 ? 0x3a6a9a : 0x2a7a3a, [18 + i * 0.32, APRON + 0.7, 22]);
-    this.site.add(k.mesh());
+    this.site.add(k.mesh(), texSolid(kc.mesh(), 'concrete', { scale: 3, grime: 0.3, weather: 0.35, local: true }));
 
     // The service tower: a lattice tower east of the rocket with platforms reaching to it at several
     // levels, a lift cage inside, and the top platform level with Sputnik. It lowers away (pivoting at

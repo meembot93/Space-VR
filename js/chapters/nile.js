@@ -37,6 +37,11 @@ const NOSET = new URLSearchParams(location.search).has('noset');   // ?noset: th
 const GIZA = NOSET ? null : await loadGLB('sets/giza.glb');
 // ... and the priest's house you stand on, with the seven houses round it (tools/blender/egypt_village.py)
 const VILLAGE = NOSET ? null : await loadGLB('sets/egypt_village.glb');
+// the far town (past 120 m): the flat-roofed mud-brick houses built in Blender for Babylon
+// (tools/blender/babylon_city.py lo0..lo5), stretched to each plot, in place of plain blocks
+const FARH = new Map();
+if (!NOSET) { const gl = await loadGLB('sets/babylon_city.glb').catch(() => null); if (gl) { gl.scene.updateMatrixWorld(true); gl.scene.traverse((o) => { if (o.isMesh && o.name.startsWith('lo')) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); for (const a of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(a)) g.deleteAttribute(a); const n = g.attributes.position.count; g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(0.92), 3)); FARH.set(o.name, { g, map: o.material.map }); } }); } }
+const _fh = new THREE.Matrix4(), _fq = new THREE.Quaternion(), _fy = new THREE.Vector3(0, 1, 0);
 function setPieces(gltf) {
   const out = new Map(); if (!gltf) return out;
   gltf.scene.updateMatrixWorld(true);
@@ -442,6 +447,13 @@ export default class Nile {
         if (dist < 60 && r() < 0.6) P.add('amphora', x + sa * (half + 0.45) + ca * 1.3, y + 0.3, z + ca * (half + 0.45) - sa * 1.3, r() * 6, { s: 0.7 + r() * 0.3 });
         if (dist < 60 && r() < 0.25) P.add('crate_basket_set', x + sa * (half + 0.8) - ca * 1.6, y + 0.3, z + ca * (half + 0.8) + sa * 1.6, a + 2.8);
         this.roofSpots.push(new THREE.Vector3(x, top, z));
+        return;
+      }
+      if (FARH.size) {
+        const H = FARH.get('lo' + ((r() * 6) | 0)), g = H.g.clone(), side = (r() * 4) | 0, a = yaw + side * Math.PI / 2, half = (side % 2 ? w : d) / 2;
+        g.applyMatrix4(_fh.compose(new THREE.Vector3(x, y, z), _fq.setFromAxisAngle(_fy, a), side % 2 ? new THREE.Vector3(d / 10, (hgt + 0.3) / 4, w / 10) : new THREE.Vector3(w / 10, (hgt + 0.3) / 4, d / 10)));
+        k.addTextured(H.map, g);
+        this.lampSpots.push(new THREE.Vector3(x + Math.sin(a) * (half + 0.4), y + 1.6, z + Math.cos(a) * (half + 0.4))); this.roofSpots.push(new THREE.Vector3(x, top, z));
         return;
       }
       k.box(w, hgt + 0.3, d, col, [x, y + (hgt + 0.3) / 2, z], [0, yaw, 0]);

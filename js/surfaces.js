@@ -189,7 +189,7 @@ export function texSolid(mesh, kind, o = {}) {
   #ifdef USE_INSTANCING
     wp = instanceMatrix * wp; wn = mat3(instanceMatrix) * wn;
   #endif
-    vGW = (modelMatrix * wp).xyz; vGN = normalize(mat3(modelMatrix) * wn); }`);
+    vGW = (${o.local ? '' : 'modelMatrix * '}wp).xyz; vGN = normalize(${o.local ? '' : 'mat3(modelMatrix) * '}wn); }`);
     sh.fragmentShader = SOLID_FRAG + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
   vec3 sW = abs(normalize(vGN)); sW = pow(sW, vec3(4.0)); sW /= sW.x + sW.y + sW.z;
@@ -210,7 +210,7 @@ export function texSolid(mesh, kind, o = {}) {
     normal = normalize((viewMatrix * vec4(wnb, 0.0)).xyz);
   }`);
   };
-  m.customProgramCacheKey = () => 'solid3:' + kind + (m.flatShading ? 'f' : '');
+  m.customProgramCacheKey = () => 'solid3:' + kind + (m.flatShading ? 'f' : '') + (o.local ? 'L' : '');
   m.needsUpdate = true;
   mesh.material = m; mesh.userData.solid3 = true;
   return mesh;
