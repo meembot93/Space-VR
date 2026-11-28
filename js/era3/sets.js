@@ -7,6 +7,30 @@ import { Kit, FLAT, SMOOTH, segs } from '../kit.js';
 import { canvasTex } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
 import { surface } from '../surfaces.js';
+import { loadGLB } from '../models.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ---------- Furniture built in Blender (tools/blender/furniture.py) ----------
+// Rounded edges, wood grain, upholstery, baked soft shadows. desk/chair/table/shelf/armchair/sofa use
+// these (stretched to the size asked for) and fall back to boxes without them (?noset = boxes).
+// They ride along in the Kit you pass: kit.mesh() gets them as a child mesh (one per texture).
+const FURN = new Map();
+if (!new URLSearchParams(location.search).has('noset')) {
+  const gl = await loadGLB('sets/furniture.glb').catch(() => null);
+  if (gl) { gl.scene.updateMatrixWorld(true); gl.scene.traverse((o) => { if (o.isMesh) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); for (const a of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(a)) g.deleteAttribute(a); FURN.set(o.name, { g, map: o.material.map }); } }); }
+}
+const _fm = new THREE.Matrix4(), _fq = new THREE.Quaternion(), _fy = new THREE.Vector3(0, 1, 0);
+function furn(k, name, x, y, z, yaw, sx = 1, sy = 1, sz = 1, tint = null) {
+  const p = FURN.get(name); if (!p) return false;
+  const g = p.g.clone(); g.applyMatrix4(_fm.compose(new THREE.Vector3(x, y, z), _fq.setFromAxisAngle(_fy, yaw), new THREE.Vector3(sx, sy, sz)));
+  const c = new THREE.Color(tint ?? 0xffffff), n = g.attributes.position.count, col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  k.addTextured(p.map, g);
+  return true;
+}
+// a tint that turns the piece's own upholstery colour into col
+const tintFor = (col, own) => { const a = new THREE.Color(col), b = new THREE.Color(own); return new THREE.Color(Math.min(2, a.r / b.r), Math.min(2, a.g / b.g), Math.min(2, a.b / b.b)).getHex(); };
 
 // ---------- Painted surfaces ----------
 // Each returns a repeating CanvasTexture; rep: [u, v] metres per repeat
@@ -113,6 +137,7 @@ export function room(w, d, h, { floor, wall, ceil, windows = [], doors = [], ski
 export const WOOD = 0x6a4428, DARKWOOD = 0x3a2416, STEEL = 0x8a8e92;
 export function desk(k, x, z, yaw = 0, { w = 1.5, d = 0.75, h = 0.76, col = WOOD, drawers = true } = {}) {
   const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz);
+  if (drawers && furn(k, 'desk', x, 0, z, yaw, w / 1.5, h / 0.76, d / 0.75, tintFor(col, WOOD))) return;
   k.box(w, 0.04, d, col, R(0, h - 0.02, 0), [0, yaw, 0]);
   if (drawers) { k.box(0.42, h - 0.05, d - 0.05, col, R(-w / 2 + 0.23, (h - 0.05) / 2, 0), [0, yaw, 0]); for (let i = 0; i < 3; i++) { k.box(0.38, 0.18, 0.01, shadeHex(col, 0.85), R(-w / 2 + 0.23, 0.15 + i * 0.22, d / 2 - 0.02), [0, yaw, 0]); k.box(0.08, 0.015, 0.02, 0xc8b070, R(-w / 2 + 0.23, 0.18 + i * 0.22, d / 2), [0, yaw, 0]); } }
   for (const [sx, sz] of [[1, 1], [1, -1]].concat(drawers ? [] : [[-1, 1], [-1, -1]])) k.box(0.05, h - 0.04, 0.05, col, R(sx * (w / 2 - 0.05), (h - 0.04) / 2, sz * (d / 2 - 0.05)), [0, yaw, 0]);
@@ -120,6 +145,7 @@ export function desk(k, x, z, yaw = 0, { w = 1.5, d = 0.75, h = 0.76, col = WOOD
 }
 export function chair(k, x, z, yaw = 0, { col = WOOD, seat = 0x6a2a1e, h = 0.46 } = {}) {
   const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz);
+  if (furn(k, 'chair', x, 0, z, yaw, 1, h / 0.46, 1, tintFor(col, WOOD))) return;
   k.box(0.44, 0.05, 0.42, seat, R(0, h, 0), [0, yaw, 0]);
   for (const [sx, sz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) k.box(0.035, h, 0.035, col, R(sx * 0.19, h / 2, sz * 0.18), [0, yaw, 0]);
   for (const sx of [-1, 1]) k.box(0.035, 0.5, 0.035, col, R(sx * 0.19, h + 0.25, -0.18), [0, yaw, 0]);
@@ -127,6 +153,7 @@ export function chair(k, x, z, yaw = 0, { col = WOOD, seat = 0x6a2a1e, h = 0.46 
 }
 export function armchair(k, x, z, yaw = 0, { col = 0x6a3a2a, leg = DARKWOOD } = {}) {
   const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz);
+  if (furn(k, 'armchair', x, 0, z, yaw, 1, 1, 1, tintFor(col, 0x7a3a2a))) return;
   k.box(0.72, 0.22, 0.7, col, R(0, 0.3, 0), [0, yaw, 0]);
   k.box(0.6, 0.12, 0.58, shadeHex(col, 1.1), R(0, 0.46, 0.04), [0, yaw, 0]);
   k.box(0.72, 0.6, 0.16, col, R(0, 0.65, -0.29), [0, yaw, 0]);
@@ -135,6 +162,7 @@ export function armchair(k, x, z, yaw = 0, { col = 0x6a3a2a, leg = DARKWOOD } = 
 }
 export function sofa(k, x, z, yaw = 0, { col = 0x4a5a3a, w = 1.8 } = {}) {
   const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz);
+  if (furn(k, 'sofa', x, 0, z, yaw, w / 1.8, 1, 1, tintFor(col, 0x4a5a3a))) return;
   k.box(w, 0.24, 0.8, col, R(0, 0.3, 0), [0, yaw, 0]);
   for (let i = 0; i < 3; i++) k.box(w / 3 - 0.04, 0.12, 0.66, shadeHex(col, 1.1), R((i - 1) * w / 3, 0.47, 0.05), [0, yaw, 0]);
   k.box(w, 0.55, 0.18, col, R(0, 0.62, -0.32), [0, yaw, 0]);
@@ -142,17 +170,17 @@ export function sofa(k, x, z, yaw = 0, { col = 0x4a5a3a, w = 1.8 } = {}) {
 }
 export function table(k, x, z, yaw = 0, { w = 1.2, d = 0.8, h = 0.75, col = WOOD, cloth = null } = {}) {
   const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz);
+  if (furn(k, 'table', x, 0, z, yaw, w / 1.2, h / 0.75, d / 0.8, tintFor(col, WOOD))) { if (cloth) k.box(w + 0.1, 0.01, d + 0.1, cloth, R(0, h + 0.005, 0), [0, yaw, 0]); return; }
   k.box(w, 0.04, d, col, R(0, h - 0.02, 0), [0, yaw, 0]);
   if (cloth) k.box(w + 0.1, 0.01, d + 0.1, cloth, R(0, h + 0.005, 0), [0, yaw, 0]);
   for (const [sx, sz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) k.box(0.05, h - 0.04, 0.05, col, R(sx * (w / 2 - 0.06), (h - 0.04) / 2, sz * (d / 2 - 0.06)), [0, yaw, 0]);
 }
 export function shelf(k, x, z, yaw = 0, { w = 1.0, h = 1.8, d = 0.32, col = WOOD, seed = 3, books = true } = {}) {
   const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz), r = rng(seed);
-  for (const sx of [-1, 1]) k.box(0.03, h, d, col, R(sx * w / 2, h / 2, 0), [0, yaw, 0]);
-  k.box(w, h, 0.02, shadeHex(col, 0.8), R(0, h / 2, -d / 2), [0, yaw, 0]);
-  const n = Math.round(h / 0.36);
+  const n = Math.round(h / 0.36), model = n === 5 && furn(k, 'shelf', x, 0, z, yaw, w / 1.0, h / 1.8, d / 0.32, tintFor(col, WOOD));
+  if (!model) { for (const sx of [-1, 1]) k.box(0.03, h, d, col, R(sx * w / 2, h / 2, 0), [0, yaw, 0]); k.box(w, h, 0.02, shadeHex(col, 0.8), R(0, h / 2, -d / 2), [0, yaw, 0]); }
   for (let i = 0; i <= n; i++) {
-    const y = i * h / n; k.box(w, 0.025, d, col, R(0, y, 0), [0, yaw, 0]);
+    const y = i * h / n; if (!model) k.box(w, 0.025, d, col, R(0, y, 0), [0, yaw, 0]);
     if (books && i < n) { let bx = -w / 2 + 0.03; while (bx < w / 2 - 0.06) { const bw = 0.025 + r() * 0.035, bh = 0.2 + r() * 0.1; if (r() < 0.9) k.box(bw, bh, d * 0.8, [0x6a1a1a, 0x1a3a5a, 0x2a4a2a, 0x8a6a3a, 0x3a2a4a, 0xc8b890, 0x5a3a1a][(r() * 7) | 0], R(bx + bw / 2, y + 0.015 + bh / 2, 0.01), [0, yaw, 0]); bx += bw + 0.004; } }
   }
 }
