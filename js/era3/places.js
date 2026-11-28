@@ -8,6 +8,7 @@ import { loadProps } from '../props.js';
 import { rng } from '../shapes.js';
 import { loadE3, copy } from './craft.js';
 import { room, surfMat, quad, desk, chair, shelf, deskLamp, picture } from './sets.js';
+import { texSolid } from '../surfaces.js';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // Von Braun's office: a desk under two windows looking out on the green hills of north Alabama, his
@@ -60,8 +61,33 @@ export function riceStadium(ch, name = 'stadium') {
   for (let i = -4; i <= 4; i++) k.box(0.15, 0.02, 60, 0xf0f0e8, [i * 9, 0.01, -20]);
   // the stands: concrete steps in a bowl round three sides (north, east, west)
   const stepsN = 32, rise = 0.48, tread = 0.85;
-  const stand = (cx, cz, yaw, w, r0) => { for (let i = 0; i < stepsN; i++) { const d = r0 + i * tread, y = 0.6 + i * rise; const p = V(0, y / 2, -d).applyAxisAngle(V(0, 1, 0), yaw); k.box(w, y, tread, i % 2 ? 0xb8b2a6 : 0xc4beb2, [cx + p.x, p.y, cz + p.z], [0, yaw, 0]); } };
+  // (the steps, rim wall, columns and press box are concrete: real photo texture, js/surfaces.js)
+  const kc = new Kit(), Y = V(0, 1, 0);
+  const at = (cx, cz, yaw, u, y, d) => { const p = V(u, y, -d).applyAxisAngle(Y, yaw); return [cx + p.x, p.y, cz + p.z]; };
+  const stand = (cx, cz, yaw, w, r0) => {
+    for (let i = 0; i < stepsN; i++) { const d = r0 + i * tread, y = 0.6 + i * rise; kc.box(w, y, tread, i % 2 ? 0xb8b2a6 : 0xc4beb2, at(cx, cz, yaw, 0, y / 2, d), [0, yaw, 0]); }
+    const dTop = r0 + stepsN * tread, yTop = 0.6 + (stepsN - 1) * rise;
+    // a rim wall along the top row with a pipe railing, and the back of the stand on concrete columns
+    kc.box(w, 1.1, 0.3, 0xb0aa9e, at(cx, cz, yaw, 0, yTop + 0.55, dTop - 0.15), [0, yaw, 0]);
+    k.box(w, 0.05, 0.05, 0x8a8a84, at(cx, cz, yaw, 0, yTop + 1.45, dTop - 0.25), [0, yaw, 0]);
+    for (let u = -w / 2 + 3; u < w / 2; u += 6) {
+      k.box(0.05, 0.35, 0.05, 0x8a8a84, at(cx, cz, yaw, u, yTop + 1.25, dTop - 0.25), [0, yaw, 0]);
+      kc.box(1.1, yTop + 1.1, 1.2, 0xa8a296, at(cx, cz, yaw, u, (yTop + 1.1) / 2, dTop + 0.55), [0, yaw, 0]);   // a column down the back
+    }
+    // entry tunnels (dark mouths) in the front wall, and a band of shadow under the first row
+    for (let u = -w / 2 + 10; u < w / 2 - 5; u += 20) k.box(2.4, 2.1, 0.06, 0x14120f, at(cx, cz, yaw, u, 1.05, r0 - tread / 2 - 0.02), [0, yaw, 0]);
+  };
   stand(0, STAGE_Z, 0, 120, 24); stand(-42, -20, Math.PI / 2, 80, 6); stand(42, -20, -Math.PI / 2, 80, 6);
+  // the press box high on the north stand: a long glazed cabin on the top rim
+  { const d = 24 + stepsN * tread, y = 0.6 + stepsN * rise + 1.1; kc.box(50, 4.2, 4.5, 0xbab4a8, [0, y + 2.1, STAGE_Z - d - 1.5]); kc.box(52, 0.3, 5.5, 0x9a948a, [0, y + 4.35, STAGE_Z - d - 1.5]);
+    for (let x = -23.5; x <= 23.5; x += 2.5) k.box(2.1, 1.6, 0.05, 0x22303a, [x, y + 2.4, STAGE_Z - d + 0.78]); }
+  // four floodlight towers outside the corners: tapered steel masts with banks of lamps
+  for (const [x, z] of [[-62, STAGE_Z - 40], [62, STAGE_Z - 40], [-62, 8], [62, 8]]) {
+    k.box(1.4, 34, 1.4, 0x7a7a76, [x, 17, z], null, [0.5, 1, 0.5]); k.box(2.2, 2, 2.2, 0x6a6a66, [x, 1, z]);
+    k.box(7, 3.2, 0.6, 0x5a5a56, [x, 35.5, z], [0, Math.atan2(-x, -z + (STAGE_Z - 16)), 0]);
+    for (let i = 0; i < 12; i++) k.box(0.9, 0.7, 0.12, 0xe8e4d0, [x + ((i % 4) - 1.5) * 1.6 * Math.cos(Math.atan2(-x, -z + (STAGE_Z - 16))), 34.6 + Math.floor(i / 4) * 0.95, z - ((i % 4) - 1.5) * 1.6 * Math.sin(Math.atan2(-x, -z + (STAGE_Z - 16)))], [0, Math.atan2(-x, -z + (STAGE_Z - 16)), 0]);
+  }
+  g.add(texSolid(kc.mesh(FLAT), 'concrete', { scale: 3, ground: 0, grime: 0.3, weather: 0.35 }));
   // the speakers' stand: a platform with bunting, the lectern and its microphones, flags
   k.box(14, 1.4, 6, 0x6a5a48, [0, 0.7, STAGE_Z]);
   for (let i = 0; i < 9; i++) k.box(1.5, 0.6, 0.05, i % 3 === 0 ? 0xb02030 : i % 3 === 1 ? 0xf0ece4 : 0x2a3a6a, [-6 + i * 1.5, 1.05, STAGE_Z + 3.02]);
@@ -79,7 +105,27 @@ export function riceStadium(ch, name = 'stadium') {
   for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) { const d = 6 + i * tread + 0.4, y = 0.6 + i * rise; for (let z = -2; z >= -30; z -= 0.62) if (r() < 0.85) spots.push({ x: sx * (42 - d), y, z, yaw: -sx * Math.PI / 2 + (r() - 0.5) * 0.3 }); }
   R.ricers = new Crowd(spots, { seed: 33, sit: true, who: ['man_casual', 'woman_dress', 'man_suit', 'woman_summer', 'woman_office', 'woman_older', 'eng_white_shirt', 'girl', 'boy'] });
   g.add(R.ricers.group);
-  const far = surfMat('plaster', '#c8c0b0'); far.map = canvasTex(512, 256, (c, w, h) => { const rr = rng(9); c.fillStyle = '#b8b0a0'; c.fillRect(0, 0, w, h); for (let y = 6; y < h; y += 16) for (let x = 2; x < w; x += 7 + rr() * 3) { c.fillStyle = ['#e8e4dc', '#d8d0c0', '#a8c0d8', '#c8b090', '#f0f0ea', '#8aa0c0', '#d8b8a8'][Math.floor(rr() * 7)]; c.fillRect(x, y, 5, 8); c.fillStyle = ['#e8c8a8', '#c89878', '#8a5a3a'][Math.floor(rr() * 3)]; c.fillRect(x + 1, y - 4, 3, 4); } }); far.map.wrapS = far.map.wrapT = THREE.RepeatWrapping; far.map.repeat.set(8, 3);
+  // the far rows: a painted crowd, one band per concrete step (people in 1962 summer clothes, a few
+  // empty seats, hats, fans), each band with the step's lit tread and shadowed riser
+  const far = surfMat('plaster', '#c8c0b0'); far.map = canvasTex(1024, 512, (c, w, h) => {
+    const rr = rng(9), RH = 32;
+    for (let row = 0; row < 16; row++) {
+      const y0 = row * RH;
+      c.fillStyle = '#b4ada0'; c.fillRect(0, y0, w, RH); c.fillStyle = '#8a8478'; c.fillRect(0, y0 + RH - 7, w, 7); c.fillStyle = '#cfc8ba'; c.fillRect(0, y0 + RH - 9, w, 2);
+      for (let x = 2 + rr() * 6; x < w - 10; x += 12 + rr() * 5) {
+        if (rr() < 0.08) continue;   // an empty seat
+        const shirt = ['#f0eee8', '#e8e4da', '#f4f2ec', '#a8c0d8', '#d8c8a8', '#c8d4e0', '#e0b8a8', '#9ab0c8', '#e8d8b0', '#5a6a8a', '#f0f0ea', '#c8a878'][Math.floor(rr() * 12)];
+        const skin = ['#e8c8a8', '#d8a888', '#c89878', '#8a5a3a', '#f0d0b8'][Math.floor(rr() * 5)];
+        const by = y0 + RH - 9 - 13;
+        c.fillStyle = shirt; c.fillRect(x, by, 9, 13);
+        c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(x + 7, by, 2, 13);
+        c.fillStyle = skin; c.fillRect(x + 2, by - 6, 5, 6);
+        const hair = rr(); c.fillStyle = hair < 0.15 ? '#e8e0c8' : hair < 0.3 ? '#2a2a2a' : ['#3a2a1a', '#5a4028', '#8a6a3a', '#1a1612'][Math.floor(rr() * 4)];
+        if (hair < 0.15) c.fillRect(x, by - 8, 9, 3); else c.fillRect(x + 2, by - 7, 5, 2);   // a straw hat, or hair
+        if (rr() < 0.06) { c.fillStyle = '#f4f0e0'; c.fillRect(x + 6, by - 4, 5, 5); }   // a fan or a programme
+      }
+    }
+  }); far.map.wrapS = far.map.wrapT = THREE.RepeatWrapping; far.map.repeat.set(3, 23 / 16);
   const farRows = (cx, cz, yaw, w, d0, i0) => { const len = (stepsN - i0) * Math.hypot(tread, rise); const p = new THREE.Mesh(new THREE.PlaneGeometry(w, len), far); const dmid = d0 + (i0 + (stepsN - i0) / 2) * tread, ymid = 0.6 + (i0 + (stepsN - i0) / 2) * rise + 0.55; const o = V(0, ymid, -dmid).applyAxisAngle(V(0, 1, 0), yaw); p.position.set(cx + o.x, o.y, cz + o.z); p.rotation.set(-Math.PI / 2 + Math.atan2(tread, rise), yaw, 0, 'YXZ'); g.add(p); };
   farRows(0, STAGE_Z, 0, 120, 24, 9); farRows(-42, -20, Math.PI / 2, 80, 6, 6); farRows(42, -20, -Math.PI / 2, 80, 6, 6);
   // Kennedy at the lectern; Glenn and von Braun sitting behind him; a few dignitaries
