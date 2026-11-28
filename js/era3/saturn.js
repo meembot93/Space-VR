@@ -15,7 +15,7 @@ export const SATURN = ['craft/saturn_s1c', 'craft/saturn_interstage', 'craft/sat
 export const SAT_Y = { s1c: 0, interstage: 42, s2: 47.5, s4b: 78.2, sla: 96.9, csm: 111.9, les: 111.9 };
 export const SAT_TOP = 124.3;          // the top of the escape tower
 export const PAD_Y = 8.6;              // on the launch tower's platform, the rocket's bottom is this high
-export const CREW_ARM_Y = SAT_Y.csm + 0.3;   // the crew access arm's floor (by the hatch), above the rocket's bottom
+export const CREW_ARM_Y = 112.46;          // the crew access arm's walkway (arm 9, by the hatch), above the rocket's bottom
 
 // Rocket() options: the pieces in the order they come off, the five F-1s on the first stage, the
 // five J-2s on the second, one J-2 on the third
@@ -40,3 +40,14 @@ export function saturnStack(M, env = null, k = 0.9) {
   for (const p of saturnRocket(M).parts) { if (!p.M) continue; const m = copy(p.M, env, k); m.position.y = p.y; g.add(m); }
   return g;
 }
+
+// The launch tower's layout (tools/blender/launch_tower.py), in its own space: the rocket's axis at
+// x = z = 0, the tower behind it (-z). The crew access arm runs from the tower face to the white
+// room round the CM hatch; the elevator shaft is in the middle of the tower.
+export const TOWER = {
+  face: -13, back: -25, halfX: 6,                  // the tower's front and back faces (z) and half-width
+  shaft: { x: 0, z: -19, size: 3.2 },              // the elevator shaft
+  arm: { x: 0, halfW: 1.2, z0: -13, z1: -1.9 },    // the crew access arm's walkway
+  whiteRoom: { x: 0, z: -3.0, w: 3.0, d: 3.0, h: 2.6 },
+  top: 125.6,                                      // the crane deck
+};
