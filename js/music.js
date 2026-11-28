@@ -29,6 +29,28 @@ const MOMENTS = {
   ch12: { line: 'ch12_03', at: 'Something must be pulling', hold: true },   // Newton puts it together: something pulls the apple down
   ch13: { line: 'ch13_01', at: 'how do you get there' },  // right at the start, dreaming of space (Meem's pick); none for Goddard or the V-2
   ch14: { when: (ch) => ch.s?.phase === 'liftoff', vol: 0.95, hold: true }, // the instant the countdown ends and the rocket lifts off (Meem's pick), on to the end
+  // Era 3 (sounds/music: Claude made these with ElevenLabs Music, plan in /music/era3/ERA3_MUSIC_PLAN.md)
+  ch15: { line: 'ch15_16' },
+  ch16: { line: 'ch16_13', hold: true },
+  ch17: { line: 'ch17_17' },
+  ch18: { line: 'ch18_11' },
+  ch19: { line: 'ch19_12' },
+  ch20: { line: 'ch20_11', hold: true },
+  ch21: { line: 'ch21_10', hold: true },
+  ch22: { line: 'ch22_09' },
+  ch23: { line: 'ch23_07', hold: true },
+  ch24: { line: 'ch24_04' },
+  ch25: { line: 'ch25_02' },
+  ch26: { line: 'ch26_16', hold: true },
+  ch27: { line: 'ch27_06', hold: true },
+  ch28: { line: 'ch28_05' },
+  ch29: { line: 'ch29_05', hold: true },
+  ch30: { line: 'ch30_06' },
+  ch31: { line: 'ch31_10', hold: true },
+  ch32: { line: 'ch32_07' },
+  ch33: { line: 'ch33_03', hold: true },
+  ch34: { line: 'ch34_15', hold: true },
+  ch35: { line: 'ch35_08', hold: true },
 };
 const SCORE_SECS = 50; // how long the generated score plays at a moment (when there's no music file)
 

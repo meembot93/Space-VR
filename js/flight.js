@@ -30,7 +30,30 @@ export const PLACES = {
   12: { year: '1666', place: 'Woolsthorpe, England' },
   13: { year: '1903 to 1944', place: 'Russia, America, Germany' },
   14: { year: '1957', place: 'Kazakhstan, Soviet Union' },
+  15: { year: '1957 to 1961', place: 'Moscow, Baikonur, Cape Canaveral' },
+  16: { year: '1961', place: 'Baikonur, Soviet Union' },
+  17: { year: '1961 to 1962', place: 'Cape Canaveral, Florida' },
+  18: { year: '1963 to 1965', place: 'Baikonur, and above the Earth' },
+  19: { year: '1965 to 1966', place: 'Gemini, in orbit' },
+  20: { year: '1967', place: 'Cape Kennedy, Florida' },
+  21: { year: 'Christmas 1968', place: 'Around the Moon' },
+  22: { year: '16 July 1969', place: 'Kennedy Space Center' },
+  23: { year: '16 July 1969', place: 'Launch Pad 39A' },
+  24: { year: '1969', place: 'Between the Earth and the Moon' },
+  25: { year: '19 July 1969', place: 'Around the Moon' },
+  26: { year: '20 July 1969', place: 'The Sea of Tranquility' },
+  27: { year: '20 July 1969', place: 'Tranquility Base, the Moon' },
+  28: { year: '21 July 1969', place: 'Above the Moon' },
+  29: { year: '24 July 1969', place: 'The Pacific Ocean' },
+  30: { year: 'April 1970', place: 'On the way to the Moon' },
+  31: { year: '13 April 1970', place: 'Odyssey and Houston' },
+  32: { year: 'April 1970', place: 'Behind the Moon' },
+  33: { year: 'April 1970', place: 'Houston, and Aquarius' },
+  34: { year: '17 April 1970', place: 'Home' },
+  35: { year: 'July 1975', place: 'Above the Earth' },
 };
+// Astra's line on the flight into a chapter (Era 3)
+export const FLIGHT_LINES = { 15: 'fl3_01', 16: 'fl3_03', 17: 'fl3_02', 18: 'fl3_04', 20: 'fl3_05', 21: 'fl3_06', 30: 'fl3_07', 35: 'fl3_08' };
 const GAP = 36;     // metres between chapter markers on the ribbon
 const DROP = 1.25;  // how far below your eyes the ribbon runs
 // The diorama: where it stands in front of you (its base top, metres from your eyes), how big
@@ -155,7 +178,14 @@ export class Flight {
     G.soundscape?.setLevel(0);
     // the flight's own music, if Meem's track is listed in sounds/music/index.json ("flight", and
     // "flight_era" for the flight into a new era); it fades as the next chapter starts
-    G.music.ready.then(() => { const f = (newEra && G.music.files.flight_era) || G.music.files.flight; if (f && this.active) G.music.sting(f, 0.7); });
+    G.music.ready.then(() => {
+      const M = G.music.files, e3 = info?.era === 3;
+      const f = e3 ? ((newEra && M.flight_era3) || M.flight3 || M.flight) : ((newEra && M.flight_era) || M.flight);
+      if (f && this.active) G.music.sting(f, 0.7);
+    });
+    // Astra says a word on the way (Era 3)
+    const line = FLIGHT_LINES[to];
+    if (line) setTimeout(() => { if (this.active) G.narration.say(line); }, G.params.has('fast') ? 100 : 1800);
     const A = G.audio;
     if (A.ctx) {
       // a soft rushing sound for the glide, and a warm swell
