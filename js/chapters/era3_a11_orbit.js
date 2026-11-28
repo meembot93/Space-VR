@@ -121,7 +121,7 @@ export default class A11Orbit extends Chapter3 {
     this.corona.position.copy(this.moonDir).multiplyScalar(1500).add(EYE); this.corona.scale.setScalar(260 * 2 * (1500 / 720) * 2.8); this.corona.renderOrder = -1; g.add(this.corona);
     // the ship, lying across in front of you, Columbia's engine bell towards you
     const st = this.stackS = stack(envMap('space')); st.rotation.set(0, 0.5, -Math.PI / 2 - 0.15); st.position.set(-5, -1.6, -20); g.add(st);
-    this.addScene('shadow', { group: g, bounds: 0.4, amb: 0, fogFar: 9000,
+    this.addScene('shadow', { group: g, bounds: 0.4, amb: 0, fogFar: 9000, airless: true,
       enter: () => { this.G.sky.set(200, -60); },
       update: (dt, t) => {
         const s = this.s;
@@ -173,7 +173,7 @@ export default class A11Orbit extends Chapter3 {
     const moon = this.moonO = orbitGround(31); g.add(moon);
     const st = this.stackO = stack(envMap('moon')); st.rotation.set(0.1, 0.2, -Math.PI / 2); st.position.set(-1.0, 1.0, -13); g.add(st);
     this.sunO = spaceSun(60); g.add(this.sunO);
-    this.addScene('orbit', { group: g, bounds: 0.4, amb: 0, fogFar: 9000,
+    this.addScene('orbit', { group: g, bounds: 0.4, amb: 0, fogFar: 9000, airless: true,
       enter: () => { this.G.sky.set(200, -60); },
       update: (dt, t) => {
         moon.userData.slide(dt * this.F);
@@ -192,7 +192,7 @@ export default class A11Orbit extends Chapter3 {
     this.neilT = person(C.group, 'armstrong', V(-1.0, 0.45, -0.25), 0.9); this.buzzT = person(C.group, 'aldrin', V(0.95, 0.3, -0.3), -1.1);
     holdProp(this.neilT, copy(M.helmet_apollo), 'Right', [0, 0.12, 0.05]);
     this.people.push(this.neilT, this.buzzT);
-    this.addScene('tunnel', { group: g, bounds: 0.2, indoors: true, amb: 0, fogFar: 9000,
+    this.addScene('tunnel', { group: g, bounds: 0.2, indoors: true, airless: true, amb: 0, fogFar: 9000,
       enter: () => { C.lights(true); this.G.sky.set(200, -60); },
       update: (dt, t) => {
         const s = this.s;
@@ -218,7 +218,7 @@ export default class A11Orbit extends Chapter3 {
     this.pads = [[rx, 0], [-rx, 0], [0, rz], [0, -rz]].map(([x, z]) => { const sp = glowSprite(0x9adcff, 1.6, 0); sp.position.set(x, fy, z); piv.add(sp); return sp; });
     this.eagleIt = this.touchable('eagle', piv, { hint: 'Point at Eagle, so Mike can check its four legs', deskHint: 'Click on Eagle to check its legs', r: 4.5, grab: false });
     this.sunU = spaceSun(60); g.add(this.sunU);
-    this.addScene('undock', { group: g, bounds: 0.4, amb: 0, fogFar: 9000,
+    this.addScene('undock', { group: g, bounds: 0.4, amb: 0, fogFar: 9000, airless: true,
       enter: () => { this.G.sky.set(200, -60); },
       update: (dt, t) => {
         const s = this.s;

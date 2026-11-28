@@ -149,7 +149,7 @@ export default class A11TLC extends Chapter3 {
     this.coas = coas;
     this.hcIt = this.touchable('dock', () => (C.handController ? C.handController.getWorldPosition(new THREE.Vector3()) : C.group.localToWorld(V(0.32, 0.98, -0.32))), { hint: 'Grip the hand controller by your right hand, and fly in', deskHint: 'Click the hand controller by your right hand', r: 0.2 });
     this.hcGlow = glowSprite(0x80c0ff, 0.25, 0); C.group.add(this.hcGlow);
-    this.addScene('dock', { group: g, bounds: 0.2, indoors: true, amb: 0, fogFar: 9000,
+    this.addScene('dock', { group: g, bounds: 0.2, indoors: true, airless: true, amb: 0, fogFar: 9000,
       enter: () => { C.lights(true); this.G.sky.set(200, -40); },
       update: (dt, t) => {
         const s = this.s;
@@ -197,7 +197,7 @@ export default class A11TLC extends Chapter3 {
     this.earthC = earthDisc(); g.add(this.earthC);
     this.beams = C.windows.map((w) => { const s = glowSprite(0xfff4d8, 0.5, 0); s.position.copy(w.local).multiplyScalar(0.98).add(EYE); g.add(s); return { s, a: Math.atan2(w.local.x, w.local.y) }; });
     this.thumbIt = this.touchable('thumb', () => C.group.localToWorld(EYE.clone().addScaledVector(this.winC, 0.42)), { hint: 'Hold up your hand in front of the window, and hide the Earth behind your thumb', deskHint: 'Click the little blue Earth in the window', r: 0.09, grab: false });
-    this.addScene('coast', { group: g, bounds: 0.25, indoors: true, amb: 0, fogFar: 9000,
+    this.addScene('coast', { group: g, bounds: 0.25, indoors: true, airless: true, amb: 0, fogFar: 9000,
       enter: () => { C.lights(true); this.G.sky.set(200, -40); },
       update: (dt, t) => {
         const s = this.s;
