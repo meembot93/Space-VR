@@ -9,6 +9,7 @@ import { moonFields } from '../moontex.js';
 import { rng, noise2 } from '../shapes.js';
 import { canvasTex, clamp } from '../util.js';
 import { FLAT } from '../kit.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const _a = new THREE.Vector3();
@@ -102,7 +103,7 @@ export function moonGlobe(R = 100, { seg = 160, relief = 1.4 } = {}) {   // reli
 // A patch `size` m across: soft grey dust with small craters, rocks and boulders, footprints can
 // be pressed into it; it curves gently down at the edges so the horizon is close, like on the Moon.
 // opts: { size, seed, craters: [[x, z, r, depth]], flatten: [[x, z, r]] (keep flat, e.g. under the lander), boulders }
-export function moonGround({ size = 600, seg = 220, seed = 11, craters = [], flatten = [], boulders = [], rocks = 900 } = {}) {
+export function moonGround({ size = 600, seg = 220, seed = 11, craters = [], flatten = [], boulders = [], rocks = 900, clear = [] } = {}) {
   const N1 = noise2(seed), N2 = noise2(seed + 1), N3 = noise2(seed + 2), r = rng(seed);
   const cr = [...craters];
   for (let i = 0; i < 140; i++) { const a = r() * 6.28, d = 20 + Math.pow(r(), 0.7) * size * 0.45, rad = 0.6 + Math.pow(r(), 3) * 14; cr.push([Math.cos(a) * d, Math.sin(a) * d, rad, rad * (0.18 + r() * 0.1)]); }
@@ -139,12 +140,24 @@ export function moonGround({ size = 600, seg = 220, seed = 11, craters = [], fla
   const ground = new THREE.Mesh(g, mat);
   // rocks scattered about, and the boulders named by the chapter, in one mesh
   const rk = [];
-  for (let i = 0; i < rocks; i++) { const a = r() * 6.28, d = 3 + Math.pow(r(), 1.5) * size * 0.4, s = 0.05 + Math.pow(r(), 5) * 0.8; rk.push([Math.cos(a) * d, Math.sin(a) * d, s]); }
+  for (let i = 0; i < rocks; i++) {
+    const a = r() * 6.28, d = 3 + Math.pow(r(), 1.5) * size * 0.4, x = Math.cos(a) * d, z = Math.sin(a) * d; let s = 0.05 + Math.pow(r(), 5) * 0.8;
+    for (const [cx, cz, cr, cs] of clear) if (Math.hypot(x - cx, z - cz) < cr) s = Math.min(s, cs);   // keep the ground where people walk clear of big rocks
+    rk.push([x, z, s]);
+  }
   for (const b of boulders) rk.push(b);
-  const rg = new THREE.IcosahedronGeometry(1, 1), rp = rg.attributes.position;
-  for (let i = 0; i < rp.count; i++) { const k = 0.75 + r() * 0.45; rp.setXYZ(i, rp.getX(i) * k, rp.getY(i) * k * 0.7, rp.getZ(i) * k); }
+  // a lumpy rock: a rounded ball pushed about by noise (the same spot always moves the same way, so
+  // the shared corners stay joined), squashed, with a few flat faces where it broke
+  const ico = new THREE.IcosahedronGeometry(1, 3); ico.deleteAttribute('uv'); ico.deleteAttribute('normal');
+  const rg = mergeVertices(ico), rp = rg.attributes.position, RN = noise2(seed + 5);
+  for (let i = 0; i < rp.count; i++) {
+    const x = rp.getX(i), y = rp.getY(i), z = rp.getZ(i);
+    let k = 0.82 + (RN(x * 1.3 + 3, z * 1.3 + y) - 0.5) * 0.5 + (RN(x * 3.1, y * 3.1 + z) - 0.5) * 0.16;
+    if (x * 0.6 + y * 0.3 - z * 0.7 > 0.55) k *= 0.88;   // a broken face
+    rp.setXYZ(i, x * k, y * k * 0.68, z * k);
+  }
   rg.computeVertexNormals();
-  const rocksM = new THREE.InstancedMesh(rg, new THREE.MeshStandardMaterial({ color: 0x8a8884, roughness: 1, flatShading: true }), rk.length);
+  const rocksM = new THREE.InstancedMesh(rg, new THREE.MeshStandardMaterial({ color: 0x8a8884, roughness: 1 }), rk.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
   rk.forEach(([x, z, s], i) => { m.compose(new THREE.Vector3(x, H(x, z) + s * 0.2, z), q.setFromEuler(e.set(r(), r() * 6, r())), new THREE.Vector3(s, s, s)); rocksM.setMatrixAt(i, m); });
   const grp = new THREE.Group(); grp.add(ground, rocksM);
