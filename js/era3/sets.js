@@ -39,7 +39,7 @@ export function surf(kind, col = null) {
 // a material with a painted surface repeating every `rep` metres (world-sized UVs from boxUV)
 // Real photo detail (js/surfaces.js) for the plain kinds; patterned ones (wallpaper, tiles, acoustic,
 // panelling) keep their painted pattern and get the photo's bumps only.
-const REAL = { boards: 'boards', parquet: 'parquet', concrete: 'concrete', brick: 'brick', plaster: 'plaster', deck: 'boards', grass: null };
+const REAL = { boards: 'boards', parquet: 'parquet', concrete: 'concrete', brick: 'brick', plaster: 'plaster', deck: 'boards', grass: 'grass' };
 const BUMPS = { wallpaper: 'plaster', tiles: 'marble', lino: 'marble', panelwood: 'boards', acoustic: 'plaster' };
 export function surfMat(kind, col, { rough = 0.9, metal = 0, tint = 0xffffff, emissive = 0 } = {}) {
   if (REAL[kind] && !emissive) { const m = surface(REAL[kind], col, { rough, metal, tint, rep: kind === 'lino' ? 0.5 : 1 }); if (m) return m; }
