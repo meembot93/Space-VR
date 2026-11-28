@@ -15,7 +15,7 @@ const [n, out, ...views] = process.argv.slice(2);
     await page.goto(`http://localhost:${srv.address().port}/index.html?autostart&chapter=${n}${mode === 'old' ? '&notex&noset' : ''}${process.env.Q || ''}`);
     await page.waitForFunction(() => window.G?.director?.running, null, { timeout: 180000 });
     await page.waitForTimeout(Number(process.env.SETTLE || 5000));
-    const y0 = await page.evaluate(() => { G.director.stop(); G.narration.stop(); G.ui.subtitle?.(''); G.ui.fadeIn?.(0.01); if (window.__pre) eval(window.__pre); return G.player.yaw; });
+    const y0 = await page.evaluate(() => { console.log('warning grounds', G.groundCount); G.director.stop(); G.narration.stop(); G.ui.subtitle?.(''); G.ui.fadeIn?.(0.01); if (window.__pre) eval(window.__pre); return G.player.yaw; });
     if (process.env.JS) await page.evaluate(process.env.JS);
     for (const v of views) {
       const [yaw, pitch] = v.split(' ').map(Number);

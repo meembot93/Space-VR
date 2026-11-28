@@ -96,12 +96,13 @@ export function groundMaterial(base, o = {}) {
 
 // Give a ground mesh the ground shader (replaces its material with a smooth-shaded copy)
 export function texGround(mesh, o = {}) {
-  if (OFF || !mesh?.material) return mesh;
+  if (OFF || !mesh?.material || mesh.userData.ground3) return mesh;
   const old = mesh.material;
   const m = old.isMeshLambertMaterial || old.isMeshStandardMaterial ? old.clone() : new THREE.MeshLambertMaterial({ vertexColors: true });
   m.vertexColors = true;
   if (!mesh.geometry.attributes.normal || old.flatShading) mesh.geometry.computeVertexNormals();
   mesh.material = groundMaterial(m, o);
+  mesh.userData.ground3 = true;
   return mesh;
 }
 
@@ -125,8 +126,8 @@ export function surfaceTex(kind, rep = 1) {
   const S = SURF[kind]; if (!S) return null;
   const k = `${kind}@${rep}`;
   if (cache.has(k)) return cache.get(k);
-  const d = tex(`surf/${kind}_d.jpg`).clone(), n = tex(`surf/${kind}_n.jpg`).clone();
-  for (const t of [d, n]) { t.repeat.set(S.rep * rep, S.rep * rep); }
+  const one = (f) => { const t = loader.load(DIR + f); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = THREE.NoColorSpace; t.repeat.set(S.rep * rep, S.rep * rep); return t; };
+  const d = one(`surf/${kind}_d.jpg`), n = one(`surf/${kind}_n.jpg`);
   const r = { d, n }; cache.set(k, r); return r;
 }
 // Turn a material that shows a flat colour (or a painted canvas) into one with real detail
@@ -139,4 +140,78 @@ export function surface(kind, col = null, { rough = 0.9, metal = 0, tint = 0xfff
   m.normalMap = T.n; m.normalScale = new THREE.Vector2(S.n * bump, S.n * bump);
   m.needsUpdate = true;
   return m;
+}
+
+// Find a chapter's ground (big, flat-lying PlaneGeometry meshes with vertex colours) and give it the
+// ground shader. A chapter can set this.groundTex = { ...texGround opts } or false to skip.
+const _b = new THREE.Box3();
+export function autoGround(root, opts = {}) {
+  if (OFF || opts === false) return 0;
+  let n = 0;
+  root.traverse((m) => {
+    if (!m.isMesh || m.isInstancedMesh || m.userData.ground3 || m.userData.noGroundTex) return;
+    const g = m.geometry, mat = m.material;
+    if (!g?.attributes?.color || Array.isArray(mat) || !(mat.isMeshLambertMaterial || mat.isMeshStandardMaterial)) return;
+    if (mat.transparent || mat.map) return;
+    if (!/Plane/.test(g.type) && !m.userData.isGround) return;
+    if (!g.boundingBox) g.computeBoundingBox(); _b.copy(g.boundingBox);
+    const sx = _b.max.x - _b.min.x, sy = _b.max.y - _b.min.y, sz = _b.max.z - _b.min.z;
+    if (Math.min(sx, sz) < 40 || sy > Math.min(sx, sz) * 0.5) return;   // big and lying flat
+    texGround(m, opts); n++;
+  });
+  return n;
+}
+
+// ---------- Solid things: walls, houses, towers built from coloured boxes ----------
+// texSolid(mesh, kind, opts) lays a surface's photo detail over a vertex-coloured mesh (Kit boxes)
+// from three sides by world position (no UVs needed), plus grime near the ground and slow
+// weathering patches, so a plain box city reads as mud brick, stone or plaster.
+//   opts: { scale: metres per repeat (2), strength: 1.4, bump: 1, ground: y of the street (grime
+//           below ground + 1.2 m), grime: 0.35, weather: 0.25 }
+const SOLID_FRAG = `
+varying vec3 vGW; varying vec3 vGN;
+uniform sampler2D sD, sN; uniform float sScale, sStrength, sBump, sGround, sGrime, sWeather;
+float sHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float sNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(sHash(i), sHash(i + vec2(1, 0)), f.x), mix(sHash(i + vec2(0, 1)), sHash(i + vec2(1, 1)), f.x), f.y); }
+`;
+export function texSolid(mesh, kind, o = {}) {
+  if (OFF || !mesh?.material || mesh.userData.solid3) return mesh;
+  const S = SURF[kind]; if (!S) return mesh;
+  const old = mesh.material;
+  const m = old.clone();
+  const u = { sD: { value: tex(`surf/${kind}_d.jpg`) }, sN: { value: tex(`surf/${kind}_n.jpg`) }, sScale: { value: o.scale || 2 }, sStrength: { value: o.strength ?? 1.4 },
+    sBump: { value: (o.bump ?? 1) * S.n }, sGround: { value: o.ground ?? -1e4 }, sGrime: { value: o.grime ?? 0.35 }, sWeather: { value: o.weather ?? 0.25 } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = 'varying vec3 vGW; varying vec3 vGN;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+  { vec4 wp = vec4(transformed, 1.0); vec3 wn = objectNormal;
+  #ifdef USE_INSTANCING
+    wp = instanceMatrix * wp; wn = mat3(instanceMatrix) * wn;
+  #endif
+    vGW = (modelMatrix * wp).xyz; vGN = normalize(mat3(modelMatrix) * wn); }`);
+    sh.fragmentShader = SOLID_FRAG + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  vec3 sW = abs(normalize(vGN)); sW = pow(sW, vec3(4.0)); sW /= sW.x + sW.y + sW.z;
+  vec2 uX = vec2(vGW.z, vGW.y) / sScale, uY = vec2(vGW.x, vGW.z) / sScale, uZ = vec2(vGW.x, vGW.y) / sScale;
+  vec3 sDet = (sW.x > 0.02 ? sW.x * texture2D(sD, uX).rgb : vec3(0.0)) + (sW.y > 0.02 ? sW.y * texture2D(sD, uY).rgb : vec3(0.0)) + (sW.z > 0.02 ? sW.z * texture2D(sD, uZ).rgb : vec3(0.0));
+  sDet *= 2.0 / max(sW.x * step(0.02, sW.x) + sW.y * step(0.02, sW.y) + sW.z * step(0.02, sW.z), 0.001);
+  float sUp = vGW.y - sGround;
+  float sGr = sGrime * (1.0 - smoothstep(0.0, 1.4, sUp)) * step(-0.5, sUp);
+  float sWe = 1.0 + sWeather * (sNoise(vGW.xz * 0.13 + vGW.y * 0.21) - 0.5) + sWeather * 0.6 * (sNoise(vec2(vGW.x + vGW.z, vGW.y) * 0.7) - 0.5);
+  diffuseColor.rgb *= max(mix(vec3(1.0), sDet, sStrength), 0.0) * sWe * (1.0 - sGr);`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  {
+    vec3 nX = texture2D(sN, uX).xyz * 2.0 - 1.0, nY = texture2D(sN, uY).xyz * 2.0 - 1.0, nZ = texture2D(sN, uZ).xyz * 2.0 - 1.0;
+    vec3 wn = normalize(vGN); vec3 sg = sign(wn);
+    // whiteout blend of the three projections, in world space
+    vec3 tX = vec3(0.0, nX.y, nX.x * sg.x) * sBump, tY = vec3(nY.x, 0.0, -nY.y * sg.y) * sBump, tZ = vec3(nZ.x * sg.z, nZ.y, 0.0) * sBump;
+    vec3 wnb = normalize(wn + tX * sW.x + tY * sW.y + tZ * sW.z);
+    normal = normalize((viewMatrix * vec4(wnb, 0.0)).xyz);
+  }`);
+  };
+  m.customProgramCacheKey = () => 'solid3:' + kind + (m.flatShading ? 'f' : '');
+  m.needsUpdate = true;
+  mesh.material = m; mesh.userData.solid3 = true;
+  return mesh;
 }

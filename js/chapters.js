@@ -77,6 +77,7 @@ export const chapterLabel = (n) => { const c = CHAPTERS.find((x) => x.n === n); 
 
 import { VIEW } from './people.js';
 import { LINES } from './script.js';
+import { autoGround } from './surfaces.js';
 
 class Stop extends Error {}
 
@@ -93,6 +94,7 @@ export class Director {
     G.interactables.length = 0;
     const mod = await info.load();
     this.chapter = new mod.default(G);
+    G.groundCount = autoGround(G.scene, this.chapter.groundTex);   // real ground textures (js/surfaces.js)
     G.guide.follow(); G.guide.place();
     G.sky.budget(G.scene);   // the rest of the triangle budget goes on the stars
     this.n = n; this.info = info;

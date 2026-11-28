@@ -76,6 +76,10 @@ Voice chat is built in. Free and peer-to-peer (WebRTC via PeerJS). See docs/MULT
   Sun or Moon and from big fires, sharper textures, the full 2048-pixel character textures
   (`models/hd/`, listed as `"hd"` in `models/index.json`) and more Milky Way star dust. Chapters don't
   need to do anything; mark a mesh `userData.noShadow = true` if it shouldn't cast a shadow.
+- `js/surfaces.js`: real surfaces. Free CC0 photo textures (`textures/`, list in `textures/CREDITS.md`) laid over
+  the game's own colours: every chapter's big ground gets grass/earth/sand detail and bumps automatically
+  (picked by the ground's colour at each spot; a chapter can set `this.groundTex = false` or options), Era 3's
+  `surfMat` walls and floors use them, and `texSolid(mesh, 'brick')` dresses a box-built wall or town. `?notex` = old look.
 - `js/sky.js`: one sky for every chapter (stars, Milky Way, dawn colours, Sun, Moon), driven by the Sun's position.
 - `js/chapters.js`: the chapter list and the director. Each chapter (`js/chapters/*.js`) builds its
   place and tells its story top to bottom: `await D.say('ch2_03')`, `await D.until(...)`.
