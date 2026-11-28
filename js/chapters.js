@@ -55,12 +55,12 @@ export const CHAPTERS = [
   { n: 27, era: 3, group: 'a11', title: 'Apollo 11 · The moonwalk', ready: true, load: () => import('./chapters/era3_a11_moonwalk.js') },
   { n: 28, era: 3, group: 'a11', title: 'Apollo 11 · Leaving the Moon', ready: true, load: () => import('./chapters/era3_a11_leaving.js') },
   { n: 29, era: 3, group: 'a11', title: 'Apollo 11 · Homecoming', ready: true, load: () => import('./chapters/era3_a11_home.js') },
-  { n: 30, era: 3, group: 'a13', title: 'Apollo 13 · A routine flight', ready: false, load: () => import('./chapters/era3_a13_routine.js') },
-  { n: 31, era: 3, group: 'a13', title: 'Apollo 13 · “We’ve had a problem”', ready: false, load: () => import('./chapters/era3_a13_problem.js') },
-  { n: 32, era: 3, group: 'a13', title: 'Apollo 13 · The lifeboat', ready: false, load: () => import('./chapters/era3_a13_lifeboat.js') },
-  { n: 33, era: 3, group: 'a13', title: 'Apollo 13 · Square peg, round hole', ready: false, load: () => import('./chapters/era3_a13_scrubber.js') },
-  { n: 34, era: 3, group: 'a13', title: 'Apollo 13 · The way home', ready: false, load: () => import('./chapters/era3_a13_home.js') },
-  { n: 35, era: 3, title: 'The handshake', ready: false, load: () => import('./chapters/era3_handshake.js') },
+  { n: 30, era: 3, group: 'a13', title: 'Apollo 13 · A routine flight', ready: true, load: () => import('./chapters/era3_a13_routine.js') },
+  { n: 31, era: 3, group: 'a13', title: 'Apollo 13 · “We’ve had a problem”', ready: true, load: () => import('./chapters/era3_a13_problem.js') },
+  { n: 32, era: 3, group: 'a13', title: 'Apollo 13 · The lifeboat', ready: true, load: () => import('./chapters/era3_a13_lifeboat.js') },
+  { n: 33, era: 3, group: 'a13', title: 'Apollo 13 · Square peg, round hole', ready: true, load: () => import('./chapters/era3_a13_scrubber.js') },
+  { n: 34, era: 3, group: 'a13', title: 'Apollo 13 · The way home', ready: true, load: () => import('./chapters/era3_a13_home.js') },
+  { n: 35, era: 3, title: 'The handshake', ready: true, load: () => import('./chapters/era3_handshake.js') },
 ];
 for (const c of CHAPTERS) c.era ||= 1;
 
