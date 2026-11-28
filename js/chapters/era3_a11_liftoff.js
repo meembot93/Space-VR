@@ -190,6 +190,12 @@ export default class A11Liftoff extends Chapter3 {
   }
   jolt(big = false) { this.flash.material.opacity = 1; this.shake(big ? 0.02 : 0.014, 0.8); clank(this.G, null, 0.3); bang(this.G, null, 0.3); cabinRumble(this.G, 2, 0.5); }
 
+  beds() { return [
+    { kind: 'room', vol: 0.09, on: (ch) => ch.cur === 'lcc' },
+    { kind: 'surf', at: V(0, 0, 40), vol: 0.25, ref: 30, wide: true, on: (ch) => ch.cur === 'beach' },
+    { kind: 'vent', at: V(0, 1.6, 0), vol: 0.06, ref: 3, on: (ch) => ch.cur === 'cabin' },
+  ]; }
+
   async run(D) {
     const G = this.G, s = this.s, fast = this.fast;
     // 1. Firing Room 1

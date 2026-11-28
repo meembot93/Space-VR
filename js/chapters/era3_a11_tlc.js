@@ -218,6 +218,10 @@ export default class A11TLC extends Chapter3 {
       } });
   }
 
+  beds() { return [
+    { kind: 'vent', at: V(0, 1.6, 0), vol: 0.06, ref: 3, on: (ch) => ch.cur === 'dock' || ch.cur === 'coast' },
+  ]; }
+
   async run(D) {
     const G = this.G, s = this.s, fast = this.fast;
     // 1. TLI

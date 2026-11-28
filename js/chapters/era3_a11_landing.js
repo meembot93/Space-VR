@@ -179,6 +179,11 @@ export default class A11Landing extends Chapter3 {
       } });
   }
 
+  beds() { return [
+    { kind: 'room', vol: 0.08, on: (ch) => ch.cur === 'mcc' },
+    { kind: 'vent', at: V(0, 1.6, 0), vol: 0.04, ref: 3, on: (ch) => ch.cur === 'lm' },
+  ]; }
+
   async run(D) {
     const G = this.G, s = this.s, fast = this.fast;
     const blip = () => { staticBurst(G, 0.25 + Math.random() * 0.3, 0.12); };

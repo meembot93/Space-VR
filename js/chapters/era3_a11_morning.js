@@ -373,6 +373,13 @@ export default class A11Morning extends Chapter3 {
       } });
   }
 
+  beds() { return [
+    { kind: 'room', vol: 0.07, on: (ch) => ch.cur === 'quarters' || ch.cur === 'mess' || ch.cur === 'suitroom' },
+    { kind: 'leaves', at: V(0, 3, -30), vol: 0.06, ref: 40, wide: true, on: (ch) => ch.cur === 'van' },
+    { kind: 'surf', at: V(400, 0, 300), vol: 0.12, ref: 300, wide: true, on: (ch) => ch.cur === 'pad' || ch.cur === 'white' },
+    { kind: 'vent', at: V(0, 1.6, 0), vol: 0.05, ref: 3, on: (ch) => ch.cur === 'white' },
+  ]; }
+
   async run(D) {
     const G = this.G, s = this.s, fast = this.fast;
     // 1. The crew quarters

@@ -245,6 +245,10 @@ export default class A11Moonwalk extends Chapter3 {
     return super.act(a);
   }
 
+  beds() { return [
+    { kind: 'room', vol: 0.06, on: (ch) => ch.cur === 'home' || ch.cur === 'studio' || ch.cur === 'oval' },
+  ]; }
+
   async run(D) {
     const G = this.G, s = this.s, fast = this.fast, H = this.H;
     Object.assign(s, { hatch: 0, cam: 0, down: 0, step: 0, buzz: 0, hop: 0, flag: 0, exp: 0, packet: 0, jog: 0 });

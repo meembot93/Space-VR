@@ -234,6 +234,11 @@ export default class A11Orbit extends Chapter3 {
       } });
   }
 
+  beds() { return [
+    { kind: 'room', vol: 0.08, on: (ch) => ch.cur === 'mcc' },
+    { kind: 'vent', at: V(0, 1.6, 0), vol: 0.06, ref: 3, on: (ch) => ch.cur === 'tunnel' },
+  ]; }
+
   async run(D) {
     const G = this.G, s = this.s, fast = this.fast;
     // 1. Into the shadow
