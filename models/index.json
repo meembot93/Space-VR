@@ -445,5 +445,20 @@
   "file": "era3/yazdovsky.glb",
   "height": 1.75,
   "turn": 0
+ },
+ "armstrong_casual": {
+  "file": "era3/armstrong_casual.glb",
+  "height": 1.8,
+  "turn": 0
+ },
+ "aldrin_casual": {
+  "file": "era3/aldrin_casual.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "collins_casual": {
+  "file": "era3/collins_casual.glb",
+  "height": 1.8,
+  "turn": 0
  }
 }

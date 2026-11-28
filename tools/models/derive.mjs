@@ -136,6 +136,28 @@ const RECIPES = {
   // Ch2: the Stonehenge builder for people far away (the crowd, the families walking in):
   // about a third of the triangles and a smaller texture, looks the same from 20 m.
   builder_far: { from: 'stonehenge_builder.glb', file: 'stonehenge_builder_far.glb', tris: 5000, texture: 512 },
+  // ---------- Era 3 ----------
+  // Apollo 11 launch morning (ch22): the crew before they suit up, from their spacesuit models:
+  // a short-sleeved shirt and slacks instead of the white suit, bare hands instead of gloves.
+  ...Object.fromEntries([['armstrong', 0xd8e4ee, 0x4a4a50], ['aldrin', 0xe8e2d0, 0x3a3e4a], ['collins', 0xc8d8e8, 0x5a5048]].map(([who, shirt, slacks]) => [`${who}_casual`, {
+    from: `era3/${who}.glb`, file: `era3/${who}_casual.glb`,
+    region(q) {
+      if (q.y > 0.875) return;                                     // the head stays
+      if (Math.abs(q.x) > 0.36 && q.y > 0.7) return 'hand';         // T-pose: the forearms and gloves
+      if (Math.abs(q.x) > 0.2 && q.y > 0.7) return 'sleeve';
+      if (q.y > 0.47) return 'shirt';
+      if (q.y > 0.05) return 'slacks';
+      return 'shoe';
+    },
+    paint: {
+      hand: (r, g, b) => (isSkin(r, g, b) ? null : shade(hex(0xd09a7a), 0.75, 0.35)(r, g, b)),
+      sleeve: (r, g, b) => (isSkin(r, g, b) ? null : shade(hex(shirt), 0.75, 0.12)(r, g, b)),
+      shirt: (r, g, b, { q }) => (isSkin(r, g, b) && q.y > 0.78 ? null : shade(hex(shirt), 0.75, 0.12)(r, g, b)),
+      slacks: (r, g, b) => shade(hex(slacks), 0.75, 0.2)(r, g, b),
+      shoe: (r, g, b) => shade(hex(0x1e1a18), 0.75, 0.4)(r, g, b),
+    },
+    rough: { shirt: 0.9, sleeve: 0.9, slacks: 0.9, shoe: 0.5, hand: 0.7 },
+  }])),
   // ---------- Era 2 ----------
   // Frombork's canons (Era 2, ch1), from Kepler: his black cassock-like coat and white collar fit a
   // cathedral canon already; grey hair and beard, lighter, as they're seen from the tower.
