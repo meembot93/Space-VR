@@ -6,7 +6,10 @@
 import sys, os, math
 import bpy, bmesh
 
-args = [a for a in sys.argv if not a.endswith('.py')]
+# props (no rig) can also be resized to real size, with the origin moved to the middle of their base:
+#   --h=0.38 (height in metres) or --len=3.1 (longest side across the ground)
+opts = dict(a[2:].split('=') for a in sys.argv if a.startswith('--') and '=' in a)
+args = [a for a in sys.argv if not a.endswith('.py') and not a.startswith('--')]
 src, out = args[-4:-2] if len(args) >= 4 else args[-2:]
 nums = [a for a in sys.argv[1:] if a.isdigit()]
 target = int(nums[0]) if nums else 14000
@@ -75,6 +78,19 @@ for im in bpy.data.images:
     if im.size[0] > px:
         im.scale(px, px)
 report['after_tris'] = tris(body)
+
+if ('h' in opts or 'len' in opts) and not any(o.type == 'ARMATURE' for o in bpy.data.objects):
+    from mathutils import Vector, Matrix
+    bpy.context.view_layer.update()
+    pts = [o.matrix_world @ v.co for o in bpy.data.objects if o.type == 'MESH' for v in o.data.vertices]
+    lo = Vector([min(p[i] for p in pts) for i in range(3)]); hi = Vector([max(p[i] for p in pts) for i in range(3)])
+    size = hi - lo
+    f = float(opts['h']) / size.z if 'h' in opts else float(opts['len']) / max(size.x, size.y)
+    m = Matrix.Scale(f, 4) @ Matrix.Translation(-Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z)))
+    for o in bpy.data.objects:
+        if o.parent is None:
+            o.matrix_world = m @ o.matrix_world
+    report['size_m'] = [round(c * f, 2) for c in size]
 
 for o in bpy.data.objects:
     o.select_set(True)
