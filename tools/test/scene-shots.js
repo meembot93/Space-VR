@@ -21,7 +21,7 @@ const [n, out, ...shots] = process.argv.slice(2);
     const [scene, x, z, yaw, pitch, name, ...js] = sh.split(' ');
     await page.evaluate(([scene, x, z, yaw, pitch, js]) => {
       const ch = G.director.chapter; window.ch = ch;
-      ch.s.scene = scene; ch.setScene(scene);
+      ch.s.scene = scene; ch.s.film = 0; ch.setScene(scene); G.world.center = { x: +x, z: +z };
       G.events.emit('placePlayers', { x: +x, z: +z, yaw: -(+yaw) * Math.PI / 180 });
       G.player.pitch = +pitch * Math.PI / 180;
       if (js) eval(js);

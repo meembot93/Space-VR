@@ -246,3 +246,14 @@ export function tune(G, notes, { vol = 0.12, step = 0.32, type = 'triangle', roo
 }
 // Jingle Bells (the first music in space, on a harmonica)
 export const JINGLE = [7, 7, [7, 2], 7, 7, [7, 2], 7, 10, 3, 5, [7, 4], 8, 8, 8, 8, 8, 7, 7, 7, 7, 5, 5, 7, [5, 2], [10, 2]];
+// A wolf howling far off in the trees: a long sine glide up, a held wavering note, a fall
+export function howl(G, pos = null, vol = 0.12, f0 = 420) {
+  const A = G.audio; if (!A.ctx) return;
+  const c = A.ctx, t = c.currentTime, o = A.out(pos, vol, 60, 0.5);
+  const osc = c.createOscillator(); osc.type = 'sine';
+  osc.frequency.setValueAtTime(f0, t); osc.frequency.linearRampToValueAtTime(f0 * 1.75, t + 1.1); osc.frequency.setValueAtTime(f0 * 1.75, t + 2.6); osc.frequency.linearRampToValueAtTime(f0 * 1.2, t + 3.6);
+  const lfo = c.createOscillator(); lfo.frequency.value = 5.5; const lg = c.createGain(); lg.gain.value = f0 * 0.02; lfo.connect(lg); lg.connect(osc.frequency);
+  const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.5); g.gain.setValueAtTime(0.25, t + 2.8); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
+  osc.connect(g); g.connect(o);
+  osc.start(t); lfo.start(t); osc.stop(t + 4); lfo.stop(t + 4);
+}

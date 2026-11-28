@@ -43,7 +43,9 @@ export function surfMat(kind, col, { rough = 0.9, metal = 0, tint = 0xffffff, em
 }
 // A flat rectangle (w × h metres) with UVs in metres / rep
 export function quad(w, h, mat, rep = 1) {
-  const g = new THREE.PlaneGeometry(w, h); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / rep, uv.getY(i) * h / rep);
+  const g = new THREE.PlaneGeometry(w, h);
+  // a picture (a texture that doesn't repeat: signs, maps, painted views) is stretched over it once
+  if (mat.map && mat.map.wrapS !== THREE.ClampToEdgeWrapping) { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / rep, uv.getY(i) * h / rep); }
   return new THREE.Mesh(g, mat);
 }
 
@@ -52,7 +54,7 @@ export function quad(w, h, mat, rep = 1) {
 // side {n,s,e,w}), ceil: material, windows: [{ side: 'n'|'s'|'e'|'w', at (m along, from the middle),
 // y (bottom), w, h }], doors: [{ side, at, w, h }], skirting colour, rep }
 // Walls are built with real holes for the windows and doors. Returns { group, windows: [{ pos, normal }] }
-export function room(w, d, h, { floor, wall, ceil, windows = [], doors = [], skirt = 0x3a2a1e, rep = 1.5, frame = 0xe8e4d8 } = {}) {
+export function room(w, d, h, { floor, wall, ceil, windows = [], doors = [], skirt = 0x3a2a1e, rep = 1.5, frame = 0xe8e4d8, outside = null, thick = 0.14, open = [] } = {}) {
   const group = new THREE.Group();
   const F = quad(w, d, floor || surfMat('boards'), rep); F.rotation.x = -Math.PI / 2; group.add(F);
   if (ceil !== false) { const C = quad(w, d, ceil || surfMat('plaster', '#e8e4d8'), 2); C.rotation.x = Math.PI / 2; C.position.y = h; group.add(C); }
@@ -60,18 +62,29 @@ export function room(w, d, h, { floor, wall, ceil, windows = [], doors = [], ski
   const wins = [];
   const k = new Kit();
   for (const [name, S] of Object.entries(sides)) {
+    if (open.includes(name)) continue;   // a side left open (a glass partition, a stage)
     const holes = [...windows.filter((x) => x.side === name).map((x) => ({ ...x, win: true })), ...doors.filter((x) => x.side === name).map((x) => ({ ...x, y: 0 }))];
     const shape = new THREE.Shape(); shape.moveTo(-S.len / 2, 0); shape.lineTo(S.len / 2, 0); shape.lineTo(S.len / 2, h); shape.lineTo(-S.len / 2, h); shape.lineTo(-S.len / 2, 0);
     for (const o of holes) { const p = new THREE.Path(); const x0 = o.at - o.w / 2, y0 = o.y ?? 0.9; p.moveTo(x0, y0); p.lineTo(x0, y0 + o.h); p.lineTo(x0 + o.w, y0 + o.h); p.lineTo(x0 + o.w, y0); p.lineTo(x0, y0); shape.holes.push(p); }
     const g = new THREE.ShapeGeometry(shape); const uv = g.attributes.uv, P = g.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, P.getX(i) / rep, P.getY(i) / rep);
     const mat = (wall && !wall.isMaterial ? wall[name] : wall) || surfMat('plaster');
     const m = new THREE.Mesh(g, mat); m.position.set(...S.pos); m.rotation.y = S.rot; group.add(m);
+    // outside: the same wall seen from outdoors (its back face), set out by the wall's thickness,
+    // with reveals round the openings so the wall reads solid from both sides
+    if (outside) {
+      const om = outside.isMaterial ? outside : outside[name]; const ob = om.userData.back || (om.userData.back = Object.assign(om.clone(), { side: THREE.BackSide }));
+      const o = new THREE.Mesh(g, ob); o.rotation.y = S.rot; o.position.set(...S.pos).addScaledVector(new THREE.Vector3(Math.sin(S.rot), 0, Math.cos(S.rot)), -thick); group.add(o);
+    }
     // skirting, and window frames with sills and glazing bars
     const dir = new THREE.Vector3(Math.sin(S.rot), 0, Math.cos(S.rot)), right = new THREE.Vector3(Math.cos(S.rot), 0, -Math.sin(S.rot));
     const at = (u, y, inn = 0.02) => new THREE.Vector3(...S.pos).addScaledVector(right, u).addScaledVector(dir, inn).setY(y).toArray();
     k.box(S.len, 0.1, 0.02, skirt, at(0, 0.05), [0, S.rot, 0]);
     for (const o of holes) {
       const y0 = o.y ?? 0.9;
+      if (outside) {   // reveals: the opening's sides, top and sill through the wall's thickness
+        k.box(o.w, 0.02, thick, frame, at(o.at, y0 + o.h, -thick / 2), [0, S.rot, 0]); if (o.y !== 0) k.box(o.w, 0.02, thick, frame, at(o.at, y0, -thick / 2), [0, S.rot, 0]);
+        for (const sx of [-1, 1]) k.box(0.02, o.h, thick, frame, at(o.at + sx * o.w / 2, y0 + o.h / 2, -thick / 2), [0, S.rot, 0]);
+      }
       k.box(o.w + 0.12, 0.06, 0.08, frame, at(o.at, y0 + o.h + 0.03, 0.03), [0, S.rot, 0]);
       for (const sx of [-1, 1]) k.box(0.06, o.h, 0.08, frame, at(o.at + sx * (o.w / 2 + 0.03), y0 + o.h / 2, 0.03), [0, S.rot, 0]);
       if (o.win) {
@@ -82,6 +95,7 @@ export function room(w, d, h, { floor, wall, ceil, windows = [], doors = [], ski
       }
     }
   }
+  if (outside) for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(thick + 0.04, h, thick + 0.04, frame, [sx * (w / 2 + thick / 2), h / 2, sz * (d / 2 + thick / 2)]);   // corner posts
   group.add(k.mesh(FLAT));
   // faint glass in each window
   for (const wn of wins) { const gm = new THREE.Mesh(new THREE.PlaneGeometry(wn.w, wn.h), new THREE.MeshBasicMaterial({ color: 0xa8c0d0, transparent: true, opacity: 0.08, depthWrite: false })); gm.position.copy(wn.pos).addScaledVector(wn.normal, 0.06); gm.lookAt(gm.position.clone().add(wn.normal)); group.add(gm); }
@@ -198,3 +212,34 @@ export function birch(k, x, z, { h = 9, seed = 1, leaf = 0xd8b040, bare = 0 } = 
 function rot(x, z, yaw, lx, ly, lz) { const c = Math.cos(yaw), s = Math.sin(yaw); return [x + lx * c + lz * s, ly, z - lx * s + lz * c]; }
 export function shadeHex(hex, k) { const c = new THREE.Color(hex); c.multiplyScalar(k); return c.getHex(); }
 export { rot };
+
+// A steel lattice tower w × d × h at (x, z): four legs, girders every `step` metres, X bracing.
+export function lattice(k, x, z, w, d, h, { col = 0xb84a2a, step = 3, leg = 0.25, br = 0.08, y0 = 0, floors = false } = {}) {
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(leg, h, leg, col, [x + sx * w / 2, y0 + h / 2, z + sz * d / 2]);
+  for (let y = y0 + step; y <= y0 + h + 0.01; y += step) {
+    k.box(w, br * 1.6, br * 1.6, col, [x, y, z - d / 2]); k.box(w, br * 1.6, br * 1.6, col, [x, y, z + d / 2]);
+    k.box(br * 1.6, br * 1.6, d, col, [x - w / 2, y, z]); k.box(br * 1.6, br * 1.6, d, col, [x + w / 2, y, z]);
+    if (floors) k.box(w, 0.06, d, 0x4a4a48, [x, y, z]);
+    const L1 = Math.hypot(w, step), a1 = Math.atan2(step, w), L2 = Math.hypot(d, step), a2 = Math.atan2(step, d);
+    for (const s of [-1, 1]) {
+      k.box(L1, br, br, col, [x, y - step / 2, z - d / 2], [0, 0, s * a1]); k.box(L1, br, br, col, [x, y - step / 2, z + d / 2], [0, 0, s * a1]);
+      k.box(br, br, L2, col, [x - w / 2, y - step / 2, z], [s * a2, 0, 0]); k.box(br, br, L2, col, [x + w / 2, y - step / 2, z], [s * a2, 0, 0]);
+    }
+  }
+}
+// A 1960s bus (front = +z), into kit k
+export function bus(k, x, z, yaw = 0, { col = 0x3a6a9a, roof = 0xe8e4d8 } = {}) {
+  const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz), r = [0, yaw, 0];
+  k.box(2.4, 1.6, 8.5, col, R(0, 1.3, 0), r); k.box(2.3, 0.9, 8.3, roof, R(0, 2.5, 0), r);
+  k.box(2.42, 0.6, 7.6, 0x2a3a4a, R(0, 2.45, -0.2), r);   // the windows band
+  for (let i = 0; i < 7; i++) k.box(2.44, 0.62, 0.08, roof, R(0, 2.45, -3.6 + i * 1.1), r);
+  k.box(2.2, 0.7, 0.05, 0x2a3a4a, R(0, 2.4, 4.26), r); k.box(2.3, 0.3, 0.2, 0x9a9a9a, R(0, 0.55, 4.3), r);
+  for (const sx of [-1, 1]) for (const sz of [-2.8, 2.8]) k.add(new THREE.CylinderGeometry(0.48, 0.48, 0.3, 12), 0x1a1a1a, R(sx * 1.1, 0.48, sz), [0, yaw, Math.PI / 2]);
+  for (const sx of [-0.8, 0.8]) k.cyl(0.12, 0.12, 0.05, 8, 0xfff8d0, R(sx, 0.9, 4.27), [Math.PI / 2, yaw, 0]);
+}
+// A plain wooden or iron bed with a blanket (head toward -z local)
+export function bed(k, x, z, yaw = 0, { blanket = 0x6a4a3a, frame = 0x3a3a3a } = {}) {
+  const R = (lx, ly, lz) => rot(x, z, yaw, lx, ly, lz), r = [0, yaw, 0];
+  k.box(0.9, 0.2, 2.0, frame, R(0, 0.35, 0), r); for (const sz of [-1, 1]) k.box(0.9, sz < 0 ? 0.9 : 0.6, 0.05, frame, R(0, sz < 0 ? 0.45 : 0.3, sz * 1.0), r);
+  k.box(0.86, 0.14, 1.94, 0xe8e4dc, R(0, 0.52, 0), r); k.box(0.6, 0.1, 0.36, 0xf0ece4, R(0, 0.64, -0.75), r);
+}

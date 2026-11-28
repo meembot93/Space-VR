@@ -52,7 +52,7 @@ export class Stargazing {
   update(dt) {
     const G = this.G, sf = G.sky.starField;
     const night = sf.opacity;
-    const a = night > 0.25 && !G.paused ? this.aim() : null;
+    const a = night > 0.25 && !G.paused && !G.sky.indoors ? this.aim() : null;   // (not under a roof)
     // the pointer beam
     this.beam.visible = !!(a && a.hand);
     if (this.beam.visible) { this.beam.position.copy(a.o); this.beam.lookAt(_c.copy(a.o).add(a.d)); this.beam.material.opacity = night; }

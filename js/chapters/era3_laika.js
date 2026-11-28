@@ -28,6 +28,7 @@ import { earthSpace, groundPlane, sea } from '../era3/worlds.js';
 import { room, surfMat, quad, desk, chair, armchair, sofa, table, shelf, rug, lampStand, deskLamp, curtains, picture, wall, floodTower, birch, shadeHex, rot } from '../era3/sets.js';
 import { glowSprite, glowPoints, textSprite, shimmer, whoosh, awe } from '../wow/fx.js';
 import { loadProps } from '../props.js';
+import { vbOffice } from '../era3/places.js';
 import { INK } from '../era2/common.js';
 import { canvasTex, clamp, lerp, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
@@ -166,7 +167,7 @@ export default class Laika extends Chapter3 {
     const fac = canvasTex(512, 512, (c, w, h) => { c.fillStyle = '#3a3a42'; c.fillRect(0, 0, w, h); const r = rng(8); for (let y = 0; y < 10; y++) for (let x = 0; x < 12; x++) { c.fillStyle = r() < 0.45 ? `rgb(255,${190 + r() * 40 | 0},${110 + r() * 40 | 0})` : '#1a1c22'; c.fillRect(10 + x * 41, 14 + y * 49, 22, 30); } });
     const facM = new THREE.MeshBasicMaterial({ map: fac, color: 0xb8b0a8 });
     for (const [x, z, w, h] of [[-26, -8, 20, 24], [-34, 14, 26, 30], [-22, 30, 16, 20], [-48, -20, 30, 36]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(6, h, w), facM); b.position.set(x, h / 2 - 6, z); out.add(b); }
-    this.addScene('home', { group: g, bounds: 1.2, place: { lat: 55.7, year: 1957, sunLon: 220 }, amb: 0.05, fogFar: 300,
+    this.addScene('home', { group: g, bounds: 1.2, indoors: true, place: { lat: 55.7, year: 1957, sunLon: 220 }, amb: 0.05, fogFar: 300,
       sky: () => { this.G.sky.set(235, -6); this.dim(0.15, 0.3); this.lamp.position.copy(lp); this.lamp.intensity = 2.2; this.lamp.distance = 9; this.lamp2.position.set(0.6, 2.6, 0); this.lamp2.intensity = 0.9; this.lamp2.distance = 8; },
       update: (dt, t) => this.homeUpdate(dt, t) });
     this.dog2 = animal(g, 'laika', V(0.1, 0, -0.5), Math.PI * 0.85);
@@ -229,35 +230,7 @@ export default class Laika extends Chapter3 {
   }
 
   // ---------- 4. Von Braun's office, Huntsville ----------
-  buildOffice() {
-    const R = room(5.6, 5, 3.0, { floor: surfMat('lino', '#7a7268'), wall: { n: surfMat('plaster', '#d8d4c4'), s: surfMat('panelwood'), e: surfMat('panelwood'), w: surfMat('panelwood') }, ceil: surfMat('acoustic'), windows: [{ side: 'n', at: -1.2, y: 0.9, w: 1.4, h: 1.5 }, { side: 'n', at: 1.2, y: 0.9, w: 1.4, h: 1.5 }], doors: [{ side: 'e', at: 1.6, w: 0.9, h: 2.1 }], skirt: 0x2a2018 });
-    const g = R.group, k = new Kit();
-    desk(k, 0, -1.2, Math.PI, { w: 1.7, d: 0.85, col: 0x5a3a22 });
-    chair(k, 0, -1.95, Math.PI, { seat: 0x3a2a22 });
-    for (const x of [-0.6, 0.6]) chair(k, x, 0.3, 0, { seat: 0x6a4a2a });
-    shelf(k, -2.65, -0.6, Math.PI / 2, { w: 1.6, h: 2.0, seed: 11 });
-    const dl = deskLamp(k, -0.65, 0.76, -1.45, 0.3);
-    k.box(0.4, 0.02, 0.3, 0xe8e4d8, [0.2, 0.775, -1.1]); k.box(0.3, 0.015, 0.22, 0xd8d0b8, [-0.2, 0.775, -0.95], [0, 0.3, 0]);   // papers
-    k.cyl(0.04, 0.035, 0.1, 8, 0xe8e8e0, [0.55, 0.81, -1.05]);   // a coffee cup
-    // a blackboard of trajectory sums on the south wall, a US flag on a pole
-    k.box(2.2, 1.2, 0.04, 0x2a3a2e, [0.6, 1.6, 2.47]); k.box(2.3, 0.05, 0.1, 0x6a4a2a, [0.6, 0.98, 2.42]);
-    k.cyl(0.02, 0.02, 2.4, 6, 0xc8a050, [2.4, 1.2, -2.1]);
-    g.add(k.mesh(FLAT));
-    const flag = picture(0.9, 0.55, (c, w, h) => { for (let i = 0; i < 13; i++) { c.fillStyle = i % 2 ? '#f0f0f0' : '#b82a2a'; c.fillRect(0, i * h / 13, w, h / 13 + 1); } c.fillStyle = '#2a3a7a'; c.fillRect(0, 0, w * 0.42, h * 0.54); c.fillStyle = '#fff'; for (let y = 0; y < 6; y++) for (let x = 0; x < 8; x++) c.fillRect(6 + x * 13, 5 + y * 12, 3, 3); }, { frame: 0xc8a050 });
-    flag.position.set(2.15, 2.05, -2.1); flag.rotation.y = -0.6; g.add(flag);
-    const board = picture(2.1, 1.1, (c, w, h) => { c.fillStyle = '#2a3a2e'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(240,240,230,0.85)'; c.fillStyle = 'rgba(240,240,230,0.85)'; c.lineWidth = 2; c.font = '15px serif'; c.fillText('v = √(GM / r)', 20, 30); c.fillText('Δv ≈ 7.9 km/s', 20, 60); c.fillText('Juno I: 4 stages', 20, 90); c.beginPath(); c.arc(170, 75, 40, 0, 7); c.stroke(); c.beginPath(); c.ellipse(170, 75, 62, 52, 0.3, 0, 7); c.stroke(); c.fillText('Explorer', 210, 40); });
-    board.position.set(0.6, 1.6, 2.44); board.rotation.y = Math.PI; g.add(board);
-    // rocket models on the shelf and the desk: his V-2, the Redstone, the Juno
-    for (const [MM, x, y, z, h] of [[M.juno1, -2.55, 1.46, -1.15, 0.5], [M.mercury_redstone ?? M.juno1, -2.55, 1.1, -0.2, 0.45]]) { const o = copy(MM); o.scale.setScalar(h / MM.size.y); o.position.set(x, y, z); g.add(o); }
-    // outside: the green hills of north Alabama in the spring sun
-    const hills = canvasTex(1024, 256, (c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#9ac0e0'); gr.addColorStop(0.55, '#d8e8f0'); gr.addColorStop(0.56, '#6a8a4a'); gr.addColorStop(1, '#4a6a32'); c.fillStyle = gr; c.fillRect(0, 0, w, h); c.fillStyle = '#5a7a42'; c.beginPath(); c.moveTo(0, h * 0.6); for (let x = 0; x <= w; x += 32) c.lineTo(x, h * 0.5 - Math.sin(x / 90) * 18 - Math.sin(x / 37) * 6); c.lineTo(w, h); c.lineTo(0, h); c.fill(); c.fillStyle = '#8a8a80'; c.fillRect(620, h * 0.36, 10, 50); c.fillRect(600, h * 0.44, 50, 6); c.fillStyle = '#e8e8e0'; c.fillRect(640, h * 0.3, 6, 46); });
-    const bd = new THREE.Mesh(new THREE.PlaneGeometry(60, 15), new THREE.MeshBasicMaterial({ map: hills })); bd.position.set(0, 2, -24); g.add(bd);
-    this.vb = person(g, 'von_braun', V(1.2, 0, -2.0), Math.PI);
-    this.people.push(this.vb);
-    this.addScene('office', { group: g, bounds: 1.2, place: { lat: 34.7, year: 1957, sunLon: 300 }, amb: 0.05, fogFar: 400,
-      sky: () => { this.G.sky.set(160, 30); this.dim(0.35, 0.8); this.lamp.position.copy(dl); this.lamp.intensity = 0.8; this.lamp.distance = 5; },
-      update: (dt, t) => { this.vb.look = this.s.vbTurn ? V(0, 1.6, 0.8) : V(1.2, 1.6, -6); this.vb.g.rotation.y = damp(this.vb.g.rotation.y, this.s.vbTurn ? 0.3 : Math.PI, 2, dt); this.vb.pose = this.s.vbTurn ? 'talk' : 'idle'; } });
-  }
+  buildOffice() { vbOffice(this, 'office', { year: 1958 }); }
 
   // ---------- 5. Cape Canaveral, the night of 31 January 1958 ----------
   buildCape() {
@@ -354,7 +327,7 @@ export default class Laika extends Chapter3 {
     // the flashbulbs
     this.flashes = this.reporters.map((P) => { const f = glowSprite(0xffffff, 0.6, 0); f.position.copy(P.g.position).add(V(0, 1.65, -0.35)); g.add(f); return f; });
     this.liftIt = this.touchable('lift', () => this.expHeld.getWorldPosition(_a), { hint: 'Lift it up high! Reach out and touch the satellite (TRIGGER)', deskHint: 'Click the satellite to lift it up high', r: 0.7 });
-    this.addScene('press', { group: g, bounds: 4.5, place: { lat: 38.9, year: 1958, sunLon: 312 }, amb: 0.04, fogFar: 300,
+    this.addScene('press', { group: g, bounds: 4.5, indoors: true, place: { lat: 38.9, year: 1958, sunLon: 312 }, amb: 0.04, fogFar: 300,
       sky: () => { this.G.sky.set(0, -40); this.dim(0, 0.35); this.lamp.position.set(0, 4.5, -2); this.lamp.intensity = 4; this.lamp.distance = 16; this.lamp2.position.set(0, 3, 2); this.lamp2.intensity = 1.5; this.lamp2.distance = 14; },
       update: (dt, t) => this.pressUpdate(dt, t) });
   }

@@ -10,7 +10,7 @@ const [n, secs = '30'] = process.argv.slice(2);
   const page = await browser.newPage({ viewport: { width: 640, height: 400 } });
   page.on('pageerror', (e) => console.log('PAGEERROR', e.message, (e.stack || '').split('\n').slice(0, 4).join(' | ')));
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log(m.type().toUpperCase(), m.text().slice(0, 400)); });
-  await page.goto(`http://localhost:${srv.address().port}/index.html?fast&autostart&chapter=${n}`);
+  await page.goto(`http://localhost:${srv.address().port}/index.html?fast&autostart&chapter=${n}${process.env.Q || ""}`);
   const t0 = Date.now();
   while (Date.now() - t0 < Number(secs) * 1000) {
     await page.waitForTimeout(5000);

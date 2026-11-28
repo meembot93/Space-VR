@@ -131,7 +131,7 @@ export function panelMesh(w, h, opts = {}) {
 // A lathed wall round the z axis (profile [radius, z] from back to front), painted: padding,
 // rivets, cable runs, stowage bags; holes where the windows are (alpha). wins: [{ ang (deg round
 // from up, clockwise seen from behind), z, w, h (metres), round }]
-function shell(profile, wins, { col = '#c8c6c0', seed = 3, quilt = true, russian = false } = {}) {
+function shell(profile, wins, { col = '#c8c6c0', seed = 3, quilt = true, russian = false, cables = true } = {}) {
   const pts = profile.map(([r, z]) => new THREE.Vector2(r, z));
   const geo = new THREE.LatheGeometry(pts, 64); geo.rotateX(Math.PI / 2);   // the lathe's axis (y) becomes z
   // the lathe's texture v steps evenly per profile point; u = 0.5 - angle/360 (0 = down)
@@ -144,7 +144,7 @@ function shell(profile, wins, { col = '#c8c6c0', seed = 3, quilt = true, russian
     if (quilt) { g.strokeStyle = 'rgba(0,0,0,0.1)'; g.lineWidth = 2; for (let x = 0; x < W; x += 48) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 48) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.04})`; g.fillRect(r() * W, r() * H, 3, 3); } }
     // stowage lockers, bags, cable runs, labels
     for (let i = 0; i < 26; i++) { const x = r() * W, y = r() * H, w = 60 + r() * 160, h = 40 + r() * 90; g.fillStyle = r() < 0.5 ? 'rgba(80,82,86,0.55)' : 'rgba(205,200,185,0.9)'; g.fillRect(x, y, w, h); g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 2; g.strokeRect(x, y, w, h); g.fillStyle = 'rgba(20,20,20,0.7)'; g.font = '14px sans-serif'; g.fillText((russian ? RU : WORDS)[(r() * 14) | 0], x + 6, y + 18); for (let k = 0; k < 4; k++) { g.fillStyle = '#999'; g.beginPath(); g.arc(x + (k % 2 ? w - 6 : 6), y + (k < 2 ? 6 : h - 6), 2.5, 0, 7); g.fill(); } }
-    for (let i = 0; i < 10; i++) { g.strokeStyle = `rgba(${40 + r() * 40},${40 + r() * 40},${50 + r() * 40},0.8)`; g.lineWidth = 4 + r() * 6; const y = r() * H; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(W * 0.3, y + (r() - 0.5) * 80, W * 0.6, y + (r() - 0.5) * 80, W, y + (r() - 0.5) * 30); g.stroke(); }
+    if (cables) for (let i = 0; i < 10; i++) { g.strokeStyle = `rgba(${40 + r() * 40},${40 + r() * 40},${50 + r() * 40},0.8)`; g.lineWidth = 4 + r() * 6; const y = r() * H; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(W * 0.3, y + (r() - 0.5) * 80, W * 0.6, y + (r() - 0.5) * 80, W, y + (r() - 0.5) * 30); g.stroke(); }
     // the window holes (alpha 0) with a dark frame round each
     for (const wn of wins) {
       const z = wn.z; let i = 1; while (i < profile.length - 1 && !((profile[i - 1][1] - z) * (profile[i][1] - z) <= 0)) i++;
@@ -238,7 +238,8 @@ export function cabin(kind, opts = {}) {
     P = panelMesh(0.6, 0.3, { seed: 66, base: panelCol, russian: true, dense: 0.6, gauges: 2 });
     P.group.position.set(-0.6, EYE - 0.3, -0.35); P.group.rotation.y = 1.0;
   }
-  const S = shell(profile, wins, { col: kind === 'vostok' || kind === 'soyuz' ? '#a8b0a8' : kind === 'apollo' ? '#b8b4a8' : '#9a9690', seed: kind.length * 7, russian: opts.russian || kind === 'vostok' || kind === 'soyuz' });
+  const ball = kind === 'vostok' || kind === 'soyuz';
+  const S = shell(profile, wins, { cables: !ball, col: ball ? '#8e9890' : kind === 'apollo' ? '#b8b4a8' : '#9a9690', seed: kind.length * 7, russian: opts.russian || kind === 'vostok' || kind === 'soyuz' });
   S.position.y = axisY; inner.add(S);
   for (const wn of wins) inner.add(glass(wn, axisY));
   inner.add(P.group);
@@ -295,7 +296,7 @@ export function panelLamp(w = 0.12, h = 0.04, { text = '', col = '#ff3020', font
 // The real props in the cabin (Meem's models): a DSKY, a hand controller, helmets. Loads them
 // and places them by the named spots if the cabin has them.
 export async function dressCabin(C) {
-  if (C.kind === 'apollo' || C.kind === 'lm') {
+  if (C.kind === 'apollo' || C.kind === 'lm' || C.kind === 'gemini') {
     const [dsky, hc] = await Promise.all([loadE3('props/dsky'), loadE3('props/hand_controller')]);
     if (dsky && C.spots.dsky) { const d = copy(dsky); fit(d, dsky, 0.2); d.position.copy(C.spots.dsky); d.rotation.x = -Math.PI / 2 * 0; C.panel.add(d); }
     if (hc) { const h = copy(hc); fit(h, hc, 0.16); h.position.set(0.32 - C.inner.position.x * 0, EYE - 0.62, -0.32); C.group.add(h); C.handController = h; }

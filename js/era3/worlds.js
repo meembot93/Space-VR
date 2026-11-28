@@ -68,12 +68,12 @@ function moonData() {
   const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true; tex.anisotropy = 4; tex.needsUpdate = true;
   return (moonTex = { tex, hr, W, H });
 }
-export function moonGlobe(R = 100, { seg = 160 } = {}) {
+export function moonGlobe(R = 100, { seg = 160, relief = 1.4 } = {}) {   // relief: how tall the mountains stand (1.4 seen from afar; less when you skim low over it)
   const { tex, hr, W, H } = moonData();
   const geo = new THREE.SphereGeometry(1, seg, Math.round(seg * 0.65)); geo.rotateY(-Math.PI / 2);
   const P = geo.attributes.position, UV = geo.attributes.uv;
   for (let i = 0; i < P.count; i++) {
-    const u = UV.getX(i), w = UV.getY(i), x = ((Math.floor(u * W) % W) + W) % W, y = Math.max(0, Math.min(H - 1, Math.floor(w * H))), k = 1 + hr[y * W + x] * 1.4;
+    const u = UV.getX(i), w = UV.getY(i), x = ((Math.floor(u * W) % W) + W) % W, y = Math.max(0, Math.min(H - 1, Math.floor(w * H))), k = 1 + hr[y * W + x] * relief;
     P.setXYZ(i, P.getX(i) * k, P.getY(i) * k, P.getZ(i) * k);
   }
   geo.computeVertexNormals();

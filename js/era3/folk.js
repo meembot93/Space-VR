@@ -31,13 +31,19 @@ export function makeFolk(look = {}) {
   const skin = look.skin ?? SKINS[Math.floor(R() * 5)], hair = look.hair ?? [0x2a1e14, 0x4a3420, 0x6a5038, 0x1a1614, 0x8a8478, 0xa07840][Math.floor(R() * 6)];
   const shoe = kind === 'swimmer' ? 0x1a1a1e : 0x1e1a18, k = new Kit(), hk = new Kit(), long = kind === 'greatcoat' || kind === 'labcoat';
   const shirt = kind === 'shirt', sleeve = kind === 'labcoat' ? 0xe8e8e2 : shirt ? (look.coat ?? 0xeeeee8) : coat;
+  // the legs, two ways: standing, and sitting (thighs forward, shins down: shown when P.sitting)
+  const lk = new Kit(), sk = new Kit(), legCol = girl ? (look.legs ?? 0xc8a090) : trou;
   for (const s of [-1, 1]) {
-    k.ball(0.1, 1, shoe, [s * 0.1, 0.05, 0.04], 0, [0.6, 0.5, 1.3]);
-    k.cyl(0.07, 0.062, 0.82, 8, girl ? (look.legs ?? 0xc8a090) : trou, [s * 0.1, 0.49, 0]);
-    if (kind === 'swimmer') k.ball(0.11, 1, 0x1a1a1e, [s * 0.1, 0.04, 0.1], 0, [0.6, 0.3, 1.8]);   // flippers
+    lk.ball(0.1, 1, shoe, [s * 0.1, 0.05, 0.04], 0, [0.6, 0.5, 1.3]);
+    lk.cyl(0.07, 0.062, 0.82, 8, legCol, [s * 0.1, 0.49, 0]);
+    if (kind === 'swimmer') lk.ball(0.11, 1, 0x1a1a1e, [s * 0.1, 0.04, 0.1], 0, [0.6, 0.3, 1.8]);   // flippers
+    sk.cyl(0.075, 0.068, 0.5, 8, girl ? coat : trou, [s * 0.1, 0.9, 0.2], [Math.PI / 2, 0, 0]);
+    sk.cyl(0.066, 0.06, 0.44, 8, legCol, [s * 0.1, 0.68, 0.44]);
+    sk.ball(0.1, 1, shoe, [s * 0.1, 0.49, 0.48], 0, [0.6, 0.5, 1.3]);
   }
   if (girl) {
-    k.cyl(0.19, 0.29, 0.52, 14, coat, [0, 0.66, 0]);
+    lk.cyl(0.19, 0.29, 0.52, 14, coat, [0, 0.66, 0]);                     // the skirt (sitting: over the lap)
+    sk.cyl(0.2, 0.2, 0.12, 12, coat, [0, 0.88, 0.02]); sk.box(0.34, 0.1, 0.42, coat, [0, 0.9, 0.24]);
     k.cyl(0.18, 0.2, 0.5, 12, coat, [0, 1.15, 0]);
     k.cyl(0.205, 0.205, 0.05, 12, look.belt ?? 0x3a2a1e, [0, 0.95, 0]);
     k.box(0.16, 0.2, 0.02, look.collar ?? 0xe8e0d0, [0, 1.36, 0.17], [-0.25, 0, 0]);
@@ -90,6 +96,7 @@ export function makeFolk(look = {}) {
   if (look.headset) { hk.add(new THREE.TorusGeometry(0.125, 0.01, 4, 14, Math.PI), 0x2a2a2a, [0, hy, 0], [0, 0, 0]); hk.cyl(0.035, 0.035, 0.03, 10, 0x1a1a1a, [0.12, hy, 0], [0, 0, Math.PI / 2]); hk.cyl(0.006, 0.006, 0.12, 4, 0x1a1a1a, [0.09, hy - 0.05, 0.07], [0.8, 0.6, 0]); }
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.userData.kind = 'characters';
   inner.add(k.mesh(FLAT));
+  const legs = [lk.mesh(FLAT), sk.mesh(FLAT)]; legs[1].visible = false; inner.add(...legs);
   const head = new THREE.Group(); head.position.set(0, 1.5, 0); inner.add(head);
   const hm = hk.mesh(SOFT); hm.position.set(0, -1.5, 0); head.add(hm); if (kid) head.scale.setScalar(1.16);
   const arms = [];
@@ -101,7 +108,7 @@ export function makeFolk(look = {}) {
     const arm = new THREE.Group(); arm.add(ak.mesh(FLAT)); arm.position.set(sx * 0.235, 1.38, 0); inner.add(arm); arms.push(arm);
   }
   inner.scale.setScalar(H);
-  const P = { g, inner, arms, head, pose: 'idle', phase: R() * 6, pointAt: new THREE.Vector3(), placeholder: true, H, folk: true };
+  const P = { g, inner, arms, head, legs, pose: 'idle', phase: R() * 6, pointAt: new THREE.Vector3(), placeholder: true, H, folk: true };
   g.userData.person = P;
   return P;
 }
@@ -109,6 +116,7 @@ export function makeFolk(look = {}) {
 export function animate(P, t, dt) {
   if (P.animal) { animateAnimal(P, t, dt); return; }
   animatePerson(P, t, dt);
+  if (P.legs) { P.legs[0].visible = !P.sitting; P.legs[1].visible = !!P.sitting; }
   if (P.sitting) {
     if (P.rig && !P._sat) { P._sat = true; sit(P, true); }
     P.inner.position.y = -(P.sitDrop ?? 0.44) * (P.H || 1);   // hips down onto the seat
@@ -210,6 +218,7 @@ export function animal(parent, model, pos, yaw = 0, { tint = null, scale = 1 } =
   const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = yaw; parent.add(g);
   const body = new THREE.Group(); g.add(body);
   const A = { g, body, animal: true, mode: 'idle', phase: Math.random() * 6, name: model, to: null, speed: 1.2 };
+  g.userData.person = A;
   loadModel(model, { sd: true }).then((m) => {
     if (!m) return;
     if (tint) m.scene.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color = new THREE.Color(tint); } });
@@ -231,4 +240,18 @@ export function animateAnimal(A, t, dt) {
   else { ry = Math.sin(ph * 0.4) * Math.sin(ph * 0.13) * 0.25; }
   b.position.y = damp(b.position.y, y, 12, dt); b.rotation.z = damp(b.rotation.z, rz, 10, dt); b.rotation.x = damp(b.rotation.x, rx, 8, dt); b.rotation.y = damp(b.rotation.y, ry, 4, dt);
   b.scale.y = sy;
+}
+
+// Put a prop on a person's head bone (a helmet), keeping its real size: obj is centred on the head,
+// lift (m) raises it. Waits for Meem's model to load if it hasn't yet.
+export function wear(P, obj, { lift = 0.06, fwd = 0.0, size = null } = {}) {
+  const put = () => {
+    const head = P.rig?.bones.Head; if (!head) return false;
+    head.add(obj); head.updateWorldMatrix(true, false);
+    const ws = new THREE.Vector3(); head.getWorldScale(ws); const gs = new THREE.Vector3(); P.g.getWorldScale(gs);
+    const k = gs.x / ws.x; obj.scale.setScalar(k * (size || 1)); obj.position.set(0, lift, fwd).multiplyScalar(k);
+    return true;
+  };
+  if (!put()) { const iv = setInterval(() => { if (put() || !P.g.parent) clearInterval(iv); }, 300); }
+  return obj;
 }

@@ -41,12 +41,12 @@ export const CHAPTERS = [
   // Era 3: The Space Race (ch15..ch35). Apollo 11 is one chapter in 8 parts (group 'a11'), Apollo 13
   // one in 5 (group 'a13'): the parts play straight on into each other, no flight between them.
   { n: 15, era: 3, title: 'First travellers', ready: true, load: () => import('./chapters/era3_laika.js') },
-  { n: 16, era: 3, title: '“Let’s go!”', ready: false, load: () => import('./chapters/era3_gagarin.js') },
-  { n: 17, era: 3, title: 'The Mercury Seven', ready: false, load: () => import('./chapters/era3_mercury.js') },
-  { n: 18, era: 3, title: 'Seagull and the spacewalk', ready: false, load: () => import('./chapters/era3_voskhod.js') },
-  { n: 19, era: 3, title: 'Meeting in orbit', ready: false, load: () => import('./chapters/era3_gemini.js') },
-  { n: 20, era: 3, title: 'Losses and the giant', ready: false, load: () => import('./chapters/era3_saturn.js') },
-  { n: 21, era: 3, title: 'Earthrise', ready: false, load: () => import('./chapters/era3_apollo8.js') },
+  { n: 16, era: 3, title: '“Let’s go!”', ready: true, load: () => import('./chapters/era3_gagarin.js') },
+  { n: 17, era: 3, title: 'The Mercury Seven', ready: true, load: () => import('./chapters/era3_mercury.js') },
+  { n: 18, era: 3, title: 'Seagull and the spacewalk', ready: true, load: () => import('./chapters/era3_voskhod.js') },
+  { n: 19, era: 3, title: 'Meeting in orbit', ready: true, load: () => import('./chapters/era3_gemini.js') },
+  { n: 20, era: 3, title: 'Losses and the giant', ready: true, load: () => import('./chapters/era3_saturn.js') },
+  { n: 21, era: 3, title: 'Earthrise', ready: true, load: () => import('./chapters/era3_apollo8.js') },
   { n: 22, era: 3, group: 'a11', title: 'Apollo 11 · Launch morning', ready: false, load: () => import('./chapters/era3_a11_morning.js') },
   { n: 23, era: 3, group: 'a11', title: 'Apollo 11 · Liftoff', ready: false, load: () => import('./chapters/era3_a11_liftoff.js') },
   { n: 24, era: 3, group: 'a11', title: 'Apollo 11 · To the Moon', ready: false, load: () => import('./chapters/era3_a11_tlc.js') },

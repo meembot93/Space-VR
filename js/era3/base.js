@@ -41,7 +41,7 @@ export class Chapter3 {
 
   // ---------- Places ----------
   // def: { group, height(x, z), bounds, place: { lat, year, sunLon }, sky(dt, t), update(dt, t), enter(), exit(),
-  //        amb (wind 0..1), fogFar, mist, space: a Space to show (it hides the sky's Sun and Moon) }
+  //        amb (wind 0..1), fogFar, mist, indoors (no pointing at stars), space: a Space to show (it hides the sky's Sun and Moon) }
   addScene(name, def) {
     const g = def.group || new THREE.Group(); g.visible = false; if (!g.parent) this.root.add(g);
     this.scenes[name] = { name, height: () => 0, bounds: 4, amb: 0.4, fogFar: 2500, mist: 0, ...def, group: g };
@@ -52,10 +52,12 @@ export class Chapter3 {
     const was = this.scenes[this.cur];
     if (was && was !== S) { was.group.visible = false; was.exit?.(); if (was.space) was.space.exit(); }
     this.cur = name; S.group.visible = true;
-    G.world.height = S.height; G.world.bounds = S.bounds; G.world.blockers = S.blockers || [];
+    G.world.height = S.height; G.world.bounds = S.bounds; G.world.blockers = S.blockers || []; G.world.center = null;
     G.sky.fogFar = S.fogFar; G.sky.mist = S.mist; G.audio.amb = S.amb;
     if (S.place) G.sky.setPlace(S.place);
     if (S.space) S.space.enter(null);
+    G.sky.indoors = !!S.indoors;   // no star-pointing under a roof
+    G.sky.hideMoon?.();   // each scene shows its own Moon (sky() sets it every frame)
     this.key.intensity = 0; this.lamp.intensity = 0; this.lamp2.intensity = 0; this.flameLight.intensity = 0;
     S.enter?.();
   }
@@ -63,7 +65,7 @@ export class Chapter3 {
   async go(D, name, yaw = 0, secs = 0.8, pos = { x: 0, z: 0 }) {
     const G = this.G, s = this.s;
     await G.ui.fadeOut(secs); D.check();
-    s.scene = name; s.guide = null; this.setScene(name);
+    s.scene = name; s.guide = null; this.setScene(name); G.world.center = { x: pos.x, z: pos.z };
     G.events.emit('placePlayers', { x: pos.x, z: pos.z, yaw });
     await G.ui.fadeIn(secs * 1.4); D.check();
   }
@@ -119,7 +121,11 @@ export class Chapter3 {
     if (s.scene && s.scene !== this.cur) this.setScene(s.scene);
     const S = this.scenes[this.cur];
     if (S) { try { S.sky?.(dt, t); S.update?.(dt, t); } catch (e) { console.error(e); } S.space?.update(dt); }
-    for (const P of this.people) if (P.g.visible && (P.g.parent?.visible ?? true)) animate(P, t, dt);
+    // everyone in the scene you're in (found once per scene), and anyone listed in this.people
+    if (S && !S.folk) { S.folk = new Set(); S.group.traverse((o) => { if (o.userData.person) S.folk.add(o.userData.person); }); }
+    const seen = S?.folk || new Set();
+    for (const P of seen) if (P.g.visible) animate(P, t, dt);
+    for (const P of this.people) if (!seen.has(P) && P.g.visible && (P.g.parent?.visible ?? true)) animate(P, t, dt);
     this.life.update(dt, t);
     // the shake moves the world a little under you (never you)
     if (this.shakeAmt > 0.0005 || s.rumble) {
@@ -134,6 +140,7 @@ export class Chapter3 {
   }
 
   dispose() {
+    this.G.world.center = null; this.G.sky.indoors = false;
     const G = this.G;
     for (const S of Object.values(this.scenes)) { S.space?.dispose(); S.dispose?.(); }
     this.film.dispose();
