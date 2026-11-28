@@ -345,7 +345,7 @@ export default class Apollo8 extends Chapter3 {
     this.heli = glowSprite(0xfff4d0, 3, 0.9); this.heli.position.set(40, 30, -90); g.add(this.heli);
     this.heliBlink = glowSprite(0xff2020, 0.8, 1); g.add(this.heliBlink);
     // the telegram
-    this.telegram = picture(0.9, 0.55, (c, w, h) => { c.fillStyle = '#f0e8c8'; c.fillRect(0, 0, w, h); c.fillStyle = '#e8c040'; c.fillRect(0, 0, w, 34); c.fillStyle = '#1a1a1a'; c.font = 'bold 22px sans-serif'; c.fillText('WESTERN UNION', 14, 25); c.font = 'bold 13px sans-serif'; c.fillText('TELEGRAM', w - 96, 24); c.font = 'bold 24px monospace'; c.fillText('COL FRANK BORMAN', 20, 84); c.fillText('HOUSTON TEX', 20, 112); c.font = 'bold 28px monospace'; c.fillText('THANK YOU APOLLO 8.', 20, 172); c.fillText('YOU SAVED 1968.', 20, 210); }, { frame: 0xd8d0b0 });
+    this.telegram = picture(0.9, 0.55, (c, w, h) => { c.fillStyle = '#f0e8c8'; c.fillRect(0, 0, w, h); c.fillStyle = '#e8c040'; c.fillRect(0, 0, w, 62); c.fillStyle = '#1a1a1a'; c.font = 'bold 40px sans-serif'; c.fillText('WESTERN UNION', 24, 45); c.font = 'bold 22px sans-serif'; c.textAlign = 'right'; c.fillText('TELEGRAM', w - 24, 42); c.textAlign = 'left'; c.font = 'bold 34px monospace'; c.fillText('COL FRANK BORMAN', 30, 118); c.fillText('HOUSTON TEX', 30, 158); c.font = 'bold 40px monospace'; c.fillText('THANK YOU APOLLO 8.', 30, 228); c.fillText('YOU SAVED 1968.', 30, 278); }, { frame: 0xd8d0b0, px: 512, basic: true });
     this.telegram.visible = false; this.root.add(this.telegram);
     this.addScene('splash', { group: g, bounds: 0.6, place: { lat: 8.1, year: 1968, sunLon: 274 }, amb: 0.4, fogFar: 3000, mist: 0.1,
       height: () => 0.3,

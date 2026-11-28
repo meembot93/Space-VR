@@ -174,10 +174,10 @@ export function curtains(k, wn, { col = 0x8a3a2a } = {}) {
   }
 }
 // a framed picture on a wall: draw(g, w, h) paints it. Returns the mesh (front faces +z)
-export function picture(w, h, draw, { frame = 0x3a2416 } = {}) {
+export function picture(w, h, draw, { frame = 0x3a2416, px = 256, basic = false } = {}) {
   const g = new THREE.Group();
   const f = new THREE.Mesh(new THREE.BoxGeometry(w + 0.06, h + 0.06, 0.03), new THREE.MeshLambertMaterial({ color: frame })); g.add(f);
-  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: canvasTex(256, Math.round(256 * h / w), draw) })); p.position.z = 0.017; g.add(p);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE[basic ? 'MeshBasicMaterial' : 'MeshLambertMaterial']({ map: canvasTex(px, Math.round(px * h / w), draw) })); p.position.z = 0.017; g.add(p);
   return g;
 }
 
