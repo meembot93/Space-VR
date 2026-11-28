@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 68;
-export const CHANGES = ['Egypt pyramids and temples rebuilt', 'New rooftop and neighbour houses'];
+export const VERSION = 69;
+export const CHANGES = ['Era 3 chapters 15 to 21', 'Space race to Earthrise', 'Picture signs fixed'];

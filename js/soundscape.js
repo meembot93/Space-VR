@@ -158,7 +158,8 @@ export class Soundscape {
 
   build(n, ch) {
     this.clear();
-    const A = this.G.audio, ctx = A.ctx, recipe = (RECIPES[n]?.(ch) || []).filter(b => CROWD || b.kind !== 'crowd');
+    const A = this.G.audio, ctx = A.ctx, recipe = (RECIPES[n]?.(ch) || ch?.beds?.() || [])   // Era 3 chapters list their own (beds())
+      .filter(b => CROWD || b.kind !== 'crowd');
     for (const d of recipe) {
       const src = ctx.createBufferSource(); src.buffer = this.buffer(d.kind); src.loop = true;
       const g = ctx.createGain(); g.gain.value = 0;

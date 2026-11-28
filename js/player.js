@@ -239,8 +239,9 @@ export class Player {
       const dx = x - bl.x, dz = z - bl.z, d = Math.hypot(dx, dz), r = bl.r + 0.25;
       if (d < r) { const k = d > 1e-4 ? r / d : 1; x = bl.x + (dx || r) * k; z = bl.z + dz * k; }
     }
-    const R = W.bounds, dc = Math.hypot(x, z);
-    if (dc > R) { x *= R / dc; z *= R / dc; }
+    // bounds: how far you may move from the world's middle (or from W.center, where a scene puts you)
+    const cx = W.center?.x || 0, cz = W.center?.z || 0, R = W.bounds, dc = Math.hypot(x - cx, z - cz);
+    if (dc > R) { x = cx + (x - cx) * R / dc; z = cz + (z - cz) * R / dc; }
     this.dolly.position.x += x - _a.x; this.dolly.position.z += z - _a.z;
     this.dolly.position.y = W.height(x, z) + this.lift + (this.peekUp ? PEEK_UP : 0);
   }

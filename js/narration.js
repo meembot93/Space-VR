@@ -15,6 +15,7 @@ export class Narration {
     this.cur = null;      // { id, src, endT }
     this.level = 0;       // how loud Astra's voice is right now, 0..1 (the guide star glows with it)
     this.otherLevel = 0;  // ...and anyone else's (SPEAKERS in script.js): a chapter can make them glow with it
+    this.radio = {};      // Era 3: line id -> 'nasa' (radio with the beeps), 'ussr' (radio), 'tv' (an old TV set)
     this.speed = G.params.has('fast') ? 6 : 1; // ?fast: placeholder lines go by quickly (testing)
     this.ready = fetch(DIR + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then((j) => { this.files = j || {}; }).catch(() => {});
   }
@@ -54,7 +55,9 @@ export class Narration {
       if (buf) {
         const ctx = this.G.audio.ctx, src = ctx.createBufferSource(); src.buffer = buf;
         const an = ctx.createAnalyser(); an.fftSize = 256; token.an = an; token.data = new Float32Array(256);
-        src.connect(an); an.connect(this.G.audio.voiceBus);
+        src.connect(an); an.connect(this.radioChain(this.radio[id]) || this.G.audio.voiceBus);
+        if (this.radio[id] === 'nasa') this.beep(0);
+        if (this.radio[id]) this.chains[this.radio[id]].hiss.gain.value = this.radio[id] === 'tv' ? 0.006 : 0.012;
         token.buf = buf; token.offset = 0;
         this.startSrc(token, src);
         if (this.paused) { this.paused = false; this.pause(true); } // a line that begins while paused waits too
@@ -64,8 +67,38 @@ export class Narration {
         token.fake = true; token.left = token.total = (Math.max(2.2, words / 2.6) + 0.4) / this.speed;
       }
     });
+    if (this.radio[id] && this.chains?.[this.radio[id]]) this.chains[this.radio[id]].hiss.gain.value = 0;
+    if (this.radio[id] === 'nasa' && this.cur === token) this.beep(0, 2475);
     if (this.cur === token) { this.cur = null; this.G.ui.subtitle(''); this.level = 0; this.G.events.emit('narrating', { id, on: false }); }
     await new Promise((ok) => setTimeout(ok, (this.G.ff ? 100 : 350) / this.speed)); // a little pause between lines
+  }
+
+  // A crackly radio (or 1960s TV) voice: the band squeezed thin, a little grit and hiss
+  radioChain(kind) {
+    if (!kind) return null;
+    const ctx = this.G.audio.ctx;
+    if (!this.chains) this.chains = {};
+    if (this.chains[kind]) return this.chains[kind];
+    const tv = kind === 'tv';
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = tv ? 220 : 380;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tv ? 4200 : 2900;
+    const pk = ctx.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 1500; pk.gain.value = 5; pk.Q.value = 0.8;
+    const ws = ctx.createWaveShaper(); const curve = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * (tv ? 1.4 : 2.6)) / Math.tanh(tv ? 1.4 : 2.6); } ws.curve = curve;
+    const out = ctx.createGain(); out.gain.value = tv ? 1.1 : 1.25;
+    hp.connect(pk); pk.connect(ws); ws.connect(lp); lp.connect(out); out.connect(this.G.audio.voiceBus);
+    // a soft hiss under it while anyone's on the radio
+    const n = ctx.createBufferSource(); const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    n.buffer = b; n.loop = true; const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 2200; nf.Q.value = 0.6;
+    const ng = ctx.createGain(); ng.gain.value = 0; n.connect(nf); nf.connect(ng); ng.connect(this.G.audio.voiceBus); n.start();
+    this.chains[kind] = hp; hp.hiss = ng;
+    return hp;
+  }
+  // The Apollo "Quindar" beeps that open (2525 Hz) and close (2475 Hz) a radio call
+  beep(delay = 0, f = 2525) {
+    const ctx = this.G.audio.ctx; if (!ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = f;
+    const t = ctx.currentTime + delay; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.01); g.gain.setValueAtTime(0.05, t + 0.24); g.gain.linearRampToValueAtTime(0, t + 0.25);
+    o.connect(g); g.connect(this.G.audio.voiceBus); o.start(t); o.stop(t + 0.3);
   }
 
   startSrc(c, src) {

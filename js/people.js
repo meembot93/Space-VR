@@ -67,9 +67,13 @@ export function makePerson(look = {}) {
 // Tripo's rigs have no animation clips, so poses are made here by turning the arm and spine
 // bones. Each arm is aimed at a direction in the figure's own space (x right, y up, z forward),
 // which works whatever way the bones' own axes happen to point.
+const TRIPO_NAMES = [['Hips', 'Hip'], ['Spine', 'Waist'], ['Spine1', 'Spine01'], ['Spine2', 'Spine02'], ['Neck', 'NeckTwist01'], ['Head', 'Head']];
+for (const [s, t] of [['Left', 'L_'], ['Right', 'R_']]) TRIPO_NAMES.push([s + 'Shoulder', t + 'Clavicle'], [s + 'Arm', t + 'Upperarm'], [s + 'ForeArm', t + 'Forearm'], [s + 'Hand', t + 'Hand'], [s + 'UpLeg', t + 'Thigh'], [s + 'Leg', t + 'Calf'], [s + 'Foot', t + 'Foot'], [s + 'ToeBase', t + 'ToeBase']);
 export function findRig(root) {
   const bones = {};
   root.traverse((o) => { if (o.isBone) bones[o.name.replace(/^mixamorig[:_]?/, '')] = o; });
+  // Some Tripo exports keep Tripo's own bone names (L_Upperarm...): give them their Mixamo names too.
+  for (const [mix, tri] of TRIPO_NAMES) if (!bones[mix] && bones[tri]) bones[mix] = bones[tri];
   if (!bones.LeftArm || !bones.RightArm) return null;
   const rest = new Map(); for (const b of Object.values(bones)) rest.set(b, b.quaternion.clone());
   return { bones, rest };

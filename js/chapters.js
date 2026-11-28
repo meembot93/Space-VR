@@ -38,6 +38,29 @@ export const CHAPTERS = [
   { n: 12, era: 2, title: 'Newton’s apple and cannon', ready: true, load: () => import('./chapters/newton.js') },
   { n: 13, era: 2, title: 'The rocket dreamers', ready: true, load: () => import('./chapters/rockets.js') },
   { n: 14, era: 2, title: 'Sputnik', ready: true, load: () => import('./chapters/sputnik.js') },
+  // Era 3: The Space Race (ch15..ch35). Apollo 11 is one chapter in 8 parts (group 'a11'), Apollo 13
+  // one in 5 (group 'a13'): the parts play straight on into each other, no flight between them.
+  { n: 15, era: 3, title: 'First travellers', ready: true, load: () => import('./chapters/era3_laika.js') },
+  { n: 16, era: 3, title: '“Let’s go!”', ready: true, load: () => import('./chapters/era3_gagarin.js') },
+  { n: 17, era: 3, title: 'The Mercury Seven', ready: true, load: () => import('./chapters/era3_mercury.js') },
+  { n: 18, era: 3, title: 'Seagull and the spacewalk', ready: true, load: () => import('./chapters/era3_voskhod.js') },
+  { n: 19, era: 3, title: 'Meeting in orbit', ready: true, load: () => import('./chapters/era3_gemini.js') },
+  { n: 20, era: 3, title: 'Losses and the giant', ready: true, load: () => import('./chapters/era3_saturn.js') },
+  { n: 21, era: 3, title: 'Earthrise', ready: true, load: () => import('./chapters/era3_apollo8.js') },
+  { n: 22, era: 3, group: 'a11', title: 'Apollo 11 · Launch morning', ready: false, load: () => import('./chapters/era3_a11_morning.js') },
+  { n: 23, era: 3, group: 'a11', title: 'Apollo 11 · Liftoff', ready: false, load: () => import('./chapters/era3_a11_liftoff.js') },
+  { n: 24, era: 3, group: 'a11', title: 'Apollo 11 · To the Moon', ready: false, load: () => import('./chapters/era3_a11_tlc.js') },
+  { n: 25, era: 3, group: 'a11', title: 'Apollo 11 · Lunar orbit', ready: false, load: () => import('./chapters/era3_a11_orbit.js') },
+  { n: 26, era: 3, group: 'a11', title: 'Apollo 11 · The landing', ready: false, load: () => import('./chapters/era3_a11_landing.js') },
+  { n: 27, era: 3, group: 'a11', title: 'Apollo 11 · The moonwalk', ready: false, load: () => import('./chapters/era3_a11_moonwalk.js') },
+  { n: 28, era: 3, group: 'a11', title: 'Apollo 11 · Leaving the Moon', ready: false, load: () => import('./chapters/era3_a11_leaving.js') },
+  { n: 29, era: 3, group: 'a11', title: 'Apollo 11 · Homecoming', ready: false, load: () => import('./chapters/era3_a11_home.js') },
+  { n: 30, era: 3, group: 'a13', title: 'Apollo 13 · A routine flight', ready: false, load: () => import('./chapters/era3_a13_routine.js') },
+  { n: 31, era: 3, group: 'a13', title: 'Apollo 13 · “We’ve had a problem”', ready: false, load: () => import('./chapters/era3_a13_problem.js') },
+  { n: 32, era: 3, group: 'a13', title: 'Apollo 13 · The lifeboat', ready: false, load: () => import('./chapters/era3_a13_lifeboat.js') },
+  { n: 33, era: 3, group: 'a13', title: 'Apollo 13 · Square peg, round hole', ready: false, load: () => import('./chapters/era3_a13_scrubber.js') },
+  { n: 34, era: 3, group: 'a13', title: 'Apollo 13 · The way home', ready: false, load: () => import('./chapters/era3_a13_home.js') },
+  { n: 35, era: 3, title: 'The handshake', ready: false, load: () => import('./chapters/era3_handshake.js') },
 ];
 for (const c of CHAPTERS) c.era ||= 1;
 
@@ -45,9 +68,12 @@ for (const c of CHAPTERS) c.era ||= 1;
 export const ERAS = {
   1: { title: 'Watchers of the Sky', sub: 'Thirty thousand years of people looking up.' },
   2: { title: 'The Telescope and the Rocket', sub: 'From a Sun in the middle to a beep from space.' },
+  3: { title: 'The Space Race', sub: 'From a dog in orbit to footprints on the Moon.' },
 };
-export const chapterNum = (n) => { const c = CHAPTERS.find((x) => x.n === n); return c ? CHAPTERS.filter((x) => x.era === c.era && x.n <= n).length : n; };
-export const chapterLabel = (n) => { const c = CHAPTERS.find((x) => x.n === n); return c?.era > 1 ? `Era ${c.era}, Chapter ${chapterNum(n)}` : `Chapter ${n}`; };
+// (the parts of one chapter, like Apollo 11's eight, share its number; partNum says which part)
+export const chapterNum = (n) => { const c = CHAPTERS.find((x) => x.n === n); return c ? new Set(CHAPTERS.filter((x) => x.era === c.era && x.n <= n).map((x) => x.group || x.n)).size : n; };
+export const partNum = (n) => { const c = CHAPTERS.find((x) => x.n === n); return c?.group ? CHAPTERS.filter((x) => x.group === c.group && x.n <= n).length : 0; };
+export const chapterLabel = (n) => { const c = CHAPTERS.find((x) => x.n === n); return c?.era > 1 ? `Era ${c.era}, Chapter ${chapterNum(n)}${c.group ? `, Part ${partNum(n)}` : ''}` : `Chapter ${n}`; };
 
 import { VIEW } from './people.js';
 import { LINES } from './script.js';

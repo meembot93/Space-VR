@@ -254,5 +254,196 @@
  },
  "tally_bone": {
   "file": "tally_bone.glb"
+ },
+ "aldrin": {
+  "file": "era3/aldrin.glb",
+  "height": 1.78,
+  "turn": 0,
+  "hd": "era3/hd/aldrin.glb"
+ },
+ "anders": {
+  "file": "era3/anders.glb",
+  "height": 1.73,
+  "turn": 0
+ },
+ "armstrong": {
+  "file": "era3/armstrong.glb",
+  "height": 1.8,
+  "turn": 0,
+  "hd": "era3/hd/armstrong.glb"
+ },
+ "bales": {
+  "file": "era3/bales.glb",
+  "height": 1.75,
+  "turn": 0
+ },
+ "belka": {
+  "file": "era3/belka.glb",
+  "height": 0.42,
+  "turn": 0
+ },
+ "belyayev": {
+  "file": "era3/belyayev.glb",
+  "height": 1.7,
+  "turn": 0
+ },
+ "borman": {
+  "file": "era3/borman.glb",
+  "height": 1.73,
+  "turn": 0
+ },
+ "collins": {
+  "file": "era3/collins.glb",
+  "height": 1.8,
+  "turn": 0,
+  "hd": "era3/hd/collins.glb"
+ },
+ "cronkite": {
+  "file": "era3/cronkite.glb",
+  "height": 1.8,
+  "turn": 0
+ },
+ "duke": {
+  "file": "era3/duke.glb",
+  "height": 1.8,
+  "turn": 0
+ },
+ "ed_white": {
+  "file": "era3/ed_white.glb",
+  "height": 1.83,
+  "turn": 0
+ },
+ "gagarin": {
+  "file": "era3/gagarin.glb",
+  "height": 1.62,
+  "turn": 0,
+  "hd": "era3/hd/gagarin.glb"
+ },
+ "gazenko": {
+  "file": "era3/gazenko.glb",
+  "height": 1.75,
+  "turn": 0
+ },
+ "glenn": {
+  "file": "era3/glenn.glb",
+  "height": 1.78,
+  "turn": 0,
+  "hd": "era3/hd/glenn.glb"
+ },
+ "haise": {
+  "file": "era3/haise.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "ham": {
+  "file": "era3/ham.glb",
+  "height": 0.8,
+  "turn": 0
+ },
+ "katherine_johnson": {
+  "file": "era3/katherine_johnson.glb",
+  "height": 1.65,
+  "turn": 0,
+  "hd": "era3/hd/katherine_johnson.glb"
+ },
+ "kennedy": {
+  "file": "era3/kennedy.glb",
+  "height": 1.85,
+  "turn": 0
+ },
+ "kranz": {
+  "file": "era3/kranz.glb",
+  "height": 1.75,
+  "turn": 0,
+  "hd": "era3/hd/kranz.glb"
+ },
+ "laika": {
+  "file": "era3/laika.glb",
+  "height": 0.5,
+  "turn": 0
+ },
+ "leonov": {
+  "file": "era3/leonov.glb",
+  "height": 1.72,
+  "turn": 0,
+  "hd": "era3/hd/leonov.glb"
+ },
+ "lovell": {
+  "file": "era3/lovell.glb",
+  "height": 1.8,
+  "turn": 0,
+  "hd": "era3/hd/lovell.glb"
+ },
+ "pickering": {
+  "file": "era3/pickering.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "schirra": {
+  "file": "era3/schirra.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "shepard": {
+  "file": "era3/shepard.glb",
+  "height": 1.8,
+  "turn": 0,
+  "hd": "era3/hd/shepard.glb"
+ },
+ "slayton": {
+  "file": "era3/slayton.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "stafford": {
+  "file": "era3/stafford.glb",
+  "height": 1.83,
+  "turn": 0
+ },
+ "swigert": {
+  "file": "era3/swigert.glb",
+  "height": 1.83,
+  "turn": 0
+ },
+ "takhtarova": {
+  "file": "era3/takhtarova.glb",
+  "height": 1.62,
+  "turn": 0
+ },
+ "takhtarova_rita": {
+  "file": "era3/takhtarova_rita.glb",
+  "height": 1.25,
+  "turn": 0
+ },
+ "tereshkova": {
+  "file": "era3/tereshkova.glb",
+  "height": 1.63,
+  "turn": 0,
+  "hd": "era3/hd/tereshkova.glb"
+ },
+ "titov": {
+  "file": "era3/titov.glb",
+  "height": 1.7,
+  "turn": 0
+ },
+ "van_allen": {
+  "file": "era3/van_allen.glb",
+  "height": 1.85,
+  "turn": 0
+ },
+ "wendt": {
+  "file": "era3/wendt.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "wolf": {
+  "file": "era3/wolf.glb",
+  "height": 0.8,
+  "turn": 0
+ },
+ "yazdovsky": {
+  "file": "era3/yazdovsky.glb",
+  "height": 1.75,
+  "turn": 0
  }
 }

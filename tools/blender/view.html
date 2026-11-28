@@ -6,6 +6,7 @@
 <script type="module">
 // Look at a GLB in the game's renderer and lighting.
 //   view.html?file=out/apollo_csm.glb&az=30&el=10&dist=14&env=space|day&h=1.75 (scale to h metres tall)
+//   &stack=a.glb:y[:x],b.glb:y[:x] places models at those heights (and sideways offsets)
 //   &file2=... places a second model beside it (for side-by-side comparisons)
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -41,7 +42,12 @@ async function add(file, x, h) {
   s.traverse((o) => { if (o.isMesh) { tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; calls++; } });
   scene.add(s); return b.getSize(new THREE.Vector3());
 }
-const sz = await add(q.get('file'), q.get('file2') ? -num('gap', 2) : 0, q.get('h') ? num('h') : 0);
+let sz;
+if (q.get('stack')) {   // &stack=a.glb:0,b.glb:42,...  models placed at those heights (metres), as they are
+  const box = new THREE.Box3();
+  for (const it of q.get('stack').split(',')) { const [f, y, x] = it.split(':'); const g = (await loader.loadAsync(f)).scene; g.position.y = Number(y); g.position.x = Number(x || 0); scene.add(g); g.traverse((o) => { if (o.isMesh) { tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; calls++; } }); box.expandByObject(g); }
+  sz = box.getSize(new THREE.Vector3());
+} else sz = await add(q.get('file'), q.get('file2') ? -num('gap', 2) : 0, q.get('h') ? num('h') : 0);
 if (q.get('file2')) await add(q.get('file2'), num('gap', 2), q.get('h2') ? num('h2') : 0);
 const cam = new THREE.PerspectiveCamera(num('fov', 35), innerWidth / innerHeight, 0.05, 500);
 const az = num('az', 30) * Math.PI / 180, el = num('el', 10) * Math.PI / 180, d = num('dist', Math.max(sz.x, sz.y, sz.z) * 2.2);

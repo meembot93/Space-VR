@@ -76,6 +76,19 @@ class Kit:
             self._faces(out['faces'], color)
         return res
 
+    def prism(self, pts, depth, color, m=Matrix()):
+        """A flat outline [(x, z), ...] (any convex or simple shape) given thickness along y: fins, plates."""
+        bm = self.bm
+        front = [bm.verts.new(m @ Vector((x, -depth / 2, z))) for x, z in pts]
+        back = [bm.verts.new(m @ Vector((x, depth / 2, z))) for x, z in pts]
+        faces = [bm.faces.new(front), bm.faces.new(list(reversed(back)))]
+        n = len(pts)
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append(bm.faces.new((front[j], front[i], back[i], back[j])))
+        bmesh.ops.recalc_face_normals(bm, faces=faces)
+        self._faces(faces, color)
+
     def tube(self, m, r, h, color, segs=12, cap=True, r2=None):
         """A cylinder (or cone with r2) standing on the origin of matrix m, along its z."""
         r2 = r if r2 is None else r2
@@ -129,7 +142,7 @@ class Kit:
         col.pack(); mr.pack()
         return col, mr, W, H2
 
-    def export(self, path, smooth_angle=35):
+    def export(self, path, smooth_angle=35, extra=()):
         col_img, mr_img, W, H = self._palette_images()
         bm = self.bm
         bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
@@ -167,11 +180,12 @@ class Kit:
         me.materials.append(mat)
 
         for o in list(bpy.context.scene.objects):
-            o.select_set(o == ob)
+            o.select_set(o == ob or o in extra)
         bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True,
                                   export_apply=True, export_yup=True)
         tris = sum(len(p.vertices) - 2 for p in me.polygons)
-        print(f'exported {path}: {tris} triangles, 1 mesh, 1 material')
+        tris += sum(len(p.vertices) - 2 for o in extra for p in o.data.polygons)
+        print(f'exported {path}: {tris} triangles, {1 + len(extra)} meshes')
         return tris
 
 

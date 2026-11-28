@@ -8,7 +8,7 @@ import { UI } from './ui.js';
 import { Narration } from './narration.js';
 import { Guide } from './guide.js';
 import { CHAPTER_ICONS } from './icons.js';
-import { Director, CHAPTERS, ERAS, chapterNum, chapterLabel } from './chapters.js';
+import { Director, CHAPTERS, ERAS, chapterNum, chapterLabel, partNum } from './chapters.js';
 import { makeWorld } from './world.js';
 import { Net } from './net/net.js';
 import { Music } from './music.js';
@@ -132,7 +132,7 @@ for (const c of CHAPTERS) {
     chapList.appendChild(h);
   }
   const b = document.createElement('button'); b.dataset.n = c.n;
-  b.innerHTML = `<span class="ico">${CHAPTER_ICONS[c.n] || ''}</span><span>${chapterNum(c.n)}. ${c.title}${c.ready ? '' : ' (coming soon)'}</span>`;
+  b.innerHTML = `<span class="ico">${CHAPTER_ICONS[c.n] || ''}</span><span>${chapterNum(c.n)}${c.group ? '.' + partNum(c.n) : ''}. ${c.title}${c.ready ? '' : ' (coming soon)'}</span>`;
   b.disabled = !c.ready; b.classList.toggle('on', c.n === chapterPick);
   b.addEventListener('click', () => { if (G.isHost) pickChapter(c.n); });
   chapList.appendChild(b); chapButtons.push(b);
@@ -344,9 +344,18 @@ if (params.has('autostart')) deskBtn.click(); // testing
 function chapterEnded() {
   const n = G.director.n, next = CHAPTERS.find((c) => c.n === n + 1 && c.ready);
   between = true;
+  const cur = CHAPTERS.find((c) => c.n === n);
+  // the next part of the same chapter (Apollo 11, Apollo 13): straight on, no card and no flight
+  if (next && cur?.group && next.group === cur.group) {
+    (async () => {
+      await G.ui.fadeOut(1.2);
+      if (G.isHost) { pickChapter(next.n); await G.director.load(next.n); G.director.play(); }
+    })();
+    return;
+  }
   if (next) {
-    const crossing = next.era !== CHAPTERS.find((c) => c.n === n)?.era;
-    if (crossing) G.ui.subtitle(`The end of Era 1: ${ERAS[1].title}`, `Next: Era ${next.era}, ${ERAS[next.era].title}`);
+    const crossing = next.era !== cur?.era;
+    if (crossing) G.ui.subtitle(`The end of Era ${cur.era}: ${ERAS[cur.era].title}`, `Next: Era ${next.era}, ${ERAS[next.era].title}`);
     else G.ui.subtitle(`End of ${chapterLabel(n)}`, `Next: ${chapterLabel(next.n)}, ${next.title}`);
     setTimeout(async () => {
       await G.ui.fadeOut(1.5);
@@ -364,6 +373,7 @@ function chapterEnded() {
   }
   if (n === 7) G.ui.subtitle('The end of Era 1: Watchers of the Sky. Thank you for watching the sky!', 'Era 2 is on the way.');
   else if (n === 14) G.ui.subtitle('The end of Era 2: The Telescope and the Rocket. Thank you for watching the sky!', 'Era 3, the Space Race, is on the way.');
+  else if (n === 35) G.ui.subtitle('The end of Era 3: The Space Race. Thank you for watching the sky!', 'Era 4, Living in Space, is on the way.');
   else G.ui.subtitle(`End of ${chapterLabel(n)}. Thank you for watching the sky!`, 'More chapters are on the way.');
   setTimeout(async () => {
     await G.ui.fadeOut(1.5);
