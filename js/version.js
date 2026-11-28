@@ -3,5 +3,5 @@
 //
 // EVERY change merged to main must bump VERSION by 1 and replace CHANGES with a few words on
 // what that change did (newest first, keep it to 2-4 short items).
-export const VERSION = 73;
-export const CHANGES = ['Rice stadium stands rebuilt', 'Packed crowd rows', 'Floodlights and press box'];
+export const VERSION = 74;
+export const CHANGES = ['Real wooden furniture in Era 3 rooms', 'Leather seats and sofas', 'Wood grain and soft shadows'];

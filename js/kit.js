@@ -21,6 +21,10 @@ const _c = new THREE.Color();
 export class Kit {
   constructor() { this.parts = []; }
 
+  // Textured pieces (e.g. Blender-built furniture) that ride along: mesh() adds them as child meshes,
+  // one per texture. geo has position, normal, uv and a 'color' tint.
+  addTextured(map, geo) { (this.textured ||= new Map()); if (!this.textured.has(map)) this.textured.set(map, []); this.textured.get(map).push(geo); }
+
   // geo: a three.js geometry (it is consumed). color: hex. Optional placement:
   // p = [x,y,z], r = [rx,ry,rz] (radians, XYZ order), s = number or [sx,sy,sz].
   add(geo, color, p, r, s, shade = 1) {
@@ -59,7 +63,14 @@ export class Kit {
     return g;
   }
 
-  mesh(mat = FLAT) { return new THREE.Mesh(this.geometry(), mat); }
+  mesh(mat = FLAT) {
+    const m = new THREE.Mesh(this.geometry(), mat);
+    if (this.textured) {
+      for (const [map, list] of this.textured) { map.anisotropy = 8; m.add(new THREE.Mesh(mergeGeometries(list, false), new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.75, metalness: 0 }))); for (const g of list) g.dispose(); }
+      this.textured = null;
+    }
+    return m;
+  }
 }
 
 // Nudge a shade a little, for variety between pirates (amount ~0.1).
