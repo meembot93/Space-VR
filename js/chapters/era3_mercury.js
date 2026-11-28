@@ -239,7 +239,7 @@ export default class Mercury extends Chapter3 {
     k.box(0.8, 1.4, 0.55, 0x8a4a2a, [4.9, 0.7, -0.6]); k.cyl(0.4, 0.4, 0.55, 16, 0xd8a040, [4.9, 1.4, -0.6], [Math.PI / 2, 0, 0], [1, 1, 1]);
     for (let i = 0; i < 5; i++) { k.cyl(0.005, 0.005, 0.5, 4, 0x2a2a2a, [-3.8 + i * 1.6, 2.75, -1.6]); k.cyl(0.08, 0.2, 0.18, 10, 0x2a6a5a, [-3.8 + i * 1.6, 2.45, -1.6]); }
     g.add(k.mesh(FLAT));
-    const menu = quad(4.6, 0.6, new THREE.MeshLambertMaterial({ map: canvasTex(600, 80, (c, w, h) => { c.fillStyle = '#1a1a1a'; c.fillRect(0, 0, w, h); c.fillStyle = '#f0ece0'; c.font = 'bold 22px sans-serif'; ['COFFEE 10¢', 'PIE 25¢', 'BURGER 35¢', 'MALTED 25¢', 'BLUE PLATE 65¢'].forEach((t, i) => c.fillText(t, 14 + i * 118, 48)); }) }));
+    const menu = quad(4.6, 0.6, new THREE.MeshLambertMaterial({ map: canvasTex(1000, 130, (c, w, h) => { c.fillStyle = '#1a1a1a'; c.fillRect(0, 0, w, h); c.fillStyle = '#f0ece0'; c.font = 'bold 32px sans-serif'; const items = ['COFFEE 10¢', 'PIE 25¢', 'BURGER 35¢', 'MALTED 25¢', 'BLUE PLATE 65¢'], ws = items.map((t) => c.measureText(t).width), gap = (w - ws.reduce((a, b) => a + b, 0)) / items.length; let x = gap / 2; items.forEach((t, i) => { c.fillText(t, x, 76); x += ws[i] + gap; }); }) }));
     menu.position.set(-1.4, 2.25, -3.49); g.add(menu);
     // the TV, up on a bracket over the end of the counter
     const tv = this.tv = tvSet((c, w, h, t) => drawKennedy(c, w, h, t, this.s.kennedy), { w: 0.62, legs: false });
