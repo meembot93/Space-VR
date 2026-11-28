@@ -69,6 +69,76 @@ def walls():
     return p
 
 
+# a Venetian facade: plaster with rows of tall windows, green shutters folded back, a stone base
+def mth(m, op, a, b=None):
+    n = m.N.new('ShaderNodeMath'); n.operation = op
+    for i, v in enumerate([a, b]):
+        if v is None: continue
+        if isinstance(v, (int, float)): n.inputs[i].default_value = v
+        else: m.link(v, n.inputs[i])
+    return n.outputs[0]
+
+
+def band(m, x, lo, hi):
+    return mth(m, 'MULTIPLY', mth(m, 'GREATER_THAN', x, lo), mth(m, 'LESS_THAN', x, hi))
+
+
+m = M('vfacade')
+sep = m.N.new('ShaderNodeSeparateXYZ'); m.link(m.courses(), sep.inputs[0])
+u, v = sep.outputs['X'], sep.outputs['Y']
+fx = mth(m, 'FRACT', mth(m, 'DIVIDE', u, 2.5)); fy = mth(m, 'FRACT', mth(m, 'DIVIDE', mth(m, 'SUBTRACT', v, 0.4), 3.0))
+upper = mth(m, 'GREATER_THAN', v, 3.2)
+rowin = band(m, fy, 0.28, 0.8)
+pane = mth(m, 'MULTIPLY', mth(m, 'MULTIPLY', band(m, fx, 0.33, 0.67), rowin), upper)
+shut = mth(m, 'MULTIPLY', mth(m, 'MULTIPLY', band(m, fx, 0.15, 0.85), rowin), upper)
+sill = mth(m, 'MULTIPLY', mth(m, 'MULTIPLY', band(m, fx, 0.3, 0.7), band(m, fy, 0.24, 0.28)), upper)
+col = m.mix(m.rgb(srgb(0xd8d2c6)), m.noise(1.4, 8, 0.6).outputs['Fac'], 0.2, 'OVERLAY')
+col = m.mix(col, m.rgb(srgb(0x8a8070)), m.ramp(m.wave(1.3, 'X', 6, 2).outputs['Fac'], [(0, 0.0), (1, 0.14)]))
+base = mth(m, 'LESS_THAN', v, 3.0)
+col = m.mix(col, m.brick(srgb(0xb4ae9e), srgb(0xa49e8e), srgb(0x6a645a), 0.45, 0.9, 0.02).outputs['Color'], base)   # stone ground floor
+door = mth(m, 'MULTIPLY', mth(m, 'MULTIPLY', base, band(m, mth(m, 'FRACT', mth(m, 'DIVIDE', u, 10.0)), 0.4, 0.55)), mth(m, 'LESS_THAN', v, 2.5))
+col = m.mix(col, m.rgb(srgb(0x4a6a4a)), shut)
+col = m.mix(col, m.rgb(srgb(0x1c1a1e)), pane)
+col = m.mix(col, m.rgb(srgb(0xe8e4d8)), sill)
+col = m.mix(col, m.rgb(srgb(0x2a1e16)), door)
+m.out(col)
+
+
+def vwalls():
+    # 10 x 10 m, 12 m tall (the game stretches it to each house)
+    p = Piece('vwalls', 'h')
+    p.box((0, 0, 0), (10, 10, 12), 'vfacade', top=False)
+    p.box((0, 0, 11.7), (10.3, 10.3, 0.3), 'quoin', top=False)   # cornice
+    p.box((0, 0, 3.0), (10.08, 10.08, 0.15), 'quoin', top=False)  # string course over the ground floor
+    return p
+
+
+def altana():
+    # a wooden roof terrace on posts (3 x 2.4 m deck, 1.6 m up, a rail)
+    p = Piece('altana', 'h')
+    for (x, y) in [(-1.4, -1.1), (1.4, -1.1), (-1.4, 1.1), (1.4, 1.1)]: p.box((x, y, 0), (0.12, 0.12, 2.5), 'ridge', top=False)
+    p.box((0, 0, 1.5), (3.1, 2.5, 0.1), 'ridge')
+    p.box((0, 0, 2.4), (3.1, 2.5, 0.08), 'ridge', top=False)   # the rail
+    return p
+
+
+def walls_lo():
+    # the same walls without corner stones, for whole towns of houses seen from afar (Venice)
+    p = Piece('walls_lo', 'h')
+    p.box((0, 0, 0), (L, D, WH), 'plaster', top=False)
+    p.box((0, 0, 0), (L + 0.12, D + 0.12, 0.45), 'stone', top=False)
+    p.box((0, 0, WH - 0.3), (L + 0.24, D + 0.24, 0.3), 'quoin', top=False)   # cornice
+    return p
+
+
+def funnel():
+    # a Venetian funnel chimney: a stack and its wide flaring pot, 1 m across, 2.6 m tall
+    p = Piece('funnel', 'h')
+    p.box((0, 0, 0), (0.5, 0.5, 1.6), 'stone', top=False)
+    p.lathe((0, 0, 1.6), [(0.22, 0), (0.5, 0.7), (0.5, 0.85), (0.0, 0.88)], 'ridge', segs=5)
+    return p
+
+
 def gables():
     p = Piece('gables', 'h')
     for sx in (-1, 1):
@@ -78,9 +148,9 @@ def gables():
     return p
 
 
-def roof():
-    p = Piece('roof', 'h')
-    n, lip, th = 9, 0.05, 0.06
+def roof(name='roof', n=9):
+    p = Piece(name, 'h')
+    lip, th = 0.05, 0.06
     W = L / 2 + OV * 0.8
     Y0 = D / 2 + OV                     # eave (horizontal distance from the ridge)
     z = lambda y: EAVE + H - abs(y) * SL   # roof surface height at |y|
@@ -101,10 +171,10 @@ def roof():
         e = [(-x, y, zz) for (x, y, zz) in e]
         p.poly(e[::-1] if s > 0 else e, 'ridge')
         p.box((0, s * (Y0 - 0.04), z(Y0) - th), (2 * W, 0.05, th + lip), 'ridge', top=False)   # fascia
-    p.cyl((-W - 0.05, 0, EAVE + H + 0.02), 0.13, 2 * W + 0.1, 'ridge', segs=6, axis='X')       # ridge cap
+    p.cyl((-W - 0.05, 0, EAVE + H + 0.02), 0.13, 2 * W + 0.1, 'ridge', segs=6 if n > 2 else 3, axis='X', cap=n > 2)       # ridge cap
     return p
 
 
-pieces = [walls(), gables(), roof()]
+pieces = [walls(), gables(), roof(), walls_lo(), funnel(), vwalls(), altana(), roof('roof_lo', 1)]
 K.bake_export(pieces, OUT, {'h': 1024}, samples=24, ao_strength=0.7, saturation=1.0, gain=1.0)
 print('EAVE', EAVE)

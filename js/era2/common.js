@@ -101,6 +101,22 @@ export function steppedGable(k, w, h, steps, color, p, yaw = 0, t = 0.5, pin = 0
 // facing out), so the town's lit windows can be made in one mesh.
 // o: { x, y, z, w (along the street), d, h (to the eaves), roof (height), yaw, wall, roofCol, timber,
 //      gableFront (true: the gable faces the street, the Baltic and Dutch way), stepped }
+// The Blender town-house pieces in a footprint, for chapters with their own house shapes (Venice):
+// lo = plain walls with a cornice (no corner stones); chimney: a funnel chimney at [lx, lz] on the roof.
+// Returns false if the pieces didn't load (?noset).
+export function houseFunnel(k, p, name = 'funnel', yaw = 0) { if (HOUSE.has(name)) housePiece(k, name, p, yaw, 1, 1, 1, 0xffffff); }
+export function housePieces(k, { x, y, z, w, d, h, yaw = 0, wall, roofCol, roof, over = 1, lo = false, venice = false, chimney = null }) {
+  if (!HOUSE.size) return false;
+  const c = Math.cos(yaw), s = Math.sin(yaw), P = (lx, ly, lz) => [x + lx * c + lz * s, y + ly, z - lx * s + lz * c];
+  const wt = tintFor(wall, PLASTER);
+  if (venice) housePiece(k, 'vwalls', P(0, 0, 0), yaw, w / 10, h / 12, d / 10, wt);
+  else housePiece(k, lo ? 'walls_lo' : 'walls', P(0, 0, 0), yaw, w / 10, h / 4, d / 8, wt);
+  housePiece(k, 'gables', P(0, h, 0), yaw, w / 10, roof / 3.4, d / 8, wt);
+  housePiece(k, venice ? 'roof_lo' : 'roof', P(0, h - EAVE * roof / 3.4 * over, 0), yaw, w / 10, roof / 3.4, d / 8 * over, tintFor(roofCol, TILE));
+  if (chimney) housePiece(k, 'funnel', P(chimney[0], h + roof * (1 - Math.abs(chimney[1]) / (d / 2)) - 0.4, chimney[1]), 0, 1, 1, 1, 0xffffff);
+  return true;
+}
+
 export function house(k, o, win = []) {
   const { x, y, z, w, d, h, yaw = 0, wall = 0xd8c8a8, roofCol = 0x9a3a28, timber = null, gableFront = false } = o;
   const roof = o.roof ?? (gableFront ? w : d) * 0.85;

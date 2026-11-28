@@ -35,13 +35,14 @@ import { eqVec } from '../stars.js';
 import { glowPoints, shatter, whoosh, awe, shimmer } from '../wow/fx.js';
 import { loadProps } from '../props.js';
 import { loadGLB } from '../models.js';
+import { texCity } from '../surfaces.js';
 // The Venice set from Blender (tools/blender/venice_set.py): the islands with stone quays, the city with
 // soft shadows baked in, and only the faces you can see from the belfry. ?noset uses the code-built one.
 const SET = new URLSearchParams(location.search).has('noset') ? null : await loadGLB('sets/venice.glb');
 // Meem's models (models/props): the Italian town house, St Mark's Basilica, the carrack, gondola and
 // bell, and the lens-grinding workbench and a spare telescope in Padua; waited for before the chapter builds
 const PROPS = await loadProps(['house_italian', 'house_italian_lo', 'st_marks', 'ship_carrack', 'gondola', 'church_bell', 'lens_workbench', 'galileo_telescope']);
-import { D2R, ease, clamp01, at, sunAt, gableRoof, gableWall, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
+import { D2R, ease, clamp01, at, sunAt, gableRoof, gableWall, housePieces, houseFunnel, glow, label, Journal, INK, guideUpdate } from '../era2/common.js';
 
 const LAT = 45.42;
 const TOPA = 48;                 // the belfry floor of the Campanile, Venice
@@ -250,19 +251,21 @@ export default class Galileo {
     const ROOFS = [0xa84a30, 0x9a4028, 0xb85a3a, 0x8a3a28];
     const free = (x, z, h) => veniceLand(x, z) && veniceLand(x + h, z + h) && veniceLand(x - h, z - h) && veniceLand(x + h, z - h) && veniceLand(x - h, z + h) && !canalAt(x, z) && !(x > -190 && x < 112 && z > -62 && z < 100) && Math.hypot(x, z) > 9;
     const VP = PROPS.fresh();   // Meem's house model for the town within 100 m of the tower
+    const pk = new Kit(), fp = [];   // the Blender-piece houses from 100 to 300 m, and their footprints
     for (let gx = -900; gx <= 900; gx += 13) for (let gz = -900; gz <= 470; gz += 13) {
       const d = Math.hypot(gx, gz); if (d > 1000) continue;
       if (Math.abs(gx % 39) < 1 || r() < 0.08) continue;   // lanes
       const near = d < 300; if (!near && (Math.abs(gx) % 26 > 1 || Math.abs(gz) % 26 > 1)) continue;
       const x = gx + (r() - 0.5) * 2, z = gz + (r() - 0.5) * 2, w = near ? 10 + r() * 3 : 22, dd = near ? 10 + r() * 2 : 22;
       if (!free(x, z, w / 2)) continue;
-      house(near ? k : far, { x, y: 1.2, z, w, d: dd, shut: d < 170, h: 9 + r() * 9, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], props: d < 100 ? VP : null, model: 'house_italian_lo' }, wins, r, near);
+      house(near ? k : far, { x, y: 1.2, z, w, d: dd, shut: d < 170, h: 9 + r() * 9, yaw: Math.floor(r() * 4) * Math.PI / 2, wall: WALLS[Math.floor(r() * WALLS.length)], roofCol: ROOFS[Math.floor(r() * ROOFS.length)], props: d < 100 ? VP : null, model: 'house_italian_lo', pk: d < 220 ? pk : null, fp }, wins, r, near);
     }
     // bell towers rising out of the roofs here and there
     for (const [x, z, h] of [[-330, -260, 50], [160, -220, 46], [-620, 200, 40], [480, -60, 44], [-120, -520, 48], [700, -400, 42]]) { k.box(6, h, 6, 0xb86a50, [x, 1.2 + h / 2, z]); k.box(6.6, 4, 6.6, 0xe8e0d0, [x, h - 1, z]); k.cyl(0.001, 3.6, 9, 4, 0x6a8a7a, [x, h + 5.5, z], [0, Math.PI / 4, 0]); }
     const city = k.mesh(), farCity = far.parts.length ? far.mesh() : null;
     city.name = 'venice_city'; if (farCity) farCity.name = 'venice_far';
-    if (SET) A.add(setMeshes(SET)); else { A.add(ground, city); if (farCity) A.add(farCity); }
+    if (SET) { const sg = setMeshes(SET); sg.children.forEach((m) => { if (m.name === 'venice_city') cutFootprints(m.geometry, fp); texCity(m); }); A.add(sg); }
+    if (pk.parts.length || pk.textured) A.add(pk.mesh()); else { A.add(ground, city); if (farCity) A.add(farCity); }
     A.add(VP.build(), BP.build());
     A.add(panes(wins, { lit: 0.12, seed: 4, glint: true }));
     // ---- boats: anchored ships in the basin, the ship far out at sea, gondolas ----
@@ -1273,6 +1276,22 @@ function beam(k, a, b, t, col) {
 // pushes its windows into `wins`. Far houses are just a block and a roof.
 // The Blender set's meshes, in the same flat-shaded vertex-colour look as the code-built city
 // (the ground keeps its own baked texture)
+// Cut the triangles of houses we rebuilt out of the Venice set's merged city mesh: every triangle
+// whose middle lies inside a footprint (above its ground).
+function cutFootprints(geo, fp) {
+  if (!fp.length) return;
+  const C = 20, grid = new Map(), key = (i, j) => i * 100003 + j;
+  for (const f of fp) for (let i = Math.floor((f.x - f.hx) / C); i <= Math.floor((f.x + f.hx) / C); i++) for (let j = Math.floor((f.z - f.hz) / C); j <= Math.floor((f.z + f.hz) / C); j++) { const kk = key(i, j); if (!grid.has(kk)) grid.set(kk, []); grid.get(kk).push(f); }
+  const P = geo.attributes.position, idx = geo.index ? geo.index.array : null, n = idx ? idx.length : P.count, keep = [];
+  for (let t = 0; t < n; t += 3) {
+    const a = idx ? idx[t] : t, b = idx ? idx[t + 1] : t + 1, c = idx ? idx[t + 2] : t + 2;
+    const x = (P.getX(a) + P.getX(b) + P.getX(c)) / 3, y = (P.getY(a) + P.getY(b) + P.getY(c)) / 3, z = (P.getZ(a) + P.getZ(b) + P.getZ(c)) / 3;
+    const L = grid.get(key(Math.floor(x / C), Math.floor(z / C)));
+    if (!(L && L.some((f) => y > f.y + 0.1 && Math.abs(x - f.x) < f.hx && Math.abs(z - f.z) < f.hz))) keep.push(a, b, c);
+  }
+  geo.setIndex(keep); geo.computeBoundingSphere();
+}
+
 function setMeshes(gltf) {
   const g = new THREE.Group();
   gltf.scene.traverse((o) => {
@@ -1293,6 +1312,26 @@ function house(k, o, wins, r, near = true) {
   // o.props + o.model: Meem's Italian house model in this footprint (with its own shutters and
   // chimney; no code window panes on it: they didn't line up with the model's own windows)
   if (o.props?.add(o.model, x, y, z, yaw, { w, d, h: h + rh + 1 })) return;
+  // o.pk: build it from the Blender town-house pieces (js/era2/common.js housePieces) into that kit, and
+  // note its footprint in o.fp (the Venice set's own plain box for it is cut away). Same random draws.
+  const pieces = near && o.pk && housePieces(o.pk, { x, y, z, w, d, h, yaw, wall, roofCol, roof: rh, venice: true });
+  if (pieces) {
+    o.fp.push({ x, z, y, hx: (Math.abs(Math.sin(yaw)) > 0.5 ? d : w) / 2 + 0.6, hz: (Math.abs(Math.sin(yaw)) > 0.5 ? w : d) / 2 + 0.6 });
+    if (r() < 0.75) { const cx = (r() - 0.5) * w * 0.6, cz = (r() - 0.5) * d * 0.4; houseFunnel(o.pk, P(cx, h + rh * (1 - Math.abs(cz) / (d / 2)) - 0.4, cz)); if ((Math.abs(x * 7 + z * 13) | 0) % 4 === 0) houseFunnel(o.pk, P(-cx * 0.8, h + rh * 0.3, -cz - d * 0.15), 'altana', yaw); }
+    // the facade pieces carry their own windows, shutters and door (painted 2.5 m apart, rows 3 m apart
+    // from 5 m up): candle-lit panes go over some of them (panes() draws only the lit ones: opt)
+    for (const [fx, fz, fy, span, depth] of [[0, 1, 0, w, d], [0, -1, Math.PI, w, d], [1, 0, Math.PI / 2, d, w], [-1, 0, -Math.PI / 2, d, w]]) {
+      const sp = span / 10;
+      for (const bu of [-3.75, -1.25, 1.25, 3.75]) for (const bz of [5.02, 8.02]) {
+        const a = bu * sp, ly = bz * h / 12, lx = fz ? a * fz : (depth / 2 + 0.03) * fx, lz = fz ? (depth / 2 + 0.03) * fz : -a * fx;
+        wins.push({ p: new THREE.Vector3(...P(lx, ly, lz)), yaw: yaw + fy, opt: true });
+      }
+    }
+    // (keep the same random draws as the plain-shape house below)
+    const floors = Math.max(1, Math.floor((h - 1) / 3.2)), cols = Math.max(1, Math.floor(w / 2.4));
+    for (let f = 0; f < floors; f++) for (let i = 0; i < cols; i++) { const lx = -w / 2 + (i + 0.5) * w / cols; if (f === 0 && Math.abs(lx + w * 0.2) < 1) continue; if (o.shut) r(); }
+    return;
+  } else {
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.add(gableRoof(w, d, rh, 0.35), roofCol, P(0, h, 0), [0, yaw, 0]);
   if (!near) return;
@@ -1300,6 +1339,7 @@ function house(k, o, wins, r, near = true) {
   for (const sx of [-1, 1]) k.add(gableWall(d, rh, 0.2), wall, P(sx * (w / 2 - 0.1), h, 0), [0, yaw + Math.PI / 2, 0]);
   k.box(w + 0.3, 0.28, d + 0.3, 0xd8d0c0, P(0, h - 0.14, 0), [0, yaw, 0]);
   if (r() < 0.75) { const cx = (r() - 0.5) * w * 0.6, cz = (r() - 0.5) * d * 0.4; k.cyl(0.24, 0.24, rh + 1.6, 6, 0xb09080, P(cx, h + (rh + 1.6) / 2, cz)); k.cyl(0.6, 0.22, 0.8, 8, 0x8a5a48, P(cx, h + rh + 1.9, cz)); }
+  }
   const fz = d / 2 + 0.03;
   if (o.portico) { for (let i = 0; i <= Math.round(w / 3); i++) k.box(0.4, 3.2, 0.4, 0xd8ccb8, P(-w / 2 + i * w / Math.round(w / 3), 1.6, fz + 2.2), [0, yaw, 0]); k.box(w, 0.5, 2.5, wall, P(0, 3.4, fz + 1.2), [0, yaw, 0]); }
   k.box(1.2, 2.3, 0.08, 0x3a2a1e, P(-w * 0.2, 1.15, fz), [0, yaw, 0]);
