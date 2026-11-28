@@ -220,7 +220,7 @@ export function texSolid(mesh, kind, o = {}) {
 // which way it faces. Walls get `wall`, sloping roofs `roof` (tile rows run along the roof, across its
 // slope), flat faces `flat` below `roofY` (paving) or `roof` above it (flat roofs). One projection per
 // face, detail only (no normal map): it is all seen from tens of metres away, and cheap on the Quest.
-export function texCity(mesh, { wall = 'plaster', roof = 'rooftiles', flat = 'ashlar', ws = 3, rs = 1.6, fs = 4, roofY = 4, strength = 1.8 } = {}) {
+export function texCity(mesh, { wall = 'plaster', roof = 'rooftiles', flat = 'ashlar', ws = 3, rs = 1.6, fs = 4, roofY = 4, strength = 1.8, windows = false } = {}) {
   if (OFF || !mesh?.material || mesh.userData.city3) return mesh;
   const m = mesh.material.clone(), T = (k) => tex(`${SURF[k].path || 'surf/' + k}_d.jpg`);
   const u = { cW: { value: T(wall) }, cR: { value: T(roof) }, cF: { value: T(flat) }, cS: { value: new THREE.Vector4(ws, rs, fs, roofY) }, cK: { value: strength } };
@@ -238,14 +238,21 @@ float cN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
     vec3 det;
     if (n.y > 0.97) det = vCW.y > cS.w ? texture2D(cR, vCW.xz / cS.y).rgb : texture2D(cF, vCW.xz / cS.z).rgb;
     else if (n.y > 0.25) det = texture2D(cR, vec2(dot(vCW.xz, q), dot(vCW.xz, t) / max(n.y, 0.3)) / cS.y).rgb;
-    else det = texture2D(cW, vec2(dot(vCW.xz, q), vCW.y) / cS.x).rgb;
+    else { det = texture2D(cW, vec2(dot(vCW.xz, q), vCW.y) / cS.x).rgb;
+      ${windows ? `// rows of tall shuttered windows painted on (for far houses that have none of their own)
+      vec2 wc = vec2(dot(vCW.xz, q) / 2.6, (vCW.y - 1.6) / 3.1), wf = fract(wc);
+      float up = step(4.4, vCW.y) * step(0.26, wf.y) * step(wf.y, 0.78);
+      float pane = up * step(0.36, wf.x) * step(wf.x, 0.64), shut = up * step(0.2, wf.x) * step(wf.x, 0.8);
+      float lit = step(0.93, cH(floor(wc) + floor(vCW.xz / 15.0)));
+      det = mix(det, vec3(0.2, 0.3, 0.2), shut * 0.75); det = mix(det, mix(vec3(0.06, 0.06, 0.08), vec3(1.6, 1.0, 0.45), lit), pane);` : ''}
+    }
     // weathering you can see from far off: soot and lichen patches on roofs, rain streaks and damp on walls
     float mac = cN(vCW.xz * 0.18) * 0.6 + cN(vCW.xz * 0.55 + 7.0) * 0.4;
     float wea = n.y > 0.25 ? 0.78 + 0.34 * mac : (0.86 + 0.2 * cN(vec2(dot(vCW.xz, q) * 0.9, vCW.y * 0.08)) ) * (0.8 + 0.2 * smoothstep(1.0, 3.5, vCW.y));
     diffuseColor.rgb *= max(mix(vec3(1.0), det * 2.0, cK), 0.0) * wea;
   }`);
   };
-  m.customProgramCacheKey = () => 'city3:' + wall + roof + flat;
+  m.customProgramCacheKey = () => 'city3:' + wall + roof + flat + windows;
   mesh.material = m; mesh.userData.city3 = true;
   return mesh;
 }
