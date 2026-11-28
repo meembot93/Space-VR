@@ -215,3 +215,37 @@ export function texSolid(mesh, kind, o = {}) {
   mesh.material = m; mesh.userData.solid3 = true;
   return mesh;
 }
+
+// A whole merged city in one mesh (e.g. Venice's Blender set): each face picks its own photo detail by
+// which way it faces. Walls get `wall`, sloping roofs `roof` (tile rows run along the roof, across its
+// slope), flat faces `flat` below `roofY` (paving) or `roof` above it (flat roofs). One projection per
+// face, detail only (no normal map): it is all seen from tens of metres away, and cheap on the Quest.
+export function texCity(mesh, { wall = 'plaster', roof = 'rooftiles', flat = 'ashlar', ws = 3, rs = 1.6, fs = 4, roofY = 4, strength = 1.8 } = {}) {
+  if (OFF || !mesh?.material || mesh.userData.city3) return mesh;
+  const m = mesh.material.clone(), T = (k) => tex(`${SURF[k].path || 'surf/' + k}_d.jpg`);
+  const u = { cW: { value: T(wall) }, cR: { value: T(roof) }, cF: { value: T(flat) }, cS: { value: new THREE.Vector4(ws, rs, fs, roofY) }, cK: { value: strength } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = 'varying vec3 vCW; varying vec3 vCN;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+  vCW = (modelMatrix * vec4(transformed, 1.0)).xyz; vCN = normalize(mat3(modelMatrix) * objectNormal);`);
+    sh.fragmentShader = `varying vec3 vCW; varying vec3 vCN; uniform sampler2D cW, cR, cF; uniform vec4 cS; uniform float cK;
+float cH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float cN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(cH(i), cH(i + vec2(1, 0)), f.x), mix(cH(i + vec2(0, 1)), cH(i + vec2(1, 1)), f.x), f.y); }
+` + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  {
+    vec3 n = normalize(vCN); vec2 h = n.xz; float hl = length(h); vec2 t = hl > 0.001 ? h / hl : vec2(1.0, 0.0), q = vec2(-t.y, t.x);
+    vec3 det;
+    if (n.y > 0.97) det = vCW.y > cS.w ? texture2D(cR, vCW.xz / cS.y).rgb : texture2D(cF, vCW.xz / cS.z).rgb;
+    else if (n.y > 0.25) det = texture2D(cR, vec2(dot(vCW.xz, q), dot(vCW.xz, t) / max(n.y, 0.3)) / cS.y).rgb;
+    else det = texture2D(cW, vec2(dot(vCW.xz, q), vCW.y) / cS.x).rgb;
+    // weathering you can see from far off: soot and lichen patches on roofs, rain streaks and damp on walls
+    float mac = cN(vCW.xz * 0.18) * 0.6 + cN(vCW.xz * 0.55 + 7.0) * 0.4;
+    float wea = n.y > 0.25 ? 0.78 + 0.34 * mac : (0.86 + 0.2 * cN(vec2(dot(vCW.xz, q) * 0.9, vCW.y * 0.08)) ) * (0.8 + 0.2 * smoothstep(1.0, 3.5, vCW.y));
+    diffuseColor.rgb *= max(mix(vec3(1.0), det * 2.0, cK), 0.0) * wea;
+  }`);
+  };
+  m.customProgramCacheKey = () => 'city3:' + wall + roof + flat;
+  mesh.material = m; mesh.userData.city3 = true;
+  return mesh;
+}
