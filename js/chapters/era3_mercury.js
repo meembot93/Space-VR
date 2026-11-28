@@ -25,7 +25,7 @@ import { loadAll, copy, Rocket } from '../era3/craft.js';
 import { cabin, panelLamp } from '../era3/cabin.js';
 import { Puffs, envMap, cabinRumble, bang, staticBurst, flashPop, applause, beep, clank } from '../era3/fx.js';
 import { earthSpace, groundPlane, sea, spaceSun } from '../era3/worlds.js';
-import { room, surfMat, quad, desk, chair, table, shelf, floodTower, lattice } from '../era3/sets.js';
+import { room, surfMat, quad, furn, desk, chair, table, shelf, floodTower, lattice } from '../era3/sets.js';
 import { glowSprite, glowPoints, whoosh, rumble } from '../wow/fx.js';
 import { loadProps } from '../props.js';
 import { holdProp } from '../people.js';
@@ -226,17 +226,18 @@ export default class Mercury extends Chapter3 {
     const R = room(11, 7, 3.0, { floor: surfMat('tiles', '#e8e4dc'), wall: { n: surfMat('tiles', '#e8d8b8'), s: surfMat('plaster', '#e8dcc0'), e: surfMat('plaster', '#e8dcc0'), w: surfMat('plaster', '#e8dcc0') }, ceil: surfMat('plaster', '#f0ece0'), windows: [{ side: 's', at: -2.8, y: 0.9, w: 2.6, h: 1.6 }, { side: 's', at: 2.6, y: 0.9, w: 2.6, h: 1.6 }], doors: [{ side: 's', at: 0, w: 1.0, h: 2.1 }], skirt: 0xb02a2a, frame: 0xc8c8c0 });
     const g = R.group, k = new Kit();
     // the counter with its chrome stools, the back bar with pies, coffee urns and the milkshake mixer
-    k.box(7.2, 1.0, 0.7, 0xc83a2a, [-0.6, 0.5, -1.9]); k.box(7.4, 0.06, 0.85, 0xe8e4dc, [-0.6, 1.03, -1.9]); k.box(7.2, 0.08, 0.02, 0xd8d8d8, [-0.6, 0.9, -1.54]);
-    for (let i = 0; i < 8; i++) { const x = -4 + i * 0.95; k.cyl(0.035, 0.12, 0.7, 8, 0xd0d0d0, [x, 0.35, -1.2]); k.cyl(0.19, 0.19, 0.08, 14, 0xc02a2a, [x, 0.72, -1.2]); }
+    // (counter, stools, booths, tables and jukebox are Blender-built when tools/blender/furniture.py's pieces load)
+    if (!furn(k, 'counter', -0.6, 0, -1.9, 0)) { k.box(7.2, 1.0, 0.7, 0xc83a2a, [-0.6, 0.5, -1.9]); k.box(7.4, 0.06, 0.85, 0xe8e4dc, [-0.6, 1.03, -1.9]); k.box(7.2, 0.08, 0.02, 0xd8d8d8, [-0.6, 0.9, -1.54]); }
+    for (let i = 0; i < 8; i++) { const x = -4 + i * 0.95; if (!furn(k, 'stool', x, 0, -1.2, 0)) { k.cyl(0.035, 0.12, 0.7, 8, 0xd0d0d0, [x, 0.35, -1.2]); k.cyl(0.19, 0.19, 0.08, 14, 0xc02a2a, [x, 0.72, -1.2]); } }
     k.box(7.4, 0.9, 0.5, 0xd8c8a8, [-0.6, 0.45, -3.25]); k.box(7.4, 0.04, 0.55, 0xe8e4dc, [-0.6, 0.92, -3.25]);
     for (let i = 0; i < 3; i++) { k.cyl(0.14, 0.14, 0.5, 12, 0xc8c8c8, [-3.6 + i * 0.4, 1.2, -3.3]); k.cyl(0.03, 0.03, 0.08, 6, 0x2a2a2a, [-3.6 + i * 0.4, 1.0, -3.12], [Math.PI / 2, 0, 0]); }
     for (let i = 0; i < 4; i++) { k.cyl(0.12, 0.12, 0.05, 12, 0xd8a050, [0.2 + i * 0.4, 1.0, -3.28]); k.cyl(0.13, 0.13, 0.25, 12, 0xe8e8f0, [0.2 + i * 0.4, 1.12, -3.28]); }
     k.box(0.25, 0.45, 0.22, 0x5ab0a0, [2.4, 1.16, -3.3]);
     k.box(7.4, 0.05, 0.3, 0x8a6a42, [-0.6, 1.9, -3.38]);   // the shelf with the menu boards
     // booths along the window side
-    for (const x of [-3.6, -1.8, 1.8, 3.6]) { k.box(1.2, 0.06, 0.75, 0xe8e4dc, [x, 0.76, 2.9]); k.cyl(0.04, 0.04, 0.74, 6, 0xc8c8c8, [x, 0.37, 2.9]); for (const sz of [-0.62, 0.62]) { k.box(1.2, 0.45, 0.45, 0xc02a2a, [x, 0.22, 2.9 + sz]); k.box(1.2, 0.7, 0.12, 0xc02a2a, [x, 0.8, 2.9 + sz + Math.sign(sz) * 0.2]); } }
+    for (const x of [-3.6, -1.8, 1.8, 3.6]) { if (furn(k, 'dtable', x, 0, 2.9, 0)) { for (const sz of [-1, 1]) furn(k, 'booth', x, 0, 2.9 + sz * 0.62, sz < 0 ? 0 : Math.PI); continue; } k.box(1.2, 0.06, 0.75, 0xe8e4dc, [x, 0.76, 2.9]); k.cyl(0.04, 0.04, 0.74, 6, 0xc8c8c8, [x, 0.37, 2.9]); for (const sz of [-0.62, 0.62]) { k.box(1.2, 0.45, 0.45, 0xc02a2a, [x, 0.22, 2.9 + sz]); k.box(1.2, 0.7, 0.12, 0xc02a2a, [x, 0.8, 2.9 + sz + Math.sign(sz) * 0.2]); } }
     // a jukebox, a pendant lamp row
-    k.box(0.8, 1.4, 0.55, 0x8a4a2a, [4.9, 0.7, -0.6]); k.cyl(0.4, 0.4, 0.55, 16, 0xd8a040, [4.9, 1.4, -0.6], [Math.PI / 2, 0, 0], [1, 1, 1]);
+    if (!furn(k, 'jukebox', 4.9, 0, -0.6, -Math.PI / 2)) { k.box(0.8, 1.4, 0.55, 0x8a4a2a, [4.9, 0.7, -0.6]); k.cyl(0.4, 0.4, 0.55, 16, 0xd8a040, [4.9, 1.4, -0.6], [Math.PI / 2, 0, 0], [1, 1, 1]); }
     for (let i = 0; i < 5; i++) { k.cyl(0.005, 0.005, 0.5, 4, 0x2a2a2a, [-3.8 + i * 1.6, 2.75, -1.6]); k.cyl(0.08, 0.2, 0.18, 10, 0x2a6a5a, [-3.8 + i * 1.6, 2.45, -1.6]); }
     g.add(k.mesh(FLAT));
     const menu = quad(4.6, 0.6, new THREE.MeshLambertMaterial({ map: canvasTex(1000, 130, (c, w, h) => { c.fillStyle = '#1a1a1a'; c.fillRect(0, 0, w, h); c.fillStyle = '#f0ece0'; c.font = 'bold 32px sans-serif'; const items = ['COFFEE 10¢', 'PIE 25¢', 'BURGER 35¢', 'MALTED 25¢', 'BLUE PLATE 65¢'], ws = items.map((t) => c.measureText(t).width), gap = (w - ws.reduce((a, b) => a + b, 0)) / items.length; let x = gap / 2; items.forEach((t, i) => { c.fillText(t, x, 76); x += ws[i] + gap; }); }) }));
@@ -322,14 +323,14 @@ export default class Mercury extends Chapter3 {
   // ---------- 6. The blockhouse, 20 February 1962 ----------
   buildBlockhouse() {
     const g = new THREE.Group(), k = new Kit(), N = noise2(81);
-    g.add(groundPlane({ size: 4000, seg: 140, h: (x, z) => (x > 600 ? -2 : (N(x / 60, z / 60) - 0.5) * 0.6 * clamp01((Math.hypot(x, z) - 20) / 60)), color: (x, z, c) => { const m = N(x / 8, z / 8); if (x > 560) c.setRGB(0.72, 0.66, 0.52); else c.setRGB(0.36 + m * 0.1, 0.38 + m * 0.1, 0.25); } }));
+    g.add(groundPlane({ size: 4000, seg: 140, h: (x, z) => (x > 600 ? -2 : (N(x / 60, z / 60) - 0.5) * 0.6 * clamp01((Math.hypot(x, z) - 20) / 60) - 0.05), color: (x, z, c) => { const m = N(x / 8, z / 8); if (x > 560) c.setRGB(0.72, 0.66, 0.52); else c.setRGB(0.36 + m * 0.1, 0.38 + m * 0.1, 0.25); } }));
     const S = sea({ size: 8000, col: 0x2a5a7a, sky: 0x9ab8d8, sun: V(0.3, 0.6, 0.6) }); S.position.set(4600, -1.2, 0); g.add(S); this.bhSea = S;
     // the room: thick concrete, a long armoured window looking at the pad
     const R = room(9, 6, 2.8, { floor: surfMat('concrete', '#8a8a84'), wall: surfMat('concrete', '#a8a8a0'), ceil: surfMat('concrete', '#9a9a94'), windows: [{ side: 'n', at: 0, y: 1.25, w: 5.5, h: 0.75 }], skirt: 0x5a5a5a, frame: 0x4a4e4a, outside: surfMat('concrete', '#b8b4a8'), thick: 0.6 });
     R.group.position.set(0, 0, 0); g.add(R.group);
     k.box(10.4, 0.6, 7.4, 0xb8b4a8, [0, 3.1, 0]);   // the roof slab
     // consoles along the window, with their dials; periscope eyepieces from the ceiling
-    for (let i = 0; i < 4; i++) { const x = -3.0 + i * 2.0; k.box(1.8, 0.85, 0.6, 0x6a7468, [x, 0.43, -2.4]); k.box(1.8, 0.5, 0.06, 0x3a4038, [x, 1.0, -2.65], [0.35, 0, 0]); }
+    for (let i = 0; i < 4; i++) { const x = -3.0 + i * 2.0; if (furn(k, 'console', x, 0, -2.45, 0)) continue; k.box(1.8, 0.85, 0.6, 0x6a7468, [x, 0.43, -2.4]); k.box(1.8, 0.5, 0.06, 0x3a4038, [x, 1.0, -2.65], [0.35, 0, 0]); }
     for (const x of [-2.6, 2.6]) { k.cyl(0.07, 0.07, 1.3, 8, 0x3a3e3a, [x, 2.15, -1.4]); k.box(0.3, 0.16, 0.22, 0x2a2e2a, [x, 1.5, -1.4]); }
     // outside: the pad, the gantry rolled back, the umbilical tower
     k.box(60, 0.3, 46, 0xa8a49c, [ATLAS_AT.x, 0.15, ATLAS_AT.z]);

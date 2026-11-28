@@ -20,7 +20,7 @@ if (!new URLSearchParams(location.search).has('noset')) {
   if (gl) { gl.scene.updateMatrixWorld(true); gl.scene.traverse((o) => { if (o.isMesh) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); for (const a of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(a)) g.deleteAttribute(a); FURN.set(o.name, { g, map: o.material.map }); } }); }
 }
 const _fm = new THREE.Matrix4(), _fq = new THREE.Quaternion(), _fy = new THREE.Vector3(0, 1, 0);
-function furn(k, name, x, y, z, yaw, sx = 1, sy = 1, sz = 1, tint = null) {
+export function furn(k, name, x, y, z, yaw, sx = 1, sy = 1, sz = 1, tint = null) {
   const p = FURN.get(name); if (!p) return false;
   const g = p.g.clone(); g.applyMatrix4(_fm.compose(new THREE.Vector3(x, y, z), _fq.setFromAxisAngle(_fy, yaw), new THREE.Vector3(sx, sy, sz)));
   const c = new THREE.Color(tint ?? 0xffffff), n = g.attributes.position.count, col = new Float32Array(n * 3);
