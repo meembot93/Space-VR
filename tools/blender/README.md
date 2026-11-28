@@ -17,6 +17,7 @@ Outputs go to `out/` (not committed).
 - `setkit.py`: shared helpers for sets made of separate pieces (buildings, temples) with named procedural
   materials (stone courses, mud plaster, reed matting); bakes colour + soft shadows into one texture per group
   and exports each piece as its own node, so the game stands each on its own ground and merges them.
+- `babylon_city.py`: Ch4's city houses (6 low-poly mud-brick kinds, stretched to each plot), the temple courtyard's crenellated walls and tower-gates (models/sets/babylon_city.glb). `?noset` = old boxes.
 - `giza.py`: Ch3's pyramids, temples, tombs and causeway (models/sets/giza.glb).
 - `egypt_village.py`: Ch3's priest's house you stand on and the seven houses round it (models/sets/egypt_village.glb).
   `?noset` shows Ch3's old code-built ones too.

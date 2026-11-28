@@ -28,6 +28,34 @@ import { loadProps } from '../props.js';
 const PROPS = await loadProps(['house_mudbrick_lo', 'babylon_gate', 'tablet_shelf', 'reading_desk', 'clay_tablet_lo', 'brazier']);
 const NIGHT = 0x231c16;   // the models' own faint light, so they don't sink into the dark
 import { grove, palm as palmTree } from '../trees.js';
+import { loadGLB } from '../models.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+// The city's houses, the temple courtyard's walls and tower-gates, built in Blender
+// (tools/blender/babylon_city.py). ?noset: the old plain boxes, to compare.
+const NOSET = new URLSearchParams(location.search).has('noset');
+const CITY = NOSET ? null : await loadGLB('sets/babylon_city.glb');
+// Copies of the set's pieces, each moved, turned and stretched into place, one merged mesh per texture
+class CitySet {
+  constructor(gltf) {
+    this.pieces = new Map(); this.parts = new Map();
+    if (!gltf) return;
+    gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse((o) => { if (o.isMesh) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); this.pieces.set(o.name, { g, map: o.material.map }); } });
+  }
+  has(name) { return this.pieces.has(name); }
+  put(name, x, y, z, yaw, sx = 1, sy = 1, sz = 1) {
+    const p = this.pieces.get(name); if (!p) return false;
+    const g = p.g.clone();
+    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(sx, sy, sz)));
+    if (!this.parts.has(p.map)) this.parts.set(p.map, []);
+    this.parts.get(p.map).push(g); return true;
+  }
+  build() {
+    const grp = new THREE.Group();
+    for (const [map, list] of this.parts) { map.anisotropy = 8; grp.add(new THREE.Mesh(mergeGeometries(list, false), new THREE.MeshStandardMaterial({ map, roughness: 0.95, metalness: 0 }))); for (const g of list) g.dispose(); }
+    this.parts.clear(); return grp;
+  }
+}
 
 const D2R = Math.PI / 180;
 const BASE = -24;                 // the city's ground level, below the terrace
@@ -256,7 +284,7 @@ export default class Babylon {
   }
 
   buildCity() {
-    const k = new Kit(), r = rng(19), lights = [], torches = [];
+    const k = new Kit(), r = rng(19), lights = [], torches = [], CS = new CitySet(CITY);
     const inTemenos = (x, z) => Math.abs(x) < 104 && Math.abs(z - ZIG_Z) < 104;
     const RIVER = -150, riverW = 34;
     const MUD = [0x9a8262, 0xa38a68, 0x8f7758, 0xb09774, 0x86705a];
@@ -275,19 +303,12 @@ export default class Babylon {
         PROPS.add('house_mudbrick_lo', x, BASE, z, yaw, { w, d, h: h + 1.2 });
         r();
       } else {
-        k.box(w, h, d, col, [x, BASE + h / 2, z], [0, yaw, 0]);
-        if (r() < 0.6) k.box(w * 0.35, 1.8, d * 0.35, col, [x + (r() - 0.5) * w * 0.4, BASE + h + 0.9, z + (r() - 0.5) * d * 0.4], [0, yaw, 0]); // a roof room
-        k.box(1.1, 1.9, 0.2, 0x2a2018, [x, BASE + 0.95, z + d / 2 + 0.05], [0, yaw, 0]); // door
-        if (Math.hypot(x, z - ZIG_Z) < 260) {
-          // near enough to see from the top: a low parapet round the flat roof, a lighter plastered
-          // roof, small high windows, and a reed awning or a stack of jars on some roofs
-          const cy = Math.cos(yaw), sy = Math.sin(yaw), P = (u, v) => [x + u * cy + v * sy, z - u * sy + v * cy];
-          const lip = 0.5, t = 0.3, top = BASE + h + lip / 2, darker = col - 0x0a0a0a;
-          for (const [u, v, a, b] of [[0, -d / 2 + t / 2, w, t], [0, d / 2 - t / 2, w, t], [-w / 2 + t / 2, 0, t, d - 2 * t], [w / 2 - t / 2, 0, t, d - 2 * t]]) { const [px, pz] = P(u, v); k.box(a, lip, b, darker, [px, top, pz], [0, yaw, 0]); }
-          { const [px, pz] = P(0, 0); k.box(w - 2 * t, 0.06, d - 2 * t, col + 0x0c0b08, [px, BASE + h + 0.03, pz], [0, yaw, 0]); }
-          for (const u of [-w * 0.3, w * 0.3]) { const [px, pz] = P(u, d / 2 + 0.03); k.box(0.45, 0.35, 0.08, 0x1e1812, [px, BASE + h - 0.9, pz], [0, yaw, 0]); }
-          if (r() < 0.3) { const [px, pz] = P(w * 0.25, -d * 0.2); k.box(2.6, 0.08, 2.0, 0x8a7448, [px, BASE + h + 1.6, pz], [0.05, yaw, 0]); for (const [a, b] of [[-1.2, -0.9], [1.2, -0.9], [-1.2, 0.9], [1.2, 0.9]]) { const [qx, qz] = P(w * 0.25 + a, -d * 0.2 + b); k.box(0.1, 1.6, 0.1, 0x4a3a28, [qx, BASE + h + 0.8, qz], [0, yaw, 0]); } }
-          else if (r() < 0.3) { const [px, pz] = P(-w * 0.3, d * 0.25); k.cyl(0.25, 0.35, 0.7, 6, 0x9a6a48, [px, BASE + h + 0.35, pz]); k.cyl(0.22, 0.3, 0.6, 6, 0x8a5e40, [px + 0.6, BASE + h + 0.3, pz + 0.2]); }
+        const lo = 'lo' + ((r() * 6) | 0);
+        if (Math.hypot(x, z - ZIG_Z) < 290 && CS.put(lo, x, BASE, z, yaw, w / 10, h / 4, d / 10)) { r(); }
+        else {
+          k.box(w, h, d, col, [x, BASE + h / 2, z], [0, yaw, 0]);
+          if (r() < 0.6) k.box(w * 0.35, 1.8, d * 0.35, col, [x + (r() - 0.5) * w * 0.4, BASE + h + 0.9, z + (r() - 0.5) * d * 0.4], [0, yaw, 0]); // a roof room
+          k.box(1.1, 1.9, 0.2, 0x2a2018, [x, BASE + 0.95, z + d / 2 + 0.05], [0, yaw, 0]); // door
         }
       }
       if (r() < 0.33) lights.push(x + (r() - 0.5) * 2, BASE + 1.3, z + d / 2 + 0.4);   // a lamp in the doorway
@@ -297,6 +318,11 @@ export default class Babylon {
     const T = 104, TW = 0x9c8462;
     for (const [x0, z0, x1, z1] of [[-T, -T, T, -T], [-T, T, T, T], [-T, -T, -T, T], [T, -T, T, T]]) {
       const len = Math.hypot(x1 - x0, z1 - z0), yaw = Math.atan2(x1 - x0, z1 - z0);
+      if (CS.has('wall')) {
+        for (let d = 0; d < len - 1; d += 16) CS.put('wall', lerp(x0, x1, (d + 8) / len), BASE, ZIG_Z + lerp(z0, z1, (d + 8) / len), yaw + Math.PI / 2);
+        for (let d = 0; d <= len; d += 16) CS.put('tower', lerp(x0, x1, d / len), BASE, ZIG_Z + lerp(z0, z1, d / len), yaw);
+        continue;
+      }
       k.box(3, 9, len, TW, [(x0 + x1) / 2, BASE + 4.5, ZIG_Z + (z0 + z1) / 2], [0, yaw, 0]);
       for (let d = 0; d <= len; d += 16) k.box(5, 12, 5, TW, [lerp(x0, x1, d / len), BASE + 6, ZIG_Z + lerp(z0, z1, d / len)], [0, yaw, 0]);
     }
@@ -335,6 +361,7 @@ export default class Babylon {
     // Torches along the Processional Way, the broad street east of the courtyard
     for (let z = -420; z <= 420; z += 14) for (const sx of [-1, 1]) torches.push(112 + sx * 6.5, BASE + 2.2, z);
     this.root.add(texSolid(k.mesh(), 'mudbrick', { scale: 2.4, ground: BASE }));
+    this.root.add(CS.build());
     this.root.add(PROPS.build());
 
     // Ground: paved courtyard, dusty streets, green fields by the river, desert beyond the walls

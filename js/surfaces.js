@@ -119,7 +119,7 @@ export const SURF = {
   redbrick: { col: '#8a3a2a', rep: 0.75, n: 1 }, ashlar: { col: '#b8a888', rep: 0.4, n: 1 }, mudbrick: { col: '#a08060', rep: 0.5, n: 0.9 },
   marble: { col: '#e8e0d0', rep: 0.5, n: 0.4 }, rooftiles: { col: '#a8583a', rep: 0.75, n: 1 }, cobbles: { col: '#8a8478', rep: 0.75, n: 1 },
   sandstone: { col: '#b89868', rep: 0.5, n: 0.8 }, rubble: { col: '#a89070', rep: 0.5, n: 1 }, clayplaster: { col: '#c8b8a0', rep: 0.5, n: 0.6 },
-  asphalt: { col: '#5a5a58', rep: 0.4, n: 0.6 },
+  asphalt: { col: '#5a5a58', rep: 0.4, n: 0.6 }, grass: { col: '#5a8a3a', rep: 2, n: 0.8, path: 'ground/grass' },
 };
 const _c = new THREE.Color();
 export function surfaceTex(kind, rep = 1) {
@@ -127,7 +127,7 @@ export function surfaceTex(kind, rep = 1) {
   const k = `${kind}@${rep}`;
   if (cache.has(k)) return cache.get(k);
   const one = (f) => { const t = loader.load(DIR + f); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = THREE.NoColorSpace; t.repeat.set(S.rep * rep, S.rep * rep); return t; };
-  const d = one(`surf/${kind}_d.jpg`), n = one(`surf/${kind}_n.jpg`);
+  const P = S.path || `surf/${kind}`, d = one(`${P}_d.jpg`), n = one(`${P}_n.jpg`);
   const r = { d, n }; cache.set(k, r); return r;
 }
 // Turn a material that shows a flat colour (or a painted canvas) into one with real detail
@@ -180,7 +180,7 @@ export function texSolid(mesh, kind, o = {}) {
   const S = SURF[kind]; if (!S) return mesh;
   const old = mesh.material;
   const m = old.clone();
-  const u = { sD: { value: tex(`surf/${kind}_d.jpg`) }, sN: { value: tex(`surf/${kind}_n.jpg`) }, sScale: { value: o.scale || 2 }, sStrength: { value: o.strength ?? 1.4 },
+  const u = { sD: { value: tex(`${S.path || 'surf/' + kind}_d.jpg`) }, sN: { value: tex(`${S.path || 'surf/' + kind}_n.jpg`) }, sScale: { value: o.scale || 2 }, sStrength: { value: o.strength ?? 1.4 },
     sBump: { value: (o.bump ?? 1) * S.n }, sGround: { value: o.ground ?? -1e4 }, sGrime: { value: o.grime ?? 0.35 }, sWeather: { value: o.weather ?? 0.25 } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
