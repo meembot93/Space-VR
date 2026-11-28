@@ -21,7 +21,7 @@ import { groundPlane, sea } from '../era3/worlds.js';
 import { room, surfMat, quad, chair, table, bed, picture, floodTower, lattice, deskLamp, shelf } from '../era3/sets.js';
 import { riceStadium } from '../era3/places.js';
 import { SATURN, saturnStack, PAD_Y, CREW_ARM_Y, TOWER } from '../era3/saturn.js';
-import { holdProp, dropProp } from '../people.js';
+import { holdProp, dropProp, makePerson } from '../people.js';
 import { glowSprite } from '../wow/fx.js';
 import { canvasTex, damp } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
@@ -170,7 +170,7 @@ export default class A11Morning extends Chapter3 {
     this.suited = ['collins', 'armstrong', 'aldrin'].map((m, i) => { const x = this.lounges[i]; const P = person(g, m, V(x, 0.1, -0.55), 0); sit(P); P.look = V(0, 1.6, 2); return P; });
     this.suitHelmets = this.suited.map((P) => { const h = wear(P, copy(M.helmet_apollo), { lift: -0.05, size: 1 }); h.visible = false; return h; });
     // suit technicians (Joe Schmitt at Neil's side)
-    this.techs = [0, 1, 2].map((i) => { const T = makeFolk({ kind: 'coverall', coat: 0xf0f0ec, hat: 'cap', seed: 2210 + i, glasses: i === 1 }); T.g.position.set(this.lounges[i] + 0.62, 0, -0.95); T.g.rotation.y = -Math.PI / 2 + 0.5; g.add(T.g); T.look = V(this.lounges[i], 1.2, -0.6); return T; });
+    this.techs = [0, 1, 2].map((i) => { const T = i === 1 ? makePerson({ model: 'joe_schmitt', seed: 2210 }) : makeFolk({ kind: 'coverall', coat: 0xf0f0ec, hat: 'cap', seed: 2210 + i }); T.g.position.set(this.lounges[i] + 0.62, 0, -0.95); T.g.rotation.y = -Math.PI / 2 + 0.5; g.add(T.g); T.look = V(this.lounges[i], 1.2, -0.6); return T; });
     this.people.push(...this.suited, ...this.techs);
     this.addScene('suitroom', { group: g, bounds: 0.6, indoors: true, place: { lat: 28.5, year: 1969, sunLon: 114 }, amb: 0.03, fogFar: 200,
       sky: () => { this.G.sky.set(SUN_AZ, -14); this.lamp.position.set(0, 2.6, 0); this.lamp.intensity = 2.6; this.lamp.distance = 9; this.lamp.color.setHex(0xf0f4ff); },

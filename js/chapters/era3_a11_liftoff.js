@@ -90,13 +90,15 @@ export default class A11Liftoff extends Chapter3 {
     // the people: rows of engineers at the consoles (one crowd, few draw calls), and the named few
     const spots = [];
     tiers.forEach((z, j) => { for (let x = -15; x <= 15; x += 1.1) { if (Math.abs(x) < 1.2 || (j === 0 && Math.abs(x - 3) < 1.5)) continue; spots.push({ x: x + (Math.random() - 0.5) * 0.2, y: j * 0.25, z: z + 0.7, yaw: Math.PI }); } });
-    this.engineers = new Crowd(spots, { sit: true, seed: 2301, coats: [0xf0f0ea, 0xe8ecf0, 0xd8e0e8, 0xf4f0e4, 0xe0e4e8, 0x4a4a52] }); g.add(this.engineers.group);
+    this.engineers = new Crowd(spots, { sit: true, seed: 2301, who: ['eng_white_shirt', 'eng_blue_shirt', 'eng_black', 'eng_white_shirt'] }); g.add(this.engineers.group);
     // Wernher von Braun at the window with binoculars; Rocco Petrone, launch director, behind him
     this.vb = person(g, 'von_braun', V(3.0, 0, -10.6), Math.PI + 0.15); this.vb.look = V(PAD_LCC.x, 60, PAD_LCC.z);
     const bk = new Kit(); for (const s of [-1, 1]) bk.cyl(0.03, 0.035, 0.12, 10, 0x1a1a1a, [s * 0.04, 0, 0], [Math.PI / 2, 0, 0]); bk.box(0.06, 0.03, 0.04, 0x2a2a2a, [0, 0, 0]);
     holdProp(this.vb, bk.mesh(FLAT), 'Right', [0, 0.08, 0.05]);
     this.petrone = makeFolk({ kind: 'suit', coat: 0x3a3e48, tie: 0x2a2a4a, glasses: true, headset: true, seed: 2311 }); this.petrone.g.position.set(4.6, 0, -9.6); this.petrone.g.rotation.y = Math.PI; g.add(this.petrone.g); this.petrone.look = V(0, 2, -14);
-    this.people.push(this.vb, this.petrone);
+    // Jack King, "the voice of Apollo", at his microphone by the windows, calling the countdown
+    this.king = person(g, 'jack_king', V(-4.0, 0, -9.2), Math.PI - 0.3); this.king.pose = 'hold'; this.king.look = V(PAD_LCC.x, 40, PAD_LCC.z);
+    this.people.push(this.vb, this.petrone, this.king);
     this.addScene('lcc', { group: g, bounds: 0.8, indoors: true, place: { lat: 28.6, year: 1969, sunLon: 114 }, amb: 0.05, fogFar: 4000,
       sky: () => { this.G.sky.set(...SUN); this.lamp.position.set(0, 6, 0); this.lamp.intensity = 6; this.lamp.distance = 30; this.lamp.color.setHex(0xf4f4ff); this.lamp2.position.set(0, 5, -8); this.lamp2.intensity = 3; this.lamp2.distance = 18; this.lamp2.color.setHex(0xfff8f0);
         this.key.position.set(200, 300, -100); this.key.target.position.set(0, 0, -1000); this.key.intensity = 1.6; },
@@ -131,7 +133,7 @@ export default class A11Liftoff extends Chapter3 {
     // the crowd: hundreds of people along the shore, watching (cheering when it goes)
     const spots = [...rows({ x0: -45, x1: 45, z0: 1.2, rows: 6, gap: 1.0, depth: 1.1, yaw: Math.PI, jit: 0.5, seed: 2321 }), ...rows({ x0: -40, x1: -4, z0: -7, rows: 6, gap: 1.0, depth: 1.0, yaw: Math.PI, jit: 0.5, seed: 2323 }), ...rows({ x0: 4, x1: 40, z0: -7, rows: 6, gap: 1.0, depth: 1.0, yaw: Math.PI, jit: 0.5, seed: 2324 })];
     spots.forEach((p) => { p.yaw = Math.PI + (Math.random() - 0.5) * 0.3; });
-    this.beachCrowd = new Crowd(spots, { seed: 2322 }); g.add(this.beachCrowd.group);
+    this.beachCrowd = new Crowd(spots, { seed: 2322, who: ['man_casual', 'woman_summer', 'girl', 'boy', 'woman_dress', 'man_casual', 'woman_older', 'reporter'] }); g.add(this.beachCrowd.group);
     this.kids = [0, 1].map((i) => { const P = makeFolk({ kind: 'kid', coat: [0xd84040, 0x4080d0][i], girl: i === 1, seed: 2330 + i }); P.g.position.set(-1.2 + i * 2.6, 0, -2.2); P.g.rotation.y = Math.PI; P.look = V(PAD_BEACH.x, 120, PAD_BEACH.z); g.add(P.g); return P; });
     this.people.push(...this.kids);
     this.puffs = new Puffs(900, { floor: 6 }); g.add(this.puffs.mesh);

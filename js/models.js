@@ -17,11 +17,15 @@ export function modelList() {
 
 // Resolves with { scene, animations, info } for a listed model, or null if there isn't one yet.
 // Each call returns a fresh copy (meshes and materials are shared, so copies are cheap).
-export async function loadModel(name, { sd = false } = {}) {   // sd: skip the HD version (big crowds)
-  const info = (await modelList())[name];
+// far: the light copy for big crowds (info.far). pick: a number that chooses one of the model's
+// recoloured copies (info.variants), so a room of engineers or a crowd isn't full of twins.
+export async function loadModel(name, { sd = false, far = false, pick = null } = {}) {   // sd: skip the HD version (big crowds)
+  const list = await modelList();
+  let info = list[name];
   if (!info) return null;
+  if (pick !== null && info.variants?.length) { const all = [name, ...info.variants]; info = list[all[Math.abs(pick) % all.length]] || info; }
   // High graphics (js/graphics.js) uses the full-texture version when there is one (info.hd)
-  const file = (!sd && globalThis.G?.gfx?.hd && info.hd) || info.file;
+  const file = (far && info.far) || (!sd && globalThis.G?.gfx?.hd && info.hd) || info.file;
   if (!cache.has(file)) cache.set(file, loader.loadAsync(DIR + file).catch((e) => { console.warn('Model failed', name, e); return null; }));
   const gltf = await cache.get(file);
   if (!gltf) return null;

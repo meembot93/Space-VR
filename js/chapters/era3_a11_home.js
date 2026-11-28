@@ -194,7 +194,7 @@ export default class A11Home extends Chapter3 {
     // the crew at the window (in their flight suits), the President outside it
     this.crewW = [['armstrong_casual', 2.5], ['aldrin_casual', 3.0], ['collins_casual', 2.0]].map(([w, z], i) => { const P = person(g, w, V(0.55 - i * 0.12, 0.24, -9 + z), Math.PI / 2); P.pose = 'wave'; return P; });
     this.nixon = person(g, 'nixon', V(2.6, 0, -6.3), -Math.PI / 2 + 0.2); this.nixon.look = V(1.3, 1.9, -6.5);
-    this.navy = [['navy_officer', 3.8, -4.6, -1.2], ['sailor', 5.0, -8.0, -1.6], ['sailor', 5.6, -6.0, -1.4], ['sailor', 4.6, -11.0, -1.9], ['navy_officer', 3.4, -12.0, -2.2]].map(([w, x, z, yaw]) => person(g, w, V(x, 0, z), yaw));
+    this.navy = [['navy_officer', 3.8, -4.6, -1.2], ['sailor_us', 5.0, -8.0, -1.6], ['sailor_us', 5.6, -6.0, -1.4], ['sailor_us', 4.6, -11.0, -1.9], ['navy_officer', 3.4, -12.0, -2.2]].map(([w, x, z, yaw]) => person(g, w, V(x, 0, z), yaw));
     this.people.push(...this.crewW, this.nixon, ...this.navy);
     this.addScene('hornet', { group: g, bounds: 3, place: { lat: 13.3, year: 1969, sunLon: 121 }, amb: 0.5, fogFar: 4000, mist: 0.04,
       sky: () => { this.G.sky.set(100, 35); this.key.position.set(40, 70, -10); this.key.target.position.set(0, 0, -8); this.key.intensity = 2.6; },

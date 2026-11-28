@@ -277,7 +277,7 @@ export default class Galileo {
         gk.box(0.9, 0.5, 1.4, 0x6a1a1a, [0, 0.75, 0.5]);   // a little cabin seat
         gk.box(1.0, 0.03, 1.3, 0x1a1410, [0, 0.585, -3.6]);   // the gondolier's little stern deck
       }
-      const gm = gmod ? gp.build() : gk.mesh(); const P = makePerson({ seed: 40 + i, tunic: [0x1a1a1a, 0xe8e0d0, 0x2a3a5a][i % 3], hair: 0x2a1a10 }); P.g.position.set(0, gmod ? GDECK : 0.6, gmod ? -3.1 : -3.6); P.pose = 'pull'; gm.add(P.g); gm.userData.P = P;
+      const gm = gmod ? gp.build() : gk.mesh(); const P = makePerson({ model: 'townsman_1600', sd: true, seed: 40 + i }); P.g.position.set(0, gmod ? GDECK : 0.6, gmod ? -3.1 : -3.6); P.pose = 'pull'; gm.add(P.g); gm.userData.P = P;
       const path = i < 5 ? { cx: 120 + i * 90, cz: 180, rx: 160 + i * 30, rz: 60 + i * 15 } : { cx: -110 + (i - 5) * 40, cz: 150 + (i - 5) * 25, rx: 35, rz: 18 };
       gm.userData.path = path; gm.userData.a = r() * 6.28; gm.userData.v = (0.02 + r() * 0.02) * (i % 2 ? 1 : -1);
       A.add(gm); this.gondolas.push(gm);
@@ -305,7 +305,7 @@ export default class Galileo {
         const look = (i % 2 ? WOMEN : MEN)[i >> 1]; if (look) dress(P, look);
       } else {
         x = -150 + r() * 126; wx = 40;
-        P = makePerson({ seed: 60 + i, tunic: [0x5a2a2a, 0x2a2a3a, 0x6a5a3a, 0x1a1a1a, 0xa82a20, 0x3a4a2a][i % 6], hair: 0x2a1a10, height: 1.6 + r() * 0.2 });
+        P = makePerson({ model: i % 2 ? 'townswoman_1600' : 'townsman_1600', sd: true, seed: 60 + i });
       }
       P.g.position.set(x, 1.2, z); A.add(P.g);
       P.routine = [{ x: x + (r() - 0.5) * wx, z: clamp(z + (r() - 0.5) * 30, -38, 8), pose: r() < 0.5 ? 'talk' : 'idle', secs: 4 + r() * 6 }, { x: x + (r() - 0.5) * wx, z: clamp(z + (r() - 0.5) * 30, -38, 8), pose: 'idle', secs: 3 + r() * 5 }];

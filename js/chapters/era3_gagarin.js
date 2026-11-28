@@ -151,7 +151,7 @@ export default class Gagarin extends Chapter3 {
     this.rocket = copy(M.r7_vostok, envMap('day'), 0.9); this.rocket.position.y = 1.8; g.add(this.rocket);
     // the hatch, opened in the nose cover beside the walkway
     const hatch = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.9), new THREE.MeshBasicMaterial({ color: 0x101010 })); hatch.position.set(1.33, DECK + 1.0, 0); hatch.rotation.y = Math.PI / 2; g.add(hatch);
-    this.crowd = new Crowd(rows({ x0: 4, x1: 16, z0: 14, rows: 3, yaw: Math.PI, seed: 3 }), { seed: 9 }); g.add(this.crowd.group); this.crowd.look = V(2, DECK, 0);
+    this.crowd = new Crowd(rows({ x0: 4, x1: 16, z0: 14, rows: 3, yaw: Math.PI, seed: 3 }), { seed: 9, who: ['soviet_citizen', 'soviet_worker', 'soviet_babushka', 'soviet_officer', 'soviet_citizen', 'woman_older'] }); g.add(this.crowd.group); this.crowd.look = V(2, DECK, 0);
     this.yuri2 = person(g, 'gagarin', V(7.2, DECK, 0.3), -Math.PI / 2);
     this.tech = makeFolk({ kind: 'coverall', hat: 'cap', coat: 0x3a4a5a, seed: 210 }); this.tech.g.position.set(2.2, DECK, -1.0); this.tech.g.rotation.y = 0.4; g.add(this.tech.g);
     this.people.push(this.yuri2, this.tech);
@@ -316,7 +316,7 @@ export default class Gagarin extends Chapter3 {
     const spots = [];
     const r = rng(3);
     for (let i = 0; i < 900; i++) { const x = -28 + r() * 62, z = -90 + r() * 110; if (Math.hypot(x, z) < 3.5) continue; spots.push({ x, y: 0, z, yaw: Math.PI + (r() - 0.5) * 1.6 }); }
-    this.crowd2 = new Crowd(spots, { seed: 13 }); g.add(this.crowd2.group); this.crowd2.look = V(-32, 20, -70);
+    this.crowd2 = new Crowd(spots, { seed: 13, who: ['soviet_citizen', 'soviet_worker', 'soviet_babushka', 'soviet_officer', 'soviet_citizen', 'woman_older'] }); g.add(this.crowd2.group); this.crowd2.look = V(-32, 20, -70);
     // flags waving above the crowd (little red rectangles on sticks)
     const fk = new Kit(); for (let i = 0; i < 60; i++) { const x = -20 + r() * 50, z = -70 + r() * 80; fk.cyl(0.015, 0.015, 1.2, 4, 0x6a4a2a, [x, 2.2, z]); fk.box(0.5, 0.32, 0.01, 0xd02a1e, [x + 0.25, 2.65, z], [0, r() * 3, 0]); }
     g.add(fk.mesh(FLAT));
