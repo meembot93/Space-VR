@@ -142,7 +142,7 @@ class Kit:
         col.pack(); mr.pack()
         return col, mr, W, H2
 
-    def export(self, path, smooth_angle=35):
+    def export(self, path, smooth_angle=35, extra=()):
         col_img, mr_img, W, H = self._palette_images()
         bm = self.bm
         bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
@@ -180,11 +180,12 @@ class Kit:
         me.materials.append(mat)
 
         for o in list(bpy.context.scene.objects):
-            o.select_set(o == ob)
+            o.select_set(o == ob or o in extra)
         bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True,
                                   export_apply=True, export_yup=True)
         tris = sum(len(p.vertices) - 2 for p in me.polygons)
-        print(f'exported {path}: {tris} triangles, 1 mesh, 1 material')
+        tris += sum(len(p.vertices) - 2 for o in extra for p in o.data.polygons)
+        print(f'exported {path}: {tris} triangles, {1 + len(extra)} meshes')
         return tris
 
 

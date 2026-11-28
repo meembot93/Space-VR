@@ -46,9 +46,58 @@ PAL = {
 W, D, H = 26.0, 20.0, 6.0
 FRONT = -10.0
 
-k = Kit(PAL)
 reset()
 k = Kit(PAL)
+
+# ---- screen pictures (Meem's images in tools/blender/src/) packed into one atlas on a second material ----
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+AW = AH = 2048
+RECTS = {'map': (0, 0, 2048, 1152), 'data': (0, 1152, 1344, 756), 'crt': (1344, 1152, 704, 528)}   # x, y (from top), w, h px
+
+
+def build_atlas():
+    from PIL import Image
+    at = Image.new('RGB', (AW, AH))
+    for name, f in (('map', 'mc_map.jpg'), ('data', 'mc_flightdata.jpg'), ('crt', 'mc_crt.jpg')):
+        x, y, w, h = RECTS[name]
+        at.paste(Image.open(os.path.join(SRC, f)).convert('RGB').resize((w, h), Image.LANCZOS), (x, y))
+    p = os.path.join(OUT, 'mc_screens.jpg')
+    at.save(p, quality=88)
+    return p
+
+
+QUADS = []   # (4 corners, uv rect u0 v0 u1 v1)
+
+
+def pic(m, w, h, name, sub=(0, 0, 1, 1)):
+    """An image quad of w x h in the x-z plane of matrix m, facing +y (seen from +y, its right is -x)."""
+    x, y, rw, rh = RECTS[name]
+    u0 = (x + sub[0] * rw) / AW; u1 = (x + sub[2] * rw) / AW
+    v1 = 1 - (y + sub[1] * rh) / AH; v0 = 1 - (y + sub[3] * rh) / AH
+    c = [m @ Vector(p) for p in ((w / 2, 0, -h / 2), (-w / 2, 0, -h / 2), (-w / 2, 0, h / 2), (w / 2, 0, h / 2))]
+    QUADS.append((c, ((u0, v0), (u1, v0), (u1, v1), (u0, v1))))
+
+
+def screens_object():
+    import bmesh
+    bm = bmesh.new(); uv = bm.loops.layers.uv.new('UVMap')
+    for c, uvs in QUADS:
+        f = bm.faces.new([bm.verts.new(p) for p in c])
+        for l, t in zip(f.loops, uvs):
+            l[uv].uv = t
+    bm.normal_update()
+    me = bpy.data.meshes.new('screens'); bm.to_mesh(me)
+    ob = bpy.data.objects.new('screens', me); bpy.context.scene.collection.objects.link(ob)
+    img = bpy.data.images.load(build_atlas()); img.pack()
+    mat = bpy.data.materials.new('screens'); mat.use_nodes = True
+    nt = mat.node_tree; bsdf = nt.nodes.get('Principled BSDF')
+    t = nt.nodes.new('ShaderNodeTexImage'); t.image = img
+    nt.links.new(t.outputs['Color'], bsdf.inputs['Base Color'])
+    nt.links.new(t.outputs['Color'], bsdf.inputs['Emission Color'])
+    bsdf.inputs['Emission Strength'].default_value = 1.0
+    bsdf.inputs['Roughness'].default_value = 0.25
+    me.materials.append(mat)
+    return ob
 
 # ---- room shell (inward-facing boxes) ----
 k.box((0, 0, -0.05), (W, D, 0.1), 'carpet')
@@ -70,24 +119,11 @@ for x in range(-10, 11, 4):
 SZ = 3.4          # centre of the main screens
 def screen(cx, w, h, kind):
     k.box((cx, FRONT + 0.06, SZ), (w + 0.2, 0.1, h + 0.2), 'frame')
-    k.box((cx, FRONT + 0.12, SZ), (w, 0.02, h), 'map')
-    if kind == 'map':
-        for x0, z0, ww, hh in ((-0.33, 0.12, 0.18, 0.22), (-0.27, -0.12, 0.08, 0.2), (-0.02, 0.14, 0.12, 0.14),
-                               (0.0, -0.05, 0.1, 0.22), (0.18, 0.12, 0.26, 0.16), (0.32, -0.18, 0.1, 0.08), (-0.1, 0.33, 0.18, 0.05)):
-            k.box((cx + x0 * w, FRONT + 0.14, SZ + z0 * h), (ww * w, 0.02, hh * h), 'land')
-        for i in range(60):                       # the sine-wave orbit track across the map
-            x = -0.48 + i / 60 * 0.96
-            k.box((cx + x * w, FRONT + 0.16, SZ + 0.3 * h * math.sin(x * 2 * math.pi * 1.5 + 0.6)), (0.07, 0.02, 0.07), 'track')
-    else:
-        rows = 9
-        for r in range(rows):
-            z = SZ + h / 2 - (r + 1) * h / (rows + 1)
-            for c in range(3):
-                ln = 0.18 + 0.12 * ((r * 7 + c * 3) % 4) / 3
-                k.box((cx - w / 2 + 0.15 * w + c * 0.3 * w + ln * w / 2, FRONT + 0.14, z), (ln * w, 0.02, 0.09), 'scrtxt')
+    k.box((cx, FRONT + 0.12, SZ), (w, 0.02, h), 'black')
+    pic(Matrix.Translation((cx, FRONT + 0.15, SZ)), w, h, kind)
 screen(0, 7.0, 3.8, 'map')
-screen(-7.2, 4.6, 3.0, 'data')
-screen(7.2, 4.6, 3.0, 'data')
+screen(-7.4, 4.8, 2.7, 'data')
+screen(7.4, 4.8, 2.7, 'data')
 for i, x in enumerate((-10.6, -3.5, 3.5, 10.6)):            # the small status screens up top
     k.box((x, FRONT + 0.06, 5.55), (2.2, 0.1, 0.7), 'frame')
     k.box((x, FRONT + 0.12, 5.55), (2.0, 0.02, 0.55), 'map')
@@ -107,8 +143,8 @@ def console(cx, cy, z, n_crt=2):
         x = (i - (n_crt - 1) / 2) * 0.5
         k.box(None, (0.42, 0.04, 0.32), 'panel', m=m @ Matrix.Translation((x, 0.06, 0.12)))
         k.box(None, (0.34, 0.03, 0.26), 'crt', m=m @ Matrix.Translation((x, 0.08, 0.12)))
-        for r in range(4):
-            k.box(None, (0.22 - 0.04 * (r % 2), 0.02, 0.02), 'crtlit', m=m @ Matrix.Translation((x - 0.04, 0.095, 0.2 - r * 0.05)))
+        j = len(QUADS) % 4                                                        # each CRT shows a different part
+        pic(m @ Matrix.Translation((x, 0.096, 0.12)), 0.32, 0.24, 'crt', (0.15 * (j % 2), 0.2 * (j // 2), 0.85 + 0.15 * (j % 2), 0.8 + 0.2 * (j // 2)))
     for r in range(2):                                                            # button strips
         for c in range(10):
             col = ('btn_w', 'btn_w', 'btn_a', 'btn_w', 'btn_g', 'btn_w', 'btn_r', 'btn_w', 'btn_w', 'btn_a')[(c + r * 3) % 10]
@@ -155,8 +191,8 @@ for x in (-6, -2, 2, 6):                                                        
     k.box((x, FRONT + 0.06, 0.6), (1.2, 0.1, 0.5), 'frame')
     for c in range(6):
         k.box((x - 0.45 + c * 0.18, FRONT + 0.12, 0.6), (0.12, 0.02, 0.26), 'btn_r')
-k.text('MISSION CONTROL', Matrix.Translation((0, FRONT + 0.11, 1.55)) @ Matrix.Rotation(math.pi, 4, 'Z'), 0.28, 'btn_w', depth=0.02)
+k.text('MISSION CONTROL', Matrix.Translation((0, FRONT + 0.11, 1.25)) @ Matrix.Rotation(math.pi, 4, 'Z'), 0.2, 'btn_w', depth=0.02)
 
-tris = k.export(os.path.join(OUT, 'mission_control.glb'))
+tris = k.export(os.path.join(OUT, 'mission_control.glb'), extra=[screens_object()])
 print(f'MODEL mission_control: {tris} triangles; {len(seats)} chairs')
 print('SEATS', seats)
