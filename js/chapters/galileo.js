@@ -265,7 +265,50 @@ export default class Galileo {
     const city = k.mesh(), farCity = far.parts.length ? far.mesh() : null;
     city.name = 'venice_city'; if (farCity) farCity.name = 'venice_far';
     if (SET) { const sg = setMeshes(SET); sg.children.forEach((m) => { if (m.name === 'venice_city') cutFootprints(m.geometry, fp); texCity(m); }); A.add(sg); }
-    if (pk.parts.length || pk.textured) A.add(pk.mesh()); else { A.add(ground, city); if (farCity) A.add(farCity); }
+    if (pk.parts.length || pk.textured) A.add(pk.mesh());
+    // ---- the rest of the city, out to the far shores: Venice is roofs from shore to shore, so the
+    // islands past 300 m are packed with houses too (lanes, a few open squares, the canals kept clear).
+    // Each is as light as can be (roof, gable ends and only the two walls that face the tower: 10
+    // triangles), with darker feet for depth; texCity paints the tiles, plaster and rows of windows.
+    if (SET) {
+      const fr = rng(77), pos = [], nor = [], col = [], cw = new THREE.Color(), cr = new THREE.Color();
+      const tri = (a, b, c, n, ca, cb, cc) => { pos.push(...a, ...b, ...c); nor.push(...n, ...n, ...n); col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b, cc.r, cc.g, cc.b); };
+      const quad = (a, b, c, d, n, c0, c1) => { tri(a, b, c, n, c0, c0, c1); tri(a, c, d, n, c0, c1, c1); };   // a,b low, c,d high
+      const add = (x, z, w, d, h, alongX) => {
+        cw.setHex(WALLS[Math.floor(fr() * WALLS.length)]).multiplyScalar(0.85 + fr() * 0.2); cr.setHex(ROOFS[Math.floor(fr() * ROOFS.length)]).multiplyScalar(0.8 + fr() * 0.3);
+        const lo = cw.clone().multiplyScalar(0.5), y0 = 1.2, y1 = y0 + h, x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, rh = (alongX ? d : w) * 0.24, yr = y1 + rh, o = 0.5;
+        // the two walls facing the tower
+        if (x < 0) quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], lo, cw); else quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], lo, cw);
+        if (z < 0) quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], lo, cw); else quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], lo, cw);
+        const dk = cr.clone().multiplyScalar(0.78);
+        if (alongX) {   // ridge along x
+          const k = rh / (d / 2), n = 1 / Math.hypot(1, k);
+          quad([x0 - o, y1 - o * k, z1 + o], [x1 + o, y1 - o * k, z1 + o], [x1 + o, yr, z], [x0 - o, yr, z], [0, n, k * n], cr, cr);
+          quad([x1 + o, y1 - o * k, z0 - o], [x0 - o, y1 - o * k, z0 - o], [x0 - o, yr, z], [x1 + o, yr, z], [0, n, -k * n], dk, dk);
+          if (x < 0) tri([x1, y1, z1], [x1, y1, z0], [x1, yr, z], [1, 0, 0], cw, cw, cw); else tri([x0, y1, z0], [x0, y1, z1], [x0, yr, z], [-1, 0, 0], cw, cw, cw);
+        } else {
+          const k = rh / (w / 2), n = 1 / Math.hypot(1, k);
+          quad([x1 + o, y1 - o * k, z1 + o], [x1 + o, y1 - o * k, z0 - o], [x, yr, z0 - o], [x, yr, z1 + o], [k * n, n, 0], cr, cr);
+          quad([x0 - o, y1 - o * k, z0 - o], [x0 - o, y1 - o * k, z1 + o], [x, yr, z1 + o], [x, yr, z0 - o], [-k * n, n, 0], dk, dk);
+          if (z < 0) tri([x0, y1, z1], [x1, y1, z1], [x, yr, z1], [0, 0, 1], cw, cw, cw); else tri([x1, y1, z0], [x0, y1, z0], [x, yr, z0], [0, 0, -1], cw, cw, cw);
+        }
+      };
+      const CAMPO = noise2(31);
+      for (let gx = -1400; gx <= 1200; gx += 15) for (let gz = -1320; gz <= 480; gz += 15) {
+        const d = Math.hypot(gx, gz); if (d < 296 || d > 1500) continue;
+        const step = d < 700 ? 1 : 2; if (step === 2 && ((gx / 15) & 1 || (gz / 15) & 1)) continue;   // past 700 m: bigger blocks
+        const lane = Math.abs(Math.round(gx / 15) % 7) === 3 || Math.abs(Math.round(gz / 15) % 9) === 4;
+        if (lane || CAMPO(gx / 140, gz / 140) > 0.78 || fr() < 0.05) continue;
+        const S = 15 * step, x = gx + (fr() - 0.5) * 2, z = gz + (fr() - 0.5) * 2, w = S - 1.5 - fr() * 2, dd = S - 1.5 - fr() * 2;
+        if (!free(x, z, S / 2 + 1)) continue;
+        add(x, z, w, dd, 9 + fr() * 8, fr() < 0.5);
+      }
+      // the bare quay between the Piazza's south wing and the water: the granaries and houses that stood there
+      for (let x = -182; x <= -42; x += 14.5) { add(x, 54, 13, 13, 11 + fr() * 4, true); if (fr() < 0.85) add(x, 70.5, 13, 14, 9 + fr() * 4, fr() < 0.5); }
+      const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); fg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); fg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      const fm = new THREE.Mesh(fg, new THREE.MeshLambertMaterial({ vertexColors: true })); fm.name = 'venice_far_town';
+      A.add(texCity(fm, { windows: true })); this.farTownTris = pos.length / 9;
+    } else { A.add(ground, city); if (farCity) A.add(farCity); }
     A.add(VP.build(), BP.build());
     A.add(panes(wins, { lit: 0.12, seed: 4, glint: true }));
     // ---- boats: anchored ships in the basin, the ship far out at sea, gondolas ----
