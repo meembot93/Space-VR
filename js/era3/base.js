@@ -57,6 +57,7 @@ export class Chapter3 {
     if (S.place) G.sky.setPlace(S.place);
     if (S.space) S.space.enter(null);
     G.sky.indoors = !!S.indoors;   // no star-pointing under a roof
+    G.sky.airless = !!(S.space || S.airless);
     G.sky.hideMoon?.();   // each scene shows its own Moon (sky() sets it every frame)
     this.key.intensity = 0; this.lamp.intensity = 0; this.lamp2.intensity = 0; this.flameLight.intensity = 0;
     S.enter?.();
@@ -140,6 +141,7 @@ export class Chapter3 {
   }
 
   dispose() {
+    this.G.sky.airless = false;
     this.G.world.center = null; this.G.sky.indoors = false;
     const G = this.G;
     for (const S of Object.values(this.scenes)) { S.space?.dispose(); S.dispose?.(); }

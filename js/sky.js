@@ -47,7 +47,7 @@ void main() {
 }`;
 const SKY_FS = `
 uniform vec3 zenith, horizon, glow, sunDir;
-uniform float glowAmt, night, milky;
+uniform float glowAmt, night, milky, air;
 uniform sampler2D mwTex;
 uniform mat3 toStar;
 varying vec3 vDir;
@@ -69,9 +69,9 @@ void main() {
   col += (mw * mw * 0.55 + mw * 0.06) * milky * night * above;
   // Airglow: the faint green-gold glow of the high air, a band just above the horizon on dark nights
   float ag = exp(-pow((d.y - 0.1) / 0.09, 2.0));
-  col += vec3(0.05, 0.075, 0.04) * ag * night * 0.35;
-  // Below the horizon: fade into the ground haze
-  col = mix(col, horizon * 0.85, smoothstep(0.0, -0.12, d.y));
+  col += vec3(0.05, 0.075, 0.04) * ag * night * 0.35 * air;
+  // Below the horizon: fade into the ground haze (in space, or on the Moon: just more stars)
+  col = mix(col, horizon * 0.85, smoothstep(0.0, -0.12, d.y) * air);
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -109,7 +109,7 @@ export class Sky {
     this.scene = scene;
     this.uni = {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() }, glow: { value: new THREE.Color() },
-      sunDir: { value: new THREE.Vector3(0, -1, 0) }, glowAmt: { value: 1 }, night: { value: 1 }, milky: { value: 1 },
+      sunDir: { value: new THREE.Vector3(0, -1, 0) }, glowAmt: { value: 1 }, night: { value: 1 }, milky: { value: 1 }, air: { value: 1 },
       mwTex: { value: null }, toStar: { value: new THREE.Matrix3() },
     };
     // The real stars (see stars.js); chapters set the place and era with sky.setPlace()
@@ -155,6 +155,10 @@ export class Sky {
     this.showLines = true; // faint constellation figures at night
     this.set(50, -20);
   }
+
+  // No air (space, the Moon): no airglow band, no haze below the horizon
+  set airless(v) { this.uni.air.value = v ? 0 : 1; }
+  get airless() { return this.uni.air.value === 0; }
 
   // Put the Sun at compass bearing az (degrees from north), height el (degrees)
   set(az, el) {

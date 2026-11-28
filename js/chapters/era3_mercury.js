@@ -82,7 +82,7 @@ export default class Mercury extends Chapter3 {
       P.look = V(x * 0.3, 1.5, 2); this.seven.push(P); this.people.push(P);
     });
     // the reporters in rows, the photographers at the front with their flashbulbs
-    this.pressCrowd = new Crowd(rows({ x0: -4.2, x1: 4.2, z0: 0.6, rows: 5, gap: 0.8, depth: 1.0, yaw: Math.PI, seed: 7, skip: (x, z) => Math.abs(x) < 0.9 }), { seed: 11, sit: true, coats: [0x3a3a3e, 0x4a4a52, 0x2a2a30, 0x5a5048, 0x3a3a48, 0x6a6a66] });
+    this.pressCrowd = new Crowd(rows({ x0: -4.2, x1: 4.2, z0: 0.6, rows: 5, gap: 0.8, depth: 1.0, yaw: Math.PI, seed: 7, skip: (x, z) => Math.abs(x) < 0.9 }), { seed: 11, sit: true, who: ['reporter', 'man_suit', 'man_casual', 'woman_office', 'reporter'] });
     g.add(this.pressCrowd.group);
     const ck = new Kit(); for (const s of this.pressCrowd.spots) chair(ck, s.x, s.z + 0.05, Math.PI, { seat: 0x5a1e1e, col: 0x3a2a1e }); g.add(ck.mesh(FLAT));
     this.snappers = [];

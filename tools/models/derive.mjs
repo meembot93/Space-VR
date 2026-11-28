@@ -39,6 +39,13 @@ const shade = (base, mid, k = 1) => (r, g, b) => { const f = 1 + (lum(r, g, b) /
 const noise = (x, y) => { const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return s - Math.floor(s); };
 
 // ---------- the recipes ----------
+// hue turn (degrees) of a colour, keeping its light and shade: for recoloured clothes
+const turnHue = (dh, ds = 1) => (r, g, b) => {
+  let [h, sat, v] = hsv(r, g, b); h = (h + dh + 360) % 360; sat = Math.min(1, sat * ds);
+  const c = v * sat, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+  const [a, bb, cc] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [a + m, bb + m, cc + m];
+};
 // region(q, n, body) gets a point on the body and its surface direction, in the rest pose, measured in
 // body heights (y 0 at the feet .. 1 at the top of the head; x across, z forward), and returns the name
 // of a paint to use there (or nothing). paint[name](r, g, b, at) returns the new colour, or null to
@@ -136,6 +143,40 @@ const RECIPES = {
   // Ch2: the Stonehenge builder for people far away (the crowd, the families walking in):
   // about a third of the triangles and a smaller texture, looks the same from 20 m.
   builder_far: { from: 'stonehenge_builder.glb', file: 'stonehenge_builder_far.glb', tris: 5000, texture: 512 },
+  // ---------- Era 3 ----------
+  // Apollo 11 launch morning (ch22): the crew before they suit up, from their spacesuit models:
+  // a short-sleeved shirt and slacks instead of the white suit, bare hands instead of gloves.
+  ...Object.fromEntries([['armstrong', 0xd8e4ee, 0x4a4a50], ['aldrin', 0xe8e2d0, 0x3a3e4a], ['collins', 0xc8d8e8, 0x5a5048]].map(([who, shirt, slacks]) => [`${who}_casual`, {
+    from: `era3/${who}.glb`, file: `era3/${who}_casual.glb`,
+    region(q) {
+      if (q.y > 0.875) return;                                     // the head stays
+      if (Math.abs(q.x) > 0.36 && q.y > 0.7) return 'hand';         // T-pose: the forearms and gloves
+      if (Math.abs(q.x) > 0.2 && q.y > 0.7) return 'sleeve';
+      if (q.y > 0.47) return 'shirt';
+      if (q.y > 0.05) return 'slacks';
+      return 'shoe';
+    },
+    paint: {
+      hand: (r, g, b) => (isSkin(r, g, b) ? null : shade(hex(0xd09a7a), 0.75, 0.35)(r, g, b)),
+      sleeve: (r, g, b) => (isSkin(r, g, b) ? null : shade(hex(shirt), 0.75, 0.12)(r, g, b)),
+      shirt: (r, g, b, { q }) => (isSkin(r, g, b) && q.y > 0.78 ? null : shade(hex(shirt), 0.75, 0.12)(r, g, b)),
+      slacks: (r, g, b) => shade(hex(slacks), 0.75, 0.2)(r, g, b),
+      shoe: (r, g, b) => shade(hex(0x1e1a18), 0.75, 0.4)(r, g, b),
+    },
+    rough: { shirt: 0.9, sleeve: 0.9, slacks: 0.9, shoe: 0.5, hand: 0.7 },
+  }])),
+  // Era 3 everyday people (Meem's Tripo models, models/era3/folk/): recoloured copies so a room or a
+  // crowd isn't full of twins. Clothes below the head get their hue turned; skin, white and black stay.
+  // [model, [hue turn, saturation x], ...]; each also gets a light copy in folk/far/ for big crowds.
+  ...Object.fromEntries([
+    ['woman_dress', [140, 1], [250, 1.1], [40, 0.8]], ['woman_summer', [180, 1], [290, 0.9]], ['man_casual', [120, 1], [220, 1]],
+    ['woman_office', [150, 1], [300, 0.9]], ['girl', [130, 1.1], [310, 1]], ['boy', [120, 1], [220, 1]], ['woman_older', [110, 1], [200, 1]],
+    ['soviet_babushka', [120, 1], [240, 1]], ['reporter', [60, 1]], ['eng_blue_shirt', [-160, 0.8], [0, 0.3]],
+  ].flatMap(([m, ...vs]) => vs.flatMap(([dh, ds], i) => [m + '_' + 'bcd'[i], m + '_' + 'bcd'[i] + '_far'].map((n, far) => [n, {
+    from: `era3/folk/${far ? 'far/' : ''}${m}.glb`, file: `era3/folk/${far ? 'far/' : ''}${m}_${'bcd'[i]}.glb`,
+    region(q) { if (q.y < 0.86) return 'cloth'; },
+    paint: { cloth: (r, g, b) => { if (isSkin(r, g, b)) return null; const [, sat, v] = hsv(r, g, b); return sat < 0.12 || v < 0.1 ? null : turnHue(dh, ds)(r, g, b); } },
+  }])))),
   // ---------- Era 2 ----------
   // Frombork's canons (Era 2, ch1), from Kepler: his black cassock-like coat and white collar fit a
   // cathedral canon already; grey hair and beard, lighter, as they're seen from the tower.

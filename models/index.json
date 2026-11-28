@@ -445,5 +445,390 @@
   "file": "era3/yazdovsky.glb",
   "height": 1.75,
   "turn": 0
+ },
+ "armstrong_casual": {
+  "file": "era3/armstrong_casual.glb",
+  "height": 1.8,
+  "turn": 0
+ },
+ "aldrin_casual": {
+  "file": "era3/aldrin_casual.glb",
+  "height": 1.78,
+  "turn": 0
+ },
+ "collins_casual": {
+  "file": "era3/collins_casual.glb",
+  "height": 1.8,
+  "turn": 0
+ },
+ "man_casual": {
+  "file": "era3/folk/man_casual.glb",
+  "height": 1.78,
+  "turn": 0,
+  "far": "era3/folk/far/man_casual.glb",
+  "variants": [
+   "man_casual_b",
+   "man_casual_c"
+  ]
+ },
+ "man_casual_b": {
+  "file": "era3/folk/man_casual_b.glb",
+  "height": 1.78,
+  "turn": 0,
+  "far": "era3/folk/far/man_casual_b.glb"
+ },
+ "man_casual_c": {
+  "file": "era3/folk/man_casual_c.glb",
+  "height": 1.78,
+  "turn": 0,
+  "far": "era3/folk/far/man_casual_c.glb"
+ },
+ "man_suit": {
+  "file": "era3/folk/man_suit.glb",
+  "height": 1.78,
+  "turn": 0,
+  "far": "era3/folk/far/man_suit.glb"
+ },
+ "woman_older": {
+  "file": "era3/folk/woman_older.glb",
+  "height": 1.6,
+  "turn": 0,
+  "far": "era3/folk/far/woman_older.glb",
+  "variants": [
+   "woman_older_b",
+   "woman_older_c"
+  ]
+ },
+ "woman_older_b": {
+  "file": "era3/folk/woman_older_b.glb",
+  "height": 1.6,
+  "turn": 0,
+  "far": "era3/folk/far/woman_older_b.glb"
+ },
+ "woman_older_c": {
+  "file": "era3/folk/woman_older_c.glb",
+  "height": 1.6,
+  "turn": 0,
+  "far": "era3/folk/far/woman_older_c.glb"
+ },
+ "woman_office": {
+  "file": "era3/folk/woman_office.glb",
+  "height": 1.66,
+  "turn": 0,
+  "far": "era3/folk/far/woman_office.glb",
+  "variants": [
+   "woman_office_b",
+   "woman_office_c"
+  ]
+ },
+ "woman_office_b": {
+  "file": "era3/folk/woman_office_b.glb",
+  "height": 1.66,
+  "turn": 0,
+  "far": "era3/folk/far/woman_office_b.glb"
+ },
+ "woman_office_c": {
+  "file": "era3/folk/woman_office_c.glb",
+  "height": 1.66,
+  "turn": 0,
+  "far": "era3/folk/far/woman_office_c.glb"
+ },
+ "girl": {
+  "file": "era3/folk/girl.glb",
+  "height": 1.22,
+  "turn": 0,
+  "far": "era3/folk/far/girl.glb",
+  "variants": [
+   "girl_b",
+   "girl_c"
+  ]
+ },
+ "girl_b": {
+  "file": "era3/folk/girl_b.glb",
+  "height": 1.22,
+  "turn": 0,
+  "far": "era3/folk/far/girl_b.glb"
+ },
+ "girl_c": {
+  "file": "era3/folk/girl_c.glb",
+  "height": 1.22,
+  "turn": 0,
+  "far": "era3/folk/far/girl_c.glb"
+ },
+ "reporter": {
+  "file": "era3/folk/reporter.glb",
+  "height": 1.77,
+  "turn": 0,
+  "far": "era3/folk/far/reporter.glb",
+  "variants": [
+   "reporter_b"
+  ]
+ },
+ "reporter_b": {
+  "file": "era3/folk/reporter_b.glb",
+  "height": 1.77,
+  "turn": 0,
+  "far": "era3/folk/far/reporter_b.glb"
+ },
+ "eng_black": {
+  "file": "era3/folk/eng_black.glb",
+  "height": 1.78,
+  "turn": 0,
+  "far": "era3/folk/far/eng_black.glb"
+ },
+ "tech_white": {
+  "file": "era3/folk/tech_white.glb",
+  "height": 1.76,
+  "turn": 0,
+  "far": "era3/folk/far/tech_white.glb"
+ },
+ "eng_white_shirt": {
+  "file": "era3/folk/eng_white_shirt.glb",
+  "height": 1.77,
+  "turn": 0,
+  "far": "era3/folk/far/eng_white_shirt.glb"
+ },
+ "eng_blue_shirt": {
+  "file": "era3/folk/eng_blue_shirt.glb",
+  "height": 1.75,
+  "turn": 0,
+  "far": "era3/folk/far/eng_blue_shirt.glb",
+  "variants": [
+   "eng_blue_shirt_b",
+   "eng_blue_shirt_c"
+  ]
+ },
+ "eng_blue_shirt_b": {
+  "file": "era3/folk/eng_blue_shirt_b.glb",
+  "height": 1.75,
+  "turn": 0,
+  "far": "era3/folk/far/eng_blue_shirt_b.glb"
+ },
+ "eng_blue_shirt_c": {
+  "file": "era3/folk/eng_blue_shirt_c.glb",
+  "height": 1.75,
+  "turn": 0,
+  "far": "era3/folk/far/eng_blue_shirt_c.glb"
+ },
+ "doctor_man": {
+  "file": "era3/folk/doctor_man.glb",
+  "height": 1.74,
+  "turn": 0,
+  "far": "era3/folk/far/doctor_man.glb"
+ },
+ "soviet_citizen": {
+  "file": "era3/folk/soviet_citizen.glb",
+  "height": 1.76,
+  "turn": 0,
+  "far": "era3/folk/far/soviet_citizen.glb"
+ },
+ "soviet_officer": {
+  "file": "era3/folk/soviet_officer.glb",
+  "height": 1.8,
+  "turn": 0,
+  "far": "era3/folk/far/soviet_officer.glb"
+ },
+ "navy_officer": {
+  "file": "era3/folk/navy_officer.glb",
+  "height": 1.79,
+  "turn": 0,
+  "far": "era3/folk/far/navy_officer.glb"
+ },
+ "doctor_woman": {
+  "file": "era3/folk/doctor_woman.glb",
+  "height": 1.65,
+  "turn": 0,
+  "far": "era3/folk/far/doctor_woman.glb"
+ },
+ "sailor_us": {
+  "file": "era3/folk/sailor_us.glb",
+  "height": 1.76,
+  "turn": 0,
+  "far": "era3/folk/far/sailor_us.glb"
+ },
+ "soviet_worker": {
+  "file": "era3/folk/soviet_worker.glb",
+  "height": 1.75,
+  "turn": 0,
+  "far": "era3/folk/far/soviet_worker.glb"
+ },
+ "soviet_babushka": {
+  "file": "era3/folk/soviet_babushka.glb",
+  "height": 1.62,
+  "turn": 0,
+  "far": "era3/folk/far/soviet_babushka.glb",
+  "variants": [
+   "soviet_babushka_b",
+   "soviet_babushka_c"
+  ]
+ },
+ "soviet_babushka_b": {
+  "file": "era3/folk/soviet_babushka_b.glb",
+  "height": 1.62,
+  "turn": 0,
+  "far": "era3/folk/far/soviet_babushka_b.glb"
+ },
+ "soviet_babushka_c": {
+  "file": "era3/folk/soviet_babushka_c.glb",
+  "height": 1.62,
+  "turn": 0,
+  "far": "era3/folk/far/soviet_babushka_c.glb"
+ },
+ "woman_dress": {
+  "file": "era3/folk/woman_dress.glb",
+  "height": 1.66,
+  "turn": 0,
+  "far": "era3/folk/far/woman_dress.glb",
+  "variants": [
+   "woman_dress_b",
+   "woman_dress_c",
+   "woman_dress_d"
+  ]
+ },
+ "woman_dress_b": {
+  "file": "era3/folk/woman_dress_b.glb",
+  "height": 1.66,
+  "turn": 0,
+  "far": "era3/folk/far/woman_dress_b.glb"
+ },
+ "woman_dress_c": {
+  "file": "era3/folk/woman_dress_c.glb",
+  "height": 1.66,
+  "turn": 0,
+  "far": "era3/folk/far/woman_dress_c.glb"
+ },
+ "woman_dress_d": {
+  "file": "era3/folk/woman_dress_d.glb",
+  "height": 1.66,
+  "turn": 0,
+  "far": "era3/folk/far/woman_dress_d.glb"
+ },
+ "woman_summer": {
+  "file": "era3/folk/woman_summer.glb",
+  "height": 1.67,
+  "turn": 0,
+  "far": "era3/folk/far/woman_summer.glb",
+  "variants": [
+   "woman_summer_b",
+   "woman_summer_c"
+  ]
+ },
+ "woman_summer_b": {
+  "file": "era3/folk/woman_summer_b.glb",
+  "height": 1.67,
+  "turn": 0,
+  "far": "era3/folk/far/woman_summer_b.glb"
+ },
+ "woman_summer_c": {
+  "file": "era3/folk/woman_summer_c.glb",
+  "height": 1.67,
+  "turn": 0,
+  "far": "era3/folk/far/woman_summer_c.glb"
+ },
+ "boy": {
+  "file": "era3/folk/boy.glb",
+  "height": 1.28,
+  "turn": 0,
+  "far": "era3/folk/far/boy.glb",
+  "variants": [
+   "boy_b",
+   "boy_c"
+  ]
+ },
+ "pad_worker": {
+  "file": "era3/folk/pad_worker.glb",
+  "height": 1.78,
+  "turn": 0,
+  "far": "era3/folk/far/pad_worker.glb"
+ },
+ "frogman": {
+  "file": "era3/folk/frogman.glb",
+  "height": 1.8,
+  "turn": 0,
+  "far": "era3/folk/far/frogman.glb"
+ },
+ "nixon": {
+  "file": "era3/nixon.glb",
+  "height": 1.8,
+  "turn": 0,
+  "hd": "era3/hd/nixon.glb"
+ },
+ "ken_mattingly": {
+  "file": "era3/ken_mattingly.glb",
+  "height": 1.78,
+  "turn": 0,
+  "hd": "era3/hd/ken_mattingly.glb"
+ },
+ "jack_garman": {
+  "file": "era3/jack_garman.glb",
+  "height": 1.77,
+  "turn": 0,
+  "hd": "era3/hd/jack_garman.glb"
+ },
+ "john_aaron": {
+  "file": "era3/john_aaron.glb",
+  "height": 1.8,
+  "turn": 0,
+  "hd": "era3/hd/john_aaron.glb"
+ },
+ "ed_smylie": {
+  "file": "era3/ed_smylie.glb",
+  "height": 1.78,
+  "turn": 0,
+  "hd": "era3/hd/ed_smylie.glb"
+ },
+ "sy_liebergot": {
+  "file": "era3/sy_liebergot.glb",
+  "height": 1.77,
+  "turn": 0,
+  "hd": "era3/hd/sy_liebergot.glb"
+ },
+ "joe_kerwin": {
+  "file": "era3/joe_kerwin.glb",
+  "height": 1.79,
+  "turn": 0,
+  "hd": "era3/hd/joe_kerwin.glb"
+ },
+ "vance_brand": {
+  "file": "era3/vance_brand.glb",
+  "height": 1.78,
+  "turn": 0,
+  "hd": "era3/hd/vance_brand.glb"
+ },
+ "valeri_kubasov": {
+  "file": "era3/valeri_kubasov.glb",
+  "height": 1.76,
+  "turn": 0,
+  "hd": "era3/hd/valeri_kubasov.glb"
+ },
+ "maria_von_braun": {
+  "file": "era3/maria_von_braun.glb",
+  "height": 1.65,
+  "turn": 0,
+  "hd": "era3/hd/maria_von_braun.glb"
+ },
+ "jack_king": {
+  "file": "era3/jack_king.glb",
+  "height": 1.78,
+  "turn": 0,
+  "hd": "era3/hd/jack_king.glb"
+ },
+ "joe_schmitt": {
+  "file": "era3/joe_schmitt.glb",
+  "height": 1.76,
+  "turn": 0,
+  "hd": "era3/hd/joe_schmitt.glb"
+ },
+ "boy_b": {
+  "file": "era3/folk/boy_b.glb",
+  "height": 1.28,
+  "turn": 0,
+  "far": "era3/folk/far/boy_b.glb"
+ },
+ "boy_c": {
+  "file": "era3/folk/boy_c.glb",
+  "height": 1.28,
+  "turn": 0,
+  "far": "era3/folk/far/boy_c.glb"
  }
 }

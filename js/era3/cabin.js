@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { canvasTex } from '../util.js';
 import { rng } from '../shapes.js';
 import { loadE3, copy } from './craft.js';
+import { Kit, FLAT } from '../kit.js';
 
 const EYE = 1.6;
 
@@ -223,14 +224,14 @@ export function cabin(kind, opts = {}) {
     P.group.position.set(0, EYE - 0.02, -0.82); P.group.rotation.x = -0.42;
     for (const x of [-0.68, 0, 0.68]) if (Math.abs(x - off) > 0.1) crew.push({ pos: new THREE.Vector3(x - off, 0, 0), yaw: 0 });
   } else if (kind === 'lm') {
-    // the Lunar Module's cabin: you stand (no seats), strapped in by cords; two triangular windows
-    // looking down and out, the panel between, the commander on the left
-    profile = [[1.2, 0.8], [1.2, -0.2], [1.1, -0.9], [0.9, -1.15], [0.01, -1.16]];
-    wins = [{ ang: -40, z: -0.98, w: 0.36, h: 0.42, round: false, name: 'left' }, { ang: 40, z: -0.98, w: 0.36, h: 0.42, round: false, name: 'right' }, { ang: 0, z: -0.6, w: 0.14, h: 0.14, round: false, name: 'overhead' }];
-    axisY = EYE - 0.05; inner.position.x = 0.42;
-    P = panelMesh(0.5, 0.75, { seed: 55, base: panelCol, dense: 1.2, gauges: 6, special: [{ name: 'master', u: 0.5, v: 0.92, s: 0.05, kind: 'light', text: 'MASTER ALARM', col: '#5a1810' }, { name: 'timer', u: 0.5, v: 0.78, s: 0.08, kind: 'timer', text: '102:45:40' }, { name: 'dsky', u: 0.5, v: 0.25, s: 0.12, kind: 'screen' }] });
-    P.group.position.set(0, EYE - 0.25, -0.75); P.group.rotation.x = -0.15;
-    crew.push({ pos: new THREE.Vector3(0.84, 0, 0), yaw: 0, stand: true });
+    // the Lunar Module's cabin: a small flat-fronted room you stand in (no seats), the commander on
+    // the left and the pilot on the right; two triangle windows in the front wall look forward and
+    // down, the main panel between and below them, more panels down the side walls
+    P = panelMesh(0.72, 0.46, { seed: 55, base: panelCol, dense: 0.7, gauges: 4, special: [{ name: 'master', u: 0.5, v: 0.9, s: 0.06, kind: 'light', text: 'MASTER ALARM', col: '#5a1810' }, { name: 'timer', u: 0.2, v: 0.88, s: 0.1, kind: 'timer', text: '102:45:40' }, { name: 'dsky', u: 0.5, v: 0.38, s: 0.16, kind: 'screen' }] });
+    P.group.position.set(0, 0.86, -0.72); P.group.rotation.x = -0.5;
+    crew.push({ pos: new THREE.Vector3(-0.66, 0, -0.22), yaw: 0, stand: true }, { pos: new THREE.Vector3(0.66, 0, -0.22), yaw: 0, stand: true });
+    const L = lmRoom(panelCol); extra.push(L);
+    wins = L.wins;
   } else if (kind === 'soyuz') {
     // the Soyuz orbital module: a ball with a round hatch ahead (the docking module beyond)
     const R = 1.1; profile = []; for (let i = 0; i <= 24; i++) { const a = Math.PI * i / 24; profile.push([Math.max(0.02, Math.sin(a) * R), 0.3 - Math.cos(a) * R]); }
@@ -239,19 +240,19 @@ export function cabin(kind, opts = {}) {
     P.group.position.set(-0.6, EYE - 0.3, -0.35); P.group.rotation.y = 1.0;
   }
   const ball = kind === 'vostok' || kind === 'soyuz';
-  const S = shell(profile, wins, { cables: !ball, col: ball ? '#8e9890' : kind === 'apollo' ? '#b8b4a8' : '#9a9690', seed: kind.length * 7, russian: opts.russian || kind === 'vostok' || kind === 'soyuz' });
-  S.position.y = axisY; inner.add(S);
-  for (const wn of wins) inner.add(glass(wn, axisY));
+  const S = kind === 'lm' ? extra[0].group : shell(profile, wins, { cables: !ball, col: ball ? '#8e9890' : kind === 'apollo' ? '#b8b4a8' : '#9a9690', seed: kind.length * 7, russian: opts.russian || kind === 'vostok' || kind === 'soyuz' });
+  if (kind !== 'lm') { S.position.y = axisY; for (const wn of wins) inner.add(glass(wn, axisY)); }
+  inner.add(S);
   inner.add(P.group);
   // the floor of the cabin (the couch's base and the bulkhead behind your feet) — a dark disc
-  const back = new THREE.Mesh(new THREE.CircleGeometry(profile[0][0] * 0.99, 40), new THREE.MeshStandardMaterial({ color: 0x5a5a58, roughness: 0.9 }));
-  back.position.set(0, axisY, profile[0][1] - 0.01); inner.add(back);
+  if (kind !== 'lm') { const back = new THREE.Mesh(new THREE.CircleGeometry(profile[0][0] * 0.99, 40), new THREE.MeshStandardMaterial({ color: 0x5a5a58, roughness: 0.9 }));
+    back.position.set(0, axisY, profile[0][1] - 0.01); inner.add(back); }
   // your couch (seen at your sides and knees): a padded frame, and your legs and hands in the suit
   const suit = opts.suit ?? (kind === 'vostok' ? 0xd86a2a : 0xe8e6e0);
   const couch = new THREE.Group(); inner.add(couch);
   const pad = new THREE.MeshStandardMaterial({ color: kind === 'vostok' ? 0x4a5a5a : 0x707070, roughness: 0.9 });
   const sm = new THREE.MeshStandardMaterial({ color: suit, roughness: 0.85 });
-  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.5), pad); arm.position.set(sx * 0.3 - inner.position.x * 0, EYE - 0.62, -0.15); couch.add(arm); }
+  if (kind !== 'lm') for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.5), pad); arm.position.set(sx * 0.3 - inner.position.x * 0, EYE - 0.62, -0.15); couch.add(arm); }
   // knees up in front (you lie back in the couch): two suited legs reaching toward the panel
   if (kind !== 'lm' && kind !== 'soyuz') for (const sx of [-1, 1]) {
     const th = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.38, 4, 8), sm); th.rotation.x = Math.PI / 2 - 0.5; th.position.set(sx * 0.11, EYE - 0.58, -0.32); couch.add(th);
@@ -264,7 +265,7 @@ export function cabin(kind, opts = {}) {
 
   const C = {
     group, inner, kind, panel: P.group, spots: P.spots, crew, light, glow, shell: S, wins,
-    windows: wins.map((wn) => ({ name: wn.name, local: winDir(wn).add(new THREE.Vector3(0, axisY - EYE, 0)) })),
+    windows: wins.map((wn) => ({ name: wn.name, local: wn.local ? wn.local.clone() : winDir(wn).add(new THREE.Vector3(0, axisY - EYE, 0)) })),
     // look direction through a window, in world space (after the group's been placed)
     dirOf(name) { const w = C.windows.find((x) => x.name === name) || C.windows[0]; group.updateMatrixWorld(true); const p = w.local.clone().add(inner.position).add(new THREE.Vector3(0, EYE, 0)).applyMatrix4(group.matrixWorld); const e = new THREE.Vector3(0, EYE, 0).applyMatrix4(group.matrixWorld); return p.sub(e).normalize(); },
     // a world point on the panel (for touch spots)
@@ -275,6 +276,61 @@ export function cabin(kind, opts = {}) {
   };
   C.lights(true);
   return C;
+}
+
+// The LM's cabin room (see cabin('lm')): you stand at x = 0, z = 0. Front wall at z = -0.8 with the
+// two triangle windows (vertical inner edge, flat top, sloping outer edge), walls quilted grey-beige,
+// side panels, a floor of grey grating, the round overhead hatch window. Returns { group, wins }.
+const LM_W = 1.15, LM_F = -0.8, LM_B = 0.75, LM_H = 2.3;
+function lmRoom(panelCol) {
+  const g = new THREE.Group();
+  const quilt = canvasTex(512, 512, (c, w, h) => { c.fillStyle = '#a8a49a'; c.fillRect(0, 0, w, h); const r = rng(5);
+    for (let y = 0; y < h; y += 64) for (let x = 0; x < w; x += 64) { const v = 150 + r() * 22 | 0; c.fillStyle = `rgb(${v},${v - 4},${v - 12})`; c.fillRect(x + 2, y + 2, 60, 60); c.strokeStyle = 'rgba(60,58,50,0.5)'; c.strokeRect(x + 2, y + 2, 60, 60); c.fillStyle = 'rgba(70,66,60,0.6)'; c.beginPath(); c.arc(x + 32, y + 32, 2, 0, 7); c.fill(); }
+    for (let i = 0; i < 6; i++) { c.strokeStyle = 'rgba(40,40,40,0.7)'; c.lineWidth = 4; c.beginPath(); c.moveTo(0, 40 + i * 90); c.lineTo(w, 40 + i * 90 + r() * 10); c.stroke(); } });
+  quilt.wrapS = quilt.wrapT = THREE.RepeatWrapping;
+  const wallM = new THREE.MeshStandardMaterial({ map: quilt, roughness: 0.85, side: THREE.DoubleSide });
+  const frameM = new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.6, metalness: 0.4 });
+  // the front wall with its two triangle holes
+  const tri = (sx) => [[sx * 0.08, 1.8], [sx * 0.66, 1.8], [sx * 0.08, 1.12]];
+  const sh = new THREE.Shape(); sh.moveTo(-LM_W, 0); sh.lineTo(LM_W, 0); sh.lineTo(LM_W, LM_H); sh.lineTo(-LM_W, LM_H); sh.closePath();
+  const wins = [];
+  for (const sx of [-1, 1]) {
+    const t = tri(sx), hole = new THREE.Path(); hole.moveTo(...t[0]); hole.lineTo(...t[1]); hole.lineTo(...t[2]); hole.closePath(); sh.holes.push(hole);
+    // a dark frame round the hole, and faint glass
+    const fs = new THREE.Shape(); fs.moveTo(t[0][0] + sx * -0.04, t[0][1] + 0.04); fs.lineTo(t[1][0] + sx * 0.07, t[1][1] + 0.04); fs.lineTo(t[2][0] - sx * 0.04, t[2][1] - 0.08); fs.closePath();
+    const fh = new THREE.Path(); fh.moveTo(...t[0]); fh.lineTo(...t[1]); fh.lineTo(...t[2]); fh.closePath(); fs.holes.push(fh);
+    const fr = new THREE.Mesh(new THREE.ExtrudeGeometry(fs, { depth: 0.05, bevelEnabled: false }), frameM); fr.position.z = LM_F + 0.005; g.add(fr);
+    const gs = new THREE.Shape(); gs.moveTo(...t[0]); gs.lineTo(...t[1]); gs.lineTo(...t[2]); gs.closePath();
+    const gl = new THREE.Mesh(new THREE.ShapeGeometry(gs), new THREE.MeshBasicMaterial({ color: 0x88aacc, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide })); gl.position.z = LM_F - 0.02; g.add(gl);
+    const c = new THREE.Vector3((t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3, LM_F);
+    wins.push({ name: sx < 0 ? 'left' : 'right', local: c.sub(new THREE.Vector3(0, EYE, 0)), round: false });
+  }
+  const front = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: false }), wallM); front.position.z = LM_F - 0.04; g.add(front);
+  { const uv = front.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 1.4, uv.getY(i) * 1.4); }
+  // side walls, back wall, ceiling (with the round overhead window), floor grating
+  const k = new Kit();
+  const side = new THREE.BoxGeometry(0.04, LM_H, LM_B - LM_F);
+  for (const sx of [-1, 1]) { const m = new THREE.Mesh(side, wallM); m.position.set(sx * LM_W, LM_H / 2, (LM_F + LM_B) / 2); g.add(m); }
+  const back = new THREE.Mesh(new THREE.BoxGeometry(LM_W * 2, LM_H, 0.04), wallM); back.position.set(0, LM_H / 2, LM_B); g.add(back);
+  const ceil = new THREE.Mesh(new THREE.BoxGeometry(LM_W * 2, 0.04, LM_B - LM_F), wallM); ceil.position.set(0, LM_H, (LM_F + LM_B) / 2); g.add(ceil);
+  const grate = canvasTex(256, 256, (c, w, h) => { c.fillStyle = '#4a4a48'; c.fillRect(0, 0, w, h); c.fillStyle = '#2a2a2a'; for (let y = 4; y < h; y += 16) for (let x = 4; x < w; x += 16) c.fillRect(x, y, 10, 10); });
+  grate.wrapS = grate.wrapT = THREE.RepeatWrapping; grate.repeat.set(4, 3);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(LM_W * 2, LM_B - LM_F), new THREE.MeshStandardMaterial({ map: grate, roughness: 0.8, metalness: 0.4 })); floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0.005, (LM_F + LM_B) / 2); g.add(floor);
+  // the overhead window ring, the hatch below the panel, handholds and the crew's restraint cords
+  k.cyl(0.2, 0.2, 0.05, 24, 0x2a2a2c, [0, LM_H - 0.02, -0.3]); k.cyl(0.16, 0.16, 0.06, 24, 0x0a0e18, [0, LM_H - 0.02, -0.3]);
+  k.box(0.8, 0.8, 0.04, 0x8a8880, [0, 0.42, LM_F + 0.03]); k.cyl(0.36, 0.36, 0.05, 24, 0x6a6a66, [0, 0.42, LM_F + 0.05], [Math.PI / 2, 0, 0]);
+  for (const sx of [-1, 1]) {
+    k.box(0.04, 0.04, 0.5, 0x2a2a2c, [sx * 0.42, 1.05, -0.5]);                 // armrests the crew lean on
+    k.cyl(0.008, 0.008, 1.3, 5, 0x2a2a2a, [sx * 0.66, 0.65, -0.05], [0.25, 0, sx * 0.25]);   // restraint cords
+    k.box(0.06, 0.3, 0.04, 0x3a3a3c, [sx * (LM_W - 0.05), 1.45, -0.55]);
+  }
+  g.add(k.mesh(FLAT));
+  // panels on the side walls, and a strip of breakers overhead on the right
+  for (const sx of [-1, 1]) {
+    const SP = panelMesh(0.75, 0.62, { seed: 70 + sx, base: panelCol, dense: 0.8, gauges: 3 }); SP.group.position.set(sx * (LM_W - 0.03), 1.25, -0.4); SP.group.rotation.y = -sx * Math.PI / 2; g.add(SP.group);
+  }
+  const BP = panelMesh(0.6, 0.25, { seed: 77, base: panelCol, dense: 0.8, gauges: 0 }); BP.group.position.set(0.8, 1.95, -0.65); BP.group.rotation.set(0.3, -0.5, 0); g.add(BP.group);
+  return { group: g, wins };
 }
 
 // A small glowing text/lamp that sits on a panel (timer digits, the master alarm): set(text, col, on)
