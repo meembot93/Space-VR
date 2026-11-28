@@ -12,6 +12,7 @@
 // tablet shelves, with a long reading desk in front of them. The writing table is east of the middle.
 // The full Moon hangs in the south-west, over the river.
 import * as THREE from 'three';
+import { texSolid, surface } from '../surfaces.js';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
 import { dress } from '../dress.js';
@@ -199,7 +200,7 @@ export default class Babylon {
     for (const sx of [-1, 1]) k.box(0.8, 1, 46, 0x8e7656, [sx * 3.9, lerp(BASE, TIERS[1][2], 0.5) + 0.5, (z0 + z1) / 2], [Math.atan2(TIERS[1][2] - BASE, 45), 0, 0]);
     // a short stair from the second tier up to the terrace (south side)
     for (let i = 0; i < 10; i++) k.box(3.6, 0.6 * (i + 1), 0.6, 0xa48a66, [0, -6 + 0.3 * (i + 1), ZIG_Z + 11 + 5.7 - i * 0.6]);
-    this.root.add(k.mesh());
+    this.root.add(texSolid(k.mesh(), 'brick', { scale: 1.6, ground: BASE, grime: 0.25, strength: 1.2 }));
     void r;
   }
 
@@ -217,6 +218,7 @@ export default class Babylon {
     });
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(14, 15);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 22).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: tex }));
+    surface('brick', '#a08a6c', { base: floor.material, rep: 12, bump: 0.9 });   // real baked bricks (photo) instead of the painted ones
     floor.position.set(0, 0.012, ZIG_Z); this.root.add(floor);   // (1.2 cm over the terrace's own top, so the two never flicker)
     // Parapet around the edge with stepped battlements, a gap where the little stair comes up
     const PAR = 0xa68b67;
@@ -246,7 +248,7 @@ export default class Babylon {
     // A low brazier on the east side, and tablets drying in a row on the east parapet's ledge
     const P = PROPS.fresh();
     if (!P.add('brazier', 8.4, 0.01, ZIG_Z + 6, 0, { w: 0.9, h: 0.45 })) k.cyl(0.35, 0.25, 0.5, 10, 0x4a3a2a, [8.4, 0.25, ZIG_Z + 6]);
-    this.root.add(k.mesh(), P.build({ glow: NIGHT }));
+    this.root.add(texSolid(k.mesh(), 'brick', { scale: 1.3, grime: 0, strength: 1.2 }), P.build({ glow: NIGHT }));
     G.world.blockers.push({ x: 8.4, z: ZIG_Z + 6, r: 0.5 });
     // Can't walk into the shrine (a row of round blockers along its front, behind the shelves)
     for (let x = -9.4; x <= 9.4; x += 0.5) G.world.blockers.push({ x, z: SZ1 - 0.1, r: 0.6 });
@@ -276,6 +278,17 @@ export default class Babylon {
         k.box(w, h, d, col, [x, BASE + h / 2, z], [0, yaw, 0]);
         if (r() < 0.6) k.box(w * 0.35, 1.8, d * 0.35, col, [x + (r() - 0.5) * w * 0.4, BASE + h + 0.9, z + (r() - 0.5) * d * 0.4], [0, yaw, 0]); // a roof room
         k.box(1.1, 1.9, 0.2, 0x2a2018, [x, BASE + 0.95, z + d / 2 + 0.05], [0, yaw, 0]); // door
+        if (Math.hypot(x, z - ZIG_Z) < 260) {
+          // near enough to see from the top: a low parapet round the flat roof, a lighter plastered
+          // roof, small high windows, and a reed awning or a stack of jars on some roofs
+          const cy = Math.cos(yaw), sy = Math.sin(yaw), P = (u, v) => [x + u * cy + v * sy, z - u * sy + v * cy];
+          const lip = 0.5, t = 0.3, top = BASE + h + lip / 2, darker = col - 0x0a0a0a;
+          for (const [u, v, a, b] of [[0, -d / 2 + t / 2, w, t], [0, d / 2 - t / 2, w, t], [-w / 2 + t / 2, 0, t, d - 2 * t], [w / 2 - t / 2, 0, t, d - 2 * t]]) { const [px, pz] = P(u, v); k.box(a, lip, b, darker, [px, top, pz], [0, yaw, 0]); }
+          { const [px, pz] = P(0, 0); k.box(w - 2 * t, 0.06, d - 2 * t, col + 0x0c0b08, [px, BASE + h + 0.03, pz], [0, yaw, 0]); }
+          for (const u of [-w * 0.3, w * 0.3]) { const [px, pz] = P(u, d / 2 + 0.03); k.box(0.45, 0.35, 0.08, 0x1e1812, [px, BASE + h - 0.9, pz], [0, yaw, 0]); }
+          if (r() < 0.3) { const [px, pz] = P(w * 0.25, -d * 0.2); k.box(2.6, 0.08, 2.0, 0x8a7448, [px, BASE + h + 1.6, pz], [0.05, yaw, 0]); for (const [a, b] of [[-1.2, -0.9], [1.2, -0.9], [-1.2, 0.9], [1.2, 0.9]]) { const [qx, qz] = P(w * 0.25 + a, -d * 0.2 + b); k.box(0.1, 1.6, 0.1, 0x4a3a28, [qx, BASE + h + 0.8, qz], [0, yaw, 0]); } }
+          else if (r() < 0.3) { const [px, pz] = P(-w * 0.3, d * 0.25); k.cyl(0.25, 0.35, 0.7, 6, 0x9a6a48, [px, BASE + h + 0.35, pz]); k.cyl(0.22, 0.3, 0.6, 6, 0x8a5e40, [px + 0.6, BASE + h + 0.3, pz + 0.2]); }
+        }
       }
       if (r() < 0.33) lights.push(x + (r() - 0.5) * 2, BASE + 1.3, z + d / 2 + 0.4);   // a lamp in the doorway
       if (r() < 0.12) lights.push(x, BASE + h + 0.6, z);                               // a fire on the roof
@@ -321,7 +334,7 @@ export default class Babylon {
     }
     // Torches along the Processional Way, the broad street east of the courtyard
     for (let z = -420; z <= 420; z += 14) for (const sx of [-1, 1]) torches.push(112 + sx * 6.5, BASE + 2.2, z);
-    this.root.add(k.mesh());
+    this.root.add(texSolid(k.mesh(), 'mudbrick', { scale: 2.4, ground: BASE }));
     this.root.add(PROPS.build());
 
     // Ground: paved courtyard, dusty streets, green fields by the river, desert beyond the walls

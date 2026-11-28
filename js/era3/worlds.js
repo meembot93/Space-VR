@@ -10,6 +10,7 @@ import { rng, noise2 } from '../shapes.js';
 import { canvasTex, clamp } from '../util.js';
 import { FLAT } from '../kit.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { texGround } from '../surfaces.js';
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const _a = new THREE.Vector3();
@@ -166,7 +167,7 @@ export function moonGround({ size = 600, seg = 220, seed = 11, craters = [], fla
 
 // ---------- Open ground ----------
 // size m across, seg steps; h(x, z) height; color(x, z, c) sets the colour. Denser near the middle.
-export function groundPlane({ size = 3000, seg = 140, h = () => 0, color = (x, z, c) => c.setHex(0x7a7a5a), dense = 1.6, cx = 0, cz = 0, mat = FLAT }) {
+export function groundPlane({ size = 3000, seg = 140, h = () => 0, color = (x, z, c) => c.setHex(0x7a7a5a), dense = 1.6, cx = 0, cz = 0, mat = FLAT, tex = null }) {
   const g = new THREE.PlaneGeometry(size, size, seg, seg); g.rotateX(-Math.PI / 2);
   const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color();
   for (let i = 0; i < p.count; i++) {
@@ -175,7 +176,7 @@ export function groundPlane({ size = 3000, seg = 140, h = () => 0, color = (x, z
     color(x, z, c); cols.set([c.r, c.g, c.b], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals();
-  return new THREE.Mesh(g, mat);
+  return texGround(new THREE.Mesh(g, mat), tex || {});
 }
 
 // ---------- The sea ----------

@@ -9,6 +9,7 @@
 // north-east, toward the midsummer sunrise (compass bearing about 50°). The Heel Stone stands
 // outside on that line, and the Avenue runs away from the entrance between two banks.
 import * as THREE from 'three';
+import { texGround } from '../surfaces.js';
 import { Kit, FLAT } from '../kit.js';
 import { makePerson, animatePerson, runRoutine, holdProp } from '../people.js';
 import { dress } from '../dress.js';
@@ -211,7 +212,7 @@ export default class Stonehenge {
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    const m = texGround(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })), { pale: 'sand' });
     this.root.add(m);
 
     // Grass clumps: thin leaning blades, thickest where you walk, plus a scatter of wild flowers
