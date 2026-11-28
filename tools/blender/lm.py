@@ -22,6 +22,8 @@ PAL = {
     'black':  ((0.05, 0.05, 0.055), 0.6, 0.1),
     'cabin':  ((0.60, 0.60, 0.58), 0.55, 0.4),    # ascent stage grey aluminium
     'cabin2': ((0.48, 0.48, 0.47), 0.6, 0.4),
+    'cabin3': ((0.70, 0.70, 0.67), 0.5, 0.5),
+    'kblack': ((0.07, 0.065, 0.06), 0.35, 0.6),   # black kapton blanket, a little shiny
     'dark':   ((0.15, 0.15, 0.16), 0.55, 0.5),
     'strut':  ((0.70, 0.68, 0.62), 0.35, 1.0),
     'glass':  ((0.02, 0.03, 0.05), 0.08, 0.0),
@@ -49,8 +51,59 @@ def rod(k, a, b, r, color, segs=8):
     k.tube(Matrix.Translation(a) @ rot, r, d.length, color, segs=segs, cap=False)
 
 
+import random
+RNG = random.Random(11)
+
+
+def pick(weights):
+    r = RNG.random() * sum(w for _, w in weights)
+    for c, w in weights:
+        r -= w
+        if r <= 0:
+            return c
+    return weights[-1][0]
+
+
+def crinkle(k, p0, pu, pv, nu, nv, jit, weights):
+    """A foil blanket over the flat quad p0 + u*pu + v*pv: a grid whose inner points are pushed in
+    and out at random (the crinkle), each cell coloured from weights [(name, weight)]."""
+    p0, pu, pv = Vector(p0), Vector(pu), Vector(pv)
+    n = pu.cross(pv).normalized()
+    grid = []
+    for j in range(nv + 1):
+        row = []
+        for i in range(nu + 1):
+            q = p0 + pu * (i / nu) + pv * (j / nv)
+            if 0 < i < nu and 0 < j < nv:
+                q = q + n * (RNG.random() * jit) + pu.normalized() * (RNG.random() - 0.5) * jit * 0.6
+            row.append(k.bm.verts.new(q))
+        grid.append(row)
+    for j in range(nv):
+        for i in range(nu):
+            f = k.bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            f[k.col] = k.ci(pick(weights))
+
+
+def pbox(k, c, size, weights, cell=0.35, seam=None):
+    """A box whose every face is a grid of separately coloured panels (bolted aluminium sheets)."""
+    c = Vector(c); sx, sy, sz = (v / 2 for v in size)
+    faces = [((-sx, -sy, -sz), (2 * sx, 0, 0), (0, 0, 2 * sz)),      # front (-y)
+             ((sx, sy, -sz), (-2 * sx, 0, 0), (0, 0, 2 * sz)),       # back
+             ((sx, -sy, -sz), (0, 2 * sy, 0), (0, 0, 2 * sz)),       # right
+             ((-sx, sy, -sz), (0, -2 * sy, 0), (0, 0, 2 * sz)),      # left
+             ((-sx, -sy, sz), (2 * sx, 0, 0), (0, 2 * sy, 0))]       # top
+    for o, u, v in faces:
+        u, v = Vector(u), Vector(v)
+        crinkle(k, c + Vector(o), u, v, max(1, round(u.length / cell)), max(1, round(v.length / cell)), 0.0, weights)
+
+
+FOIL = [('gold', 5), ('gold2', 3), ('amber', 2), ('mylar', 0.6)]
+PANEL = [('cabin', 5), ('cabin3', 3), ('cabin2', 2)]
+BLANKET = [('kblack', 5), ('black', 2), ('dark', 1)]
+
+
 def save(k, name):
-    tris = k.export(os.path.join(OUT, name + '.glb'))
+    tris = k.export(os.path.join(OUT, name + '.glb'), smooth_angle=20)
     print(f'MODEL {name}: {tris} triangles')
 
 
@@ -66,22 +119,12 @@ def foil(i, b):
     return ('gold', 'gold2', 'gold', 'gold2', 'amber')[(i * 7 + b * 3) % 5]
 
 
-# sides: each face split into a grid of foil patches so the crinkled blanket shows
-NB = 5
+# sides: crinkled foil blankets (gold kapton, with darker and silver patches), the corner bays
+# black lower down where the engine's heat reached them
 for f in range(8):
-    p0, p1 = Vector((*oct_pts[f], 0)), Vector((*oct_pts[(f + 1) % 8], 0))
-    nh = 4 if f % 2 == 0 else 2
-    for u in range(nh):
-        for v in range(NB):
-            q0 = p0.lerp(p1, u / nh); q1 = p0.lerp(p1, (u + 1) / nh)
-            z0 = BOT + (TOP - BOT) * v / NB; z1 = BOT + (TOP - BOT) * (v + 1) / NB
-            # each patch bulges out a touch at its middle, like a foil blanket
-            mid = (q0 + q1) / 2
-            out = Vector((mid.x, mid.y, 0)).normalized() * 0.035
-            vs = [k.bm.verts.new((q0.x, q0.y, z0)), k.bm.verts.new((q1.x, q1.y, z0)),
-                  k.bm.verts.new((q1.x + out.x, q1.y + out.y, z1)), k.bm.verts.new((q0.x + out.x, q0.y + out.y, z1))]
-            fc = k.bm.faces.new(vs)
-            fc[k.col] = k.ci(foil(f * 4 + u, v))
+    p0, p1 = Vector((*oct_pts[f], BOT)), Vector((*oct_pts[(f + 1) % 8], BOT))
+    long = f % 2 == 0
+    crinkle(k, p0, p1 - p0, Vector((0, 0, TOP - BOT)), 12 if long else 6, 9, 0.045, FOIL)
 # top deck and underside
 for z, rev, col in ((TOP, False, 'mylar'), (BOT, True, 'black')):
     vs = [k.bm.verts.new((x, y, z)) for x, y in oct_pts]
@@ -150,11 +193,12 @@ k = new()
 CZ = 1.55          # cabin axis height
 CR = 1.18          # cabin radius
 # Crew compartment: a drum lying across (axis along x), faceted front.
-k.lathe([(0, -0.95), (CR, -0.95), (CR, 0.95), (0, 0.95)], 20, 'cabin',
+k.lathe([(0, -0.95), (CR, -0.95), (CR, -0.6), (CR, -0.2), (CR, 0.2), (CR, 0.6), (CR, 0.95), (0, 0.95)], 28, 'cabin',
         m=Matrix.Translation((0, 0.1, CZ)) @ Matrix.Rotation(math.pi / 2, 4, 'Y'),
-        colors=lambda i, b: 'cabin2' if b != 1 else ('cabin' if i % 2 == 0 else 'cabin2'))
+        colors=lambda i, b: pick(PANEL))
 # lower cabin block (midsection) down to the deck
-k.box((0, 0.2, 0.55), (2.3, 2.1, 1.1), 'cabin2', bevel=0.04)
+pbox(k, (0, 0.2, 0.55), (2.3, 2.1, 1.1), BLANKET, cell=0.3)
+crinkle(k, (-1.16, -0.86, 0.0), (2.32, 0, 0), (0, 0, 1.1), 10, 5, 0.04, BLANKET)
 # faceted front face: a flat plate with the two triangular windows, tilted back a little
 FY = -1.24
 k.prism([(-1.0, 0.85), (1.0, 0.85), (1.15, 2.05), (0.5, 2.5), (-0.5, 2.5), (-1.15, 2.05)], 0.25, 'cabin',
@@ -175,7 +219,7 @@ for s in (-1, 1):
             'cabin2', m=Matrix.Translation((s * 1.35, 0.45, 0.75)) @ Matrix.Rotation(math.pi / 2, 4, 'X'),
             colors=lambda i, b: 'black' if b < 2 else 'cabin2')
 # aft equipment bay: a box behind the cabin with black radiator panels
-k.box((0, 1.65, 1.6), (2.6, 1.0, 1.5), 'cabin2', bevel=0.04)
+pbox(k, (0, 1.65, 1.6), (2.6, 1.0, 1.5), PANEL, cell=0.32)
 k.box((0, 2.17, 1.6), (2.4, 0.04, 1.3), 'black')
 k.box((0, 1.4, 2.45), (1.6, 0.6, 0.2), 'cabin')
 for s in (-1, 1):
