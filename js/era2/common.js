@@ -6,6 +6,27 @@ import * as THREE from 'three';
 import { Kit } from '../kit.js';
 import { canvasTex, damp } from '../util.js';
 import { rng } from '../shapes.js';
+import { loadGLB } from '../models.js';
+
+// ---------- Town houses built in Blender (tools/blender/houses.py) ----------
+// Plastered walls with a stone footing and corner stones, tiled roofs in real courses with eaves and a
+// ridge cap, baked soft shadows: house() uses them (stretched to each house, tinted to its colours)
+// and falls back to plain shapes without them (?noset). They ride in the Kit (kit.mesh()).
+const HOUSE = new Map(), EAVE = 0.238, PLASTER = 0xd8d2c6, TILE = 0xbab2a6;
+if (!new URLSearchParams(location.search).has('noset')) {
+  const gl = await loadGLB('sets/houses.glb').catch(() => null);
+  if (gl) { gl.scene.updateMatrixWorld(true); gl.scene.traverse((o) => { if (o.isMesh) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); for (const a of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(a)) g.deleteAttribute(a); HOUSE.set(o.name, { g, map: o.material.map }); } }); }
+}
+const _hm = new THREE.Matrix4(), _hq = new THREE.Quaternion(), _hy = new THREE.Vector3(0, 1, 0);
+const tintFor = (col, own) => { const a = new THREE.Color(col), b = new THREE.Color(own); return new THREE.Color(Math.min(2, a.r / b.r), Math.min(2, a.g / b.g), Math.min(2, a.b / b.b)).getHex(); };
+function housePiece(k, name, p, yaw, sx, sy, sz, tint) {
+  const P = HOUSE.get(name); const g = P.g.clone();
+  g.applyMatrix4(_hm.compose(new THREE.Vector3(...p), _hq.setFromAxisAngle(_hy, yaw), new THREE.Vector3(sx, sy, sz)));
+  const c = new THREE.Color(tint), n = g.attributes.position.count, col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  k.addTextured(P.map, g);
+}
 
 export const D2R = Math.PI / 180;
 export const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
@@ -88,6 +109,13 @@ export function house(k, o, win = []) {
   // o.props + o.model: Meem's house model (js/props.js) in this footprint instead of the shapes below.
   // (No code window panes on it: they didn't line up with the model's own windows.)
   if (o.props?.add(o.model, x, y, z, yaw, { w, d, h: h + roof * 0.9 })) return win;
+  if (HOUSE.size && !o.stepped) {
+    const wt = tintFor(wall, PLASTER), rt = tintFor(roofCol, TILE), ry = gableFront ? yaw + Math.PI / 2 : yaw;
+    const [L, Dd] = gableFront ? [d, w] : [w, d];
+    housePiece(k, 'walls', P(0, 0, 0), yaw, w / 10, h / 4, d / 8, wt);
+    housePiece(k, 'gables', P(0, h, 0), ry, L / 10, roof / 3.4, Dd / 8, wt);
+    housePiece(k, 'roof', P(0, h - EAVE * roof / 3.4, 0), ry, L / 10, roof / 3.4, Dd / 8, rt);
+  } else {
   k.box(w, h, d, wall, P(0, h / 2, 0), [0, yaw, 0]);
   k.box(w + 0.1, 0.35, d + 0.1, 0x6a6058, P(0, 0.17, 0), [0, yaw, 0]);          // stone footing
   if (gableFront) {
@@ -98,6 +126,7 @@ export function house(k, o, win = []) {
   } else {
     k.add(gableRoof(w, d, roof, 0.25), roofCol, P(0, h, 0), [0, yaw, 0]);
     for (const sx of [-1, 1]) { const gw = gableWall(d, roof, 0.2); k.add(gw, wall, P(sx * (w / 2 - 0.1), h, 0), [0, yaw + Math.PI / 2, 0]); }
+  }
   }
   // half-timbering: dark beams on the street face
   const fz = d / 2 + 0.03;
