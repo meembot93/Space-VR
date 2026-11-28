@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { Kit, FLAT, SMOOTH, segs } from '../kit.js';
 import { canvasTex } from '../util.js';
 import { rng, noise2 } from '../shapes.js';
+import { surface } from '../surfaces.js';
 
 // ---------- Painted surfaces ----------
 // Each returns a repeating CanvasTexture; rep: [u, v] metres per repeat
@@ -36,8 +37,14 @@ export function surf(kind, col = null) {
   });
 }
 // a material with a painted surface repeating every `rep` metres (world-sized UVs from boxUV)
+// Real photo detail (js/surfaces.js) for the plain kinds; patterned ones (wallpaper, tiles, acoustic,
+// panelling) keep their painted pattern and get the photo's bumps only.
+const REAL = { boards: 'boards', parquet: 'parquet', lino: 'checker', concrete: 'concrete', brick: 'brick', plaster: 'plaster', deck: 'boards', grass: null };
+const BUMPS = { wallpaper: 'plaster', tiles: 'marble', panelwood: 'boards', acoustic: 'plaster' };
 export function surfMat(kind, col, { rough = 0.9, metal = 0, tint = 0xffffff, emissive = 0 } = {}) {
+  if (REAL[kind] && !emissive) { const m = surface(REAL[kind], col, { rough, metal, tint, rep: kind === 'lino' ? 0.5 : 1 }); if (m) return m; }
   const m = new THREE.MeshStandardMaterial({ map: surf(kind, col), roughness: rough, metalness: metal, color: tint });
+  if (BUMPS[kind]) surface(BUMPS[kind], null, { keepMap: true, base: m, bump: 0.6 });
   if (emissive) { m.emissive = new THREE.Color(0xffffff); m.emissiveMap = m.map; m.emissiveIntensity = emissive; }
   return m;
 }
